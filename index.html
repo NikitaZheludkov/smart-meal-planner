@@ -34,6 +34,7 @@
     .segmented-control { background: #f1f5f9; padding: 4px; border-radius: 14px; display: flex; }
     .segmented-item { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 700; color: #94a3b8; border-radius: 10px; transition: all 0.2s; }
     .segmented-item.active { background: white; color: #0f172a; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    
     .macro-input-group { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 20px; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 85px; }
     .macro-input-group input { background: transparent; width: 100%; text-align: center; font-weight: 800; font-size: 18px; outline: none; color: #0f172a; }
     .macro-input-group label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-top: 4px; }
@@ -75,6 +76,14 @@
             </div>
 
             <div v-else-if="currentTab === 'products' || currentTab === 'dishes'" class="px-5 pb-5 space-y-3">
+                 <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                     <button v-for="cat in (currentTab==='dishes' ? dishCategories : prodCategories)" :key="cat" 
+                         @click="selectedCategory = cat"
+                         class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors"
+                         :class="selectedCategory === cat ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-500'">
+                         {{ cat }}
+                     </button>
+                 </div>
                  <div class="relative">
                     <input v-model="genericSearch" type="text" placeholder="Поиск..." class="w-full pl-4 pr-4 h-12 bg-slate-100 rounded-2xl border-none outline-none text-sm font-bold text-slate-800">
                 </div>
@@ -141,48 +150,48 @@
                     <div v-for="prod in filteredProducts" :key="prod.id" class="bg-white p-4 pl-5 rounded-3xl shadow-card border border-slate-100 flex justify-between items-center group">
                         <span class="font-bold text-slate-700 text-sm">{{ prod.name }}</span>
                         <div class="flex items-center gap-3">
+                            <span class="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{{ prod.category || '---' }}</span>
                             <span class="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg uppercase tracking-wider min-w-[30px] text-center">{{ prod.unit }}</span>
                             <button @click="openEditProduct(prod)" class="text-slate-300 hover:text-slate-600 p-2"><span class="material-icons-round text-lg">edit</span></button>
                         </div>
                     </div>
                 </div>
 
-                <div v-else-if="currentTab === 'list'" class="absolute inset-0 overflow-y-auto p-4 pb-28 no-scrollbar space-y-3">
-                    <button @click="uncheckAll" class="w-full bg-white border border-rose-100 text-rose-500 px-4 py-3 rounded-2xl text-xs font-bold shadow-card tap-effect mb-2">Очистить список</button>
-                    <div v-for="item in calculatedShoppingList" :key="item.id" @click="toggleProductCheck(item)" class="bg-white p-4 rounded-3xl border border-slate-100 shadow-card flex items-center gap-4 tap-effect transition-all" :class="item.checked ? 'opacity-50 grayscale' : ''">
-                        <div class="w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors" :class="item.checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200'"><span v-if="item.checked" class="material-icons-round text-white text-xs">check</span></div>
-                        <div class="flex-1 font-bold text-sm text-slate-800" :class="item.checked ? 'line-through' : ''">{{ item.name }}</div>
-                        <div class="text-xs font-extrabold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
+                <div v-else-if="currentTab === 'list'" class="absolute inset-0 overflow-y-auto p-4 pb-28 no-scrollbar space-y-6">
+                    <div>
+                        <div class="flex justify-between items-center mb-3 px-1">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Продукты</h3>
+                            <button @click="uncheckAll" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg">Сброс</button>
+                        </div>
+                        <div class="space-y-3">
+                            <div v-for="item in calculatedShoppingList" :key="item.id" @click="toggleProductCheck(item)" class="bg-white p-4 rounded-3xl border border-slate-100 shadow-card flex items-center gap-4 tap-effect transition-all" :class="item.checked ? 'opacity-50 grayscale' : ''">
+                                <div class="w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors" :class="item.checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200'"><span v-if="item.checked" class="material-icons-round text-white text-xs">check</span></div>
+                                <div class="flex-1 font-bold text-sm text-slate-800" :class="item.checked ? 'line-through' : ''">{{ item.name }}</div>
+                                <div class="text-xs font-extrabold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-6">
+                        <div class="flex justify-between items-center mb-3 px-1">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Базовое</h3>
+                            <button @click="addStaple" class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg">+ Добавить</button>
+                        </div>
+                        <div class="space-y-2">
+                            <div v-for="item in staples" :key="item.id" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+                                <div @click="toggleStaple(item)" class="w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors cursor-pointer" :class="item.is_checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200'"><span v-if="item.is_checked" class="material-icons-round text-white text-[10px]">check</span></div>
+                                <div class="flex-1 font-bold text-sm text-slate-700" :class="item.is_checked ? 'line-through text-slate-400' : ''">{{ item.name }}</div>
+                                <button @click="deleteStaple(item.id)" class="text-slate-300 p-1"><span class="material-icons-round text-sm">close</span></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
                 <div v-else-if="currentTab === 'settings'" class="absolute inset-0 overflow-y-auto p-4 pb-28">
                     <div class="bg-white rounded-3xl shadow-card p-6 space-y-6">
-                        <div>
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Дней в периоде</label>
-                            <input v-model.number="settings.planning_days" class="text-3xl font-extrabold text-slate-900 w-full outline-none" type="number">
-                        </div>
-                        
-                        <div class="border-t border-slate-100 pt-6">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Начало недели</label>
-                            <div class="flex gap-1 overflow-x-auto no-scrollbar">
-                                <button v-for="(day, idx) in ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']" :key="day" 
-                                    @click="settings.start_week = idx"
-                                    class="w-10 h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center shrink-0"
-                                    :class="settings.start_week === idx ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'">
-                                    {{ day }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-slate-100 pt-6">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Порций по умолчанию</label>
-                            <div class="flex items-center gap-4">
-                                <button @click="decrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">-</button>
-                                <span class="text-xl font-extrabold text-slate-900 w-6 text-center">{{ settings.default_portions }}</span>
-                                <button @click="incrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">+</button>
-                            </div>
-                        </div>
+                        <div><label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Дней в периоде</label><input v-model.number="settings.planning_days" class="text-3xl font-extrabold text-slate-900 w-full outline-none" type="number"></div>
+                        <div class="border-t border-slate-100 pt-6"><label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Начало недели</label><div class="flex gap-1 overflow-x-auto no-scrollbar"><button v-for="(day, idx) in ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']" :key="day" @click="settings.start_week = idx" class="w-10 h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center shrink-0" :class="settings.start_week === idx ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'">{{ day }}</button></div></div>
+                        <div class="border-t border-slate-100 pt-6"><label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Порций по умолчанию</label><div class="flex items-center gap-4"><button @click="decrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">-</button><span class="text-xl font-extrabold text-slate-900 w-6 text-center">{{ settings.default_portions }}</span><button @click="incrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">+</button></div></div>
                     </div>
                     <button @click="saveSettings" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl mt-4 tap-effect">Сохранить</button>
                     <button @click="handleLogout" class="w-full text-rose-500 py-4 font-bold text-sm mt-2">Выйти</button>
@@ -191,8 +200,9 @@
         </main>
 
         <nav class="bg-white/95 backdrop-blur-xl border-t border-slate-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 pb-5 pt-2 rounded-t-3xl shadow-[0_-5px_30px_rgba(0,0,0,0.03)]">
-            <div class="grid grid-cols-5 h-14 items-center">
-                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-300'" class="flex flex-col items-center justify-center tap-effect group"><span class="material-icons-round text-2xl mb-0.5 transition-colors group-hover:text-slate-500">{{ tab.icon }}</span><span class="text-[9px] font-bold">{{ tab.label }}</span></button>
+            <div class="absolute top-2 bottom-5 bg-slate-100 rounded-2xl -z-10 transition-all duration-300 ease-out" :style="pillStyle"></div>
+            <div class="grid grid-cols-5 h-14 items-center relative">
+                <button v-for="(tab, idx) in tabs" :key="tab.id" @click="currentTab = tab.id" ref="tabRefs" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-300'" class="flex flex-col items-center justify-center tap-effect group"><span class="material-icons-round text-2xl mb-0.5 transition-colors group-hover:text-slate-500">{{ tab.icon }}</span><span class="text-[9px] font-bold">{{ tab.label }}</span></button>
             </div>
         </nav>
 
@@ -206,6 +216,14 @@
                  </div>
                  <div class="flex-1 overflow-y-auto p-6 space-y-6">
                      <input v-model="newDish.name" type="text" placeholder="Название блюда" class="w-full text-2xl font-extrabold text-slate-900 border-b border-slate-100 pb-2 outline-none placeholder-slate-300 bg-transparent">
+                     
+                     <div>
+                         <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Категория</label>
+                         <div class="flex gap-2 overflow-x-auto no-scrollbar">
+                             <button v-for="cat in dishCategories.filter(c=>c!=='Все')" :key="cat" @click="newDish.category = cat" :class="newDish.category === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap">{{ cat }}</button>
+                         </div>
+                     </div>
+
                      <div class="grid grid-cols-4 gap-3">
                          <div class="macro-input-group"><input v-model.number="newDish.k" type="number" placeholder="0"><label>Ккал</label></div>
                          <div class="macro-input-group"><input v-model.number="newDish.p" type="number" placeholder="0"><label>Белки</label></div>
@@ -239,9 +257,7 @@
              <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl h-[85vh] flex flex-col relative overflow-hidden">
                  <div class="px-6 pt-6 pb-2 flex justify-between items-start shrink-0"><span class="text-[10px] font-bold uppercase px-2 py-1 rounded-lg bg-orange-50 text-orange-500">{{ selectedDish.category || 'Общее' }}</span><button @click="showDetailModal=false" class="bg-slate-50 text-slate-400 rounded-full p-2"><span class="material-icons-round">close</span></button></div>
                  <div class="px-6 pb-6 shrink-0"><h2 class="text-3xl font-extrabold text-slate-900 leading-tight mb-6">{{ selectedDish.name }}</h2><div class="grid grid-cols-4 gap-2"><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.k }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Ккал</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.p || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Белки</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.f || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Жиры</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.c || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Угл</span></div></div></div>
-                 <div class="flex-1 bg-white overflow-y-auto px-6 pb-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Ингредиенты</h3>
-                 <button @click="openEditDish" class="text-indigo-500 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-xl">Изменить</button></div>
-                 <div v-if="ingredientsMap[selectedDish.id]" class="space-y-3"><div v-for="ing in ingredientsMap[selectedDish.id]" :key="ing.id" class="flex justify-between items-center py-2 border-b border-slate-50 last:border-0"><span class="font-bold text-slate-700">{{ ing.name }}</span><span class="font-bold text-slate-400 text-sm bg-slate-50 px-2 py-1 rounded-lg">{{ ing.amount }} {{ ing.unit }}</span></div></div><div v-else class="text-center py-10 text-slate-300 font-medium">Нет ингредиентов</div></div>
+                 <div class="flex-1 bg-white overflow-y-auto px-6 pb-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Ингредиенты</h3><button @click="openEditDish" class="text-indigo-500 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-xl">Изменить</button></div><div v-if="ingredientsMap[selectedDish.id]" class="space-y-3"><div v-for="ing in ingredientsMap[selectedDish.id]" :key="ing.id" class="flex justify-between items-center py-2 border-b border-slate-50 last:border-0"><span class="font-bold text-slate-700">{{ ing.name }}</span><span class="font-bold text-slate-400 text-sm bg-slate-50 px-2 py-1 rounded-lg">{{ ing.amount }} {{ ing.unit }}</span></div></div><div v-else class="text-center py-10 text-slate-300 font-medium">Нет ингредиентов</div></div>
              </div>
         </div>
         </transition>
@@ -249,8 +265,20 @@
         <transition name="slide-up">
         <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showProdModal = false">
              <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl relative mb-safe">
-                 <h3 class="text-xl font-extrabold text-slate-900 mb-6">Продукт</h3>
-                 <div class="space-y-4"><input v-model="newProd.name" type="text" placeholder="Название" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800"><div class="flex bg-slate-100 p-1 rounded-xl"><button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500'" class="flex-1 py-3 rounded-lg text-sm font-bold transition-all">{{ u }}</button></div></div>
+                 <h3 class="text-xl font-extrabold text-slate-900 mb-6">{{ newProd.id ? 'Ред. продукта' : 'Новый продукт' }}</h3>
+                 <div class="space-y-4">
+                     <input v-model="newProd.name" type="text" placeholder="Название" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800">
+                     <div>
+                         <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Категория</label>
+                         <div class="flex gap-2 overflow-x-auto no-scrollbar">
+                             <button v-for="cat in prodCategories.filter(c=>c!=='Все')" :key="cat" @click="newProd.category = cat" :class="newProd.category === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap">{{ cat }}</button>
+                         </div>
+                     </div>
+                     <div>
+                         <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Единица измерения</label>
+                         <div class="flex bg-slate-100 p-1 rounded-xl"><button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500'" class="flex-1 py-3 rounded-lg text-sm font-bold transition-all">{{ u }}</button></div>
+                     </div>
+                 </div>
                  <button @click="saveProduct" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl mt-4">Сохранить</button>
              </div>
         </div>
@@ -280,7 +308,7 @@
     const SUPABASE_KEY = 'sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P'; 
 
     try {
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         createApp({
@@ -289,6 +317,7 @@
             const authEmail = ref(''); const authPass = ref(''); const loading = ref(false);
             
             const products = ref([]); const dishes = ref([]); const ingredientsMap = ref({}); const planMap = ref({});
+            const staples = ref([]); // New Staples Data
             const settings = ref({ planning_days: 7, start_week: 0, default_portions: 1 });
             
             const currentTab = ref('calendar');
@@ -297,10 +326,14 @@
             const genericSearch = ref('');
             const selectedCategory = ref('Все');
             
-            // MODALS
+            // Categories
+            const dishCategories = ['Все', 'Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
+            const prodCategories = ['Все', 'Овощи', 'Фрукты', 'Мясо', 'Молочное', 'Бакалея', 'Специи', 'Другое'];
+
+            // Modals
             const showSelectorModal = ref(false); const selectorContext = ref({ date: null, slot: '' }); const selectorSearch = ref('');
-            const showProdModal = ref(false); const newProd = ref({ name: '', unit: 'кг' });
-            const showDishModal = ref(false); const newDish = ref({ name: '', k: 0, p: 0, f: 0, c: 0 }); const newDishIngredients = ref([]); const ingSearch = ref('');
+            const showProdModal = ref(false); const newProd = ref({ name: '', unit: 'кг', category: 'Другое' });
+            const showDishModal = ref(false); const newDish = ref({ name: '', category: 'Обед', k: 0, p: 0, f: 0, c: 0 }); const newDishIngredients = ref([]); const ingSearch = ref('');
             const showDetailModal = ref(false); const selectedDish = ref(null);
 
             const tabs = [
@@ -312,26 +345,27 @@
             ];
             const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
 
-            // --- METHODS ---
+            // Sliding Pill Logic
+            const pillStyle = computed(() => {
+                const index = tabs.findIndex(t => t.id === currentTab.value);
+                return {
+                    width: '18%', 
+                    left: `calc(${index * 20}% + 1%)` 
+                };
+            });
+
             const incrementSettingsPortions = () => { settings.value.default_portions = (settings.value.default_portions||1) + 1; };
             const decrementSettingsPortions = () => { settings.value.default_portions = Math.max(1, (settings.value.default_portions||1) - 1); };
 
-            // --- AUTH ---
             const handleLogin = async () => {
                 if(!authEmail.value || !authPass.value) return alert('Введите данные');
                 loading.value = true;
                 let { data, error } = await sb.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
-                if (error) {
-                    const { data: up, error: upError } = await sb.auth.signUp({ email: authEmail.value, password: authPass.value });
-                    if (upError) { alert(upError.message); loading.value = false; return; }
-                    data = up;
-                }
-                user.value = data.user; loading.value = false;
-                if(user.value) loadData();
+                if (error) { const { data: up, error: upErr } = await sb.auth.signUp({ email: authEmail.value, password: authPass.value }); if (upErr) { alert(upErr.message); loading.value = false; return; } data = up; }
+                user.value = data.user; loading.value = false; if(user.value) loadData();
             };
             const handleLogout = async () => { await sb.auth.signOut(); user.value = null; };
 
-            // --- DATA ---
             const loadData = async () => {
                 loading.value = true;
                 try {
@@ -340,36 +374,35 @@
                     
                     const { data: p } = await sb.from('products').select('*'); if(p) products.value = p;
                     const { data: d } = await sb.from('dishes').select('*'); if(d) dishes.value = d;
+                    const { data: st } = await sb.from('staples').select('*').order('name'); if(st) staples.value = st;
+                    
                     const { data: i } = await sb.from('ingredients').select('*');
                     if(i) {
                         const map = {}; i.forEach(row => { if(!map[row.dish_id]) map[row.dish_id]=[]; const pr = products.value.find(x=>x.id===row.product_id); if(pr) map[row.dish_id].push({...row, name: pr.name, unit: pr.unit}); });
                         ingredientsMap.value = map;
                     }
                     const { data: pl } = await sb.from('plan').select('*, dishes(*)');
-                    if(pl) {
-                        planMap.value = {}; pl.forEach(r => { if(r.dishes) planMap.value[r.date+'|'+r.slot] = { dish: r.dishes, id: r.id, portions: r.portions }; });
-                    }
+                    if(pl) { planMap.value = {}; pl.forEach(r => { if(r.dishes) planMap.value[r.date+'|'+r.slot] = { dish: r.dishes, id: r.id, portions: r.portions }; }); }
                 } catch(e) { console.error(e); }
                 loading.value = false;
             };
 
-            // --- ACTIONS ---
             const nextDate = () => { const d = new Date(currentDateObj.value); d.setDate(d.getDate() + 1); currentDateObj.value = d; };
             const prevDate = () => { const d = new Date(currentDateObj.value); d.setDate(d.getDate() - 1); currentDateObj.value = d; };
             
             const handleFabClick = () => { 
-                if(currentTab.value === 'products') { newProd.value = { name: '', unit: 'кг' }; showProdModal.value = true; }
-                if(currentTab.value === 'dishes') { newDish.value = { name: '', k: 0, p:0, f:0, c:0 }; newDishIngredients.value = []; showDishModal.value = true; }
+                if(currentTab.value === 'products') { newProd.value = { name: '', unit: 'кг', category: 'Овощи' }; showProdModal.value = true; }
+                if(currentTab.value === 'dishes') { newDish.value = { name: '', k: 0, p:0, f:0, c:0, category: 'Обед' }; newDishIngredients.value = []; showDishModal.value = true; }
             };
             
             const openEditProduct = (prod) => { newProd.value = {...prod}; showProdModal.value = true; };
             
             const saveProduct = async () => {
                 if(newProd.value.id) {
-                    await sb.from('products').update({ name: newProd.value.name, unit: newProd.value.unit }).eq('id', newProd.value.id);
+                    await sb.from('products').update({ name: newProd.value.name, unit: newProd.value.unit, category: newProd.value.category }).eq('id', newProd.value.id);
                     const idx = products.value.findIndex(p=>p.id===newProd.value.id); products.value[idx] = {...newProd.value};
                 } else {
-                    const { data } = await sb.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, user_id: user.value.id }).select();
+                    const { data } = await sb.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, category: newProd.value.category, user_id: user.value.id }).select();
                     if(data) products.value.push(data[0]);
                 }
                 showProdModal.value = false;
@@ -380,50 +413,52 @@
 
             const saveDish = async () => {
                 let dishId = newDish.value.id;
-                // Update or Create Dish
                 if (dishId) {
                     await sb.from('dishes').update({ 
-                        name: newDish.value.name, k: newDish.value.k, p: newDish.value.p, f: newDish.value.f, c: newDish.value.c 
+                        name: newDish.value.name, category: newDish.value.category, k: newDish.value.k, p: newDish.value.p, f: newDish.value.f, c: newDish.value.c 
                     }).eq('id', dishId);
-                    // Update Local
                     const dIdx = dishes.value.findIndex(d => d.id === dishId);
                     if(dIdx !== -1) dishes.value[dIdx] = { ...dishes.value[dIdx], ...newDish.value };
                 } else {
                     const { data } = await sb.from('dishes').insert({ 
-                        name: newDish.value.name, k: newDish.value.k || 0, p: newDish.value.p || 0, f: newDish.value.f || 0, c: newDish.value.c || 0, user_id: user.value.id 
+                        name: newDish.value.name, category: newDish.value.category, k: newDish.value.k || 0, p: newDish.value.p || 0, f: newDish.value.f || 0, c: newDish.value.c || 0, user_id: user.value.id 
                     }).select();
-                    if(data) {
-                        dishId = data[0].id;
-                        dishes.value.push(data[0]);
-                    }
+                    if(data) { dishId = data[0].id; dishes.value.push(data[0]); }
                 }
-
-                // Handle Ingredients (Delete all and re-insert for simplicity)
                 if(dishId) {
                     await sb.from('ingredients').delete().eq('dish_id', dishId);
                     if(newDishIngredients.value.length > 0) {
-                        const ingRows = newDishIngredients.value.map(ing => ({
-                            dish_id: dishId, product_id: ing.product_id, amount: ing.amount, user_id: user.value.id
-                        }));
+                        const ingRows = newDishIngredients.value.map(ing => ({ dish_id: dishId, product_id: ing.product_id, amount: ing.amount, user_id: user.value.id }));
                         await sb.from('ingredients').insert(ingRows);
                         ingredientsMap.value[dishId] = newDishIngredients.value; 
-                    } else {
-                        delete ingredientsMap.value[dishId];
-                    }
+                    } else { delete ingredientsMap.value[dishId]; }
                 }
                 showDishModal.value = false;
             };
 
             const openDishDetails = (dish) => { selectedDish.value = dish; showDetailModal.value = true; };
-            
-            // NEW: Open Edit Mode
             const openEditDish = () => {
                 newDish.value = { ...selectedDish.value };
-                // Clone ingredients to avoid mutation references
                 const ings = ingredientsMap.value[selectedDish.value.id] || [];
                 newDishIngredients.value = JSON.parse(JSON.stringify(ings));
-                showDetailModal.value = false;
-                showDishModal.value = true;
+                showDetailModal.value = false; showDishModal.value = true;
+            };
+
+            // Staples Logic
+            const addStaple = async () => {
+                const name = prompt("Название (напр. Губки)");
+                if(!name) return;
+                const { data } = await sb.from('staples').insert({ name, user_id: user.value.id }).select();
+                if(data) staples.value.push(data[0]);
+            };
+            const toggleStaple = async (item) => {
+                item.is_checked = !item.is_checked;
+                await sb.from('staples').update({ is_checked: item.is_checked }).eq('id', item.id);
+            };
+            const deleteStaple = async (id) => {
+                if(!confirm('Удалить?')) return;
+                staples.value = staples.value.filter(s => s.id !== id);
+                await sb.from('staples').delete().eq('id', id);
             };
 
             const toggleProductCheck = async (item) => {
@@ -438,10 +473,7 @@
             };
             const saveSettings = async () => { await sb.from('settings').upsert({ user_id: user.value.id, ...settings.value }); alert('Сохранено'); };
             
-            const openDishSelector = (date, slot) => { 
-                const d = new Date(date); selectorContext.value = { date: d, slot }; 
-                selectorSearch.value = ''; showSelectorModal.value = true; 
-            };
+            const openDishSelector = (date, slot) => { const d = new Date(date); selectorContext.value = { date: d, slot }; selectorSearch.value = ''; showSelectorModal.value = true; };
             const clearSlot = () => selectDishForPlan(null);
             
             const selectDishForPlan = async (dish) => {
@@ -449,9 +481,7 @@
                 const dateStr = date.toISOString().split('T')[0];
                 const key = dateStr + '|' + slot;
                 const existing = planMap.value[key];
-                
                 if(existing) { await sb.from('plan').delete().eq('id', existing.id); delete planMap.value[key]; }
-                
                 if(dish) {
                     const { data } = await sb.from('plan').insert({ user_id: user.value.id, date: dateStr, slot, dish_id: dish.id, portions: 1 }).select('*, dishes(*)');
                     if(data && data[0]) planMap.value[key] = { dish: data[0].dishes, id: data[0].id, portions: 1 };
@@ -459,7 +489,6 @@
                 showSelectorModal.value = false;
             };
 
-            // --- COMPUTED ---
             const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
             const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
             const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
@@ -470,8 +499,17 @@
                 return days;
             });
 
-            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
-            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
+            // Filtered Lists
+            const filteredProducts = computed(() => {
+                let res = products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase()));
+                if(selectedCategory.value !== 'Все') res = res.filter(p => p.category === selectedCategory.value);
+                return res;
+            });
+            const filteredDishes = computed(() => {
+                let res = dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase()));
+                if(selectedCategory.value !== 'Все') res = res.filter(d => d.category === selectedCategory.value);
+                return res;
+            });
             const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
             const filteredIngSuggestions = computed(() => ingSearch.value ? products.value.filter(p => p.name.toLowerCase().includes(ingSearch.value.toLowerCase())) : []);
 
@@ -509,10 +547,7 @@
                     const dish = getPlannedDish(currentDateStr.value, slot);
                     const portions = getPlannedPortions(currentDateStr.value, slot);
                     if(dish) {
-                        k += (dish.k * portions);
-                        p += (dish.p || 0) * portions;
-                        f += (dish.f || 0) * portions;
-                        c += (dish.c || 0) * portions;
+                        k += (dish.k * portions); p += (dish.p || 0) * portions; f += (dish.f || 0) * portions; c += (dish.c || 0) * portions;
                     }
                 });
                 return { k: Math.round(k), p: Math.round(p), f: Math.round(f), c: Math.round(c) };
@@ -523,15 +558,17 @@
             return {
                 user, authEmail, authPass, loading, handleLogin, handleLogout,
                 currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
-                products, dishes, settings, genericSearch, selectorSearch,
+                products, dishes, settings, genericSearch, selectorSearch, selectedCategory,
                 currentDateStr, currentDateDisplay, currentDateObj,
                 getPlannedDish, getPlannedPortions, getSlotColor, formatDate,
-                calculatedShoppingList, showSelectorModal, showProdModal, newProd, showDetailModal, selectedDish,
+                calculatedShoppingList, staples, showSelectorModal, showProdModal, newProd, showDetailModal, selectedDish,
                 showDishModal, newDish, newDishIngredients, ingSearch, filteredIngSuggestions,
+                dishCategories, prodCategories, pillStyle,
                 nextDate, prevDate, openDishSelector, clearSlot, selectDishForPlan, toggleProductCheck, uncheckAll, saveSettings, 
                 handleFabClick, openEditProduct, saveProduct, openDishDetails, saveDish, addIngToDish, removeIng,
+                addStaple, toggleStaple, deleteStaple,
                 filteredProducts, filteredDishes, filteredSelectorDishes, ingredientsMap, dailyMacros,
-                openEditDish, incrementSettingsPortions, decrementSettingsPortions, selectedCategory
+                openEditDish, incrementSettingsPortions, decrementSettingsPortions
             };
           }
         }).mount('#app');
