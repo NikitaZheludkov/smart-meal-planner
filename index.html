@@ -14,21 +14,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; color: #1e293b; overflow: hidden; }
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; overflow: hidden; }
     input, textarea, select { font-size: 16px !important; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     .pt-safe { padding-top: env(safe-area-inset-top); }
-    .gpu-layer { transform: translateZ(0); will-change: transform, opacity; }
-    
-    /* Анимации */
-    .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-    .fade-enter-from, .fade-leave-to { opacity: 0; }
-    
     .tap-effect { transition: transform 0.1s; }
     .tap-effect:active { transform: scale(0.96); opacity: 0.9; }
-    
     .glass-header { background: rgba(255, 255, 255, 0.98); border-bottom: 1px solid rgba(0,0,0,0.03); z-index: 40; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.06); }
+    
+    /* Transitions */
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
   </style>
 </head>
 <body class="bg-slate-50">
@@ -37,26 +36,23 @@
     <div v-if="!user" class="absolute inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center p-6">
         <h1 class="text-2xl font-extrabold text-slate-900 mb-2">Smart Meal Planner</h1>
         <p class="text-slate-400 text-sm mb-8 text-center">Ваш личный план питания теперь в облаке.</p>
-        
         <div class="w-full space-y-3">
-            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
-            <input v-model="authPass" type="password" placeholder="Пароль (мин. 6 символов)" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
+            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800">
+            <input v-model="authPass" type="password" placeholder="Пароль" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800">
             <button @click="handleLogin" :disabled="loading" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl transition-all disabled:opacity-50">
                 {{ loading ? 'Загрузка...' : 'Войти / Регистрация' }}
             </button>
         </div>
-        <p class="mt-4 text-xs text-slate-400 text-center">Если аккаунта нет, он будет создан автоматически.</p>
     </div>
 
     <template v-else>
         <header class="glass-header pt-safe flex-shrink-0 relative mb-1">
             <div class="px-5 py-3 flex justify-between items-center">
                 <div>
-                    <h1 class="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">{{ pageTitle }}</h1>
-                    <div class="text-[10px] font-medium text-slate-400 leading-none mt-0.5">Cloud Edition • {{ user.email }}</div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-slate-900">{{ pageTitle }}</h1>
+                    <div class="text-[10px] font-medium text-slate-400 leading-none mt-0.5">{{ user.email }}</div>
                 </div>
-                <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-2 border-slate-200 border-t-slate-800"></div>
-                <button v-else @click="handleLogout" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg tap-effect">Выйти</button>
+                <button @click="handleLogout" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg tap-effect">Выйти</button>
             </div>
             
             <div v-if="currentTab === 'calendar'" class="px-4 pb-5 space-y-3">
@@ -67,23 +63,17 @@
                 </div>
                 <div class="flex items-center justify-between bg-white rounded-xl border border-slate-100 p-1 shadow-sm h-12">
                      <button @click="handleNav(-1)" class="w-10 h-full flex items-center justify-center text-slate-400 tap-effect"><span class="material-icons-round">chevron_left</span></button>
-                     <div class="text-center flex-1">
-                        <div class="text-sm font-bold text-slate-800">{{ planViewMode === 'day' ? currentDateDisplay : shoppingRangeDisplay }}</div>
-                     </div>
+                     <div class="text-center flex-1"><div class="text-sm font-bold text-slate-800">{{ planViewMode === 'day' ? currentDateDisplay : shoppingRangeDisplay }}</div></div>
                      <button @click="handleNav(1)" class="w-10 h-full flex items-center justify-center text-slate-400 tap-effect"><span class="material-icons-round">chevron_right</span></button>
                 </div>
             </div>
-
-            <div v-else-if="currentTab === 'products'" class="px-4 pb-5">
-                <input v-model="prodSearch" type="text" placeholder="Поиск продуктов..." class="w-full pl-4 pr-4 h-9 bg-slate-100 rounded-xl border-none outline-none text-xs font-bold text-slate-800 placeholder-slate-400">
-            </div>
-             <div v-else-if="currentTab === 'dishes'" class="px-4 pb-5">
-                <input v-model="dishSearch" type="text" placeholder="Поиск рецептов..." class="w-full pl-4 pr-4 h-9 bg-slate-100 rounded-xl border-none outline-none text-xs font-bold text-slate-800 placeholder-slate-400">
+            <div v-else-if="currentTab === 'products' || currentTab === 'dishes'" class="px-4 pb-5">
+                <input v-model="genericSearch" type="text" :placeholder="currentTab==='products'?'Поиск продуктов...':'Поиск рецептов...'" class="w-full pl-4 pr-4 h-9 bg-slate-100 rounded-xl border-none outline-none text-xs font-bold text-slate-800 placeholder-slate-400">
             </div>
         </header>
 
         <main class="flex-1 relative overflow-hidden bg-slate-50">
-             <transition name="fade">
+             <transition name="fade" mode="out-in">
                 
                 <div v-if="currentTab === 'calendar'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar">
                     <div v-if="planViewMode === 'day'" class="space-y-3">
@@ -125,11 +115,37 @@
                     </div>
                 </div>
 
+                <div v-else-if="currentTab === 'list'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar space-y-3">
+                    <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-4">
+                        <h3 class="text-xs font-bold uppercase text-indigo-400 tracking-wider mb-1">Период покупок</h3>
+                        <div class="text-sm font-bold text-indigo-900">{{ shoppingRangeDisplay }}</div>
+                    </div>
+
+                    <div v-if="calculatedShoppingList.length === 0" class="text-center py-10 opacity-50">
+                        <span class="material-icons-round text-4xl mb-2 text-slate-300">shopping_bag</span>
+                        <p class="text-sm font-bold">Список пуст</p>
+                    </div>
+
+                    <div v-for="item in calculatedShoppingList" :key="item.id" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3.5">
+                        <div class="w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center shrink-0"></div>
+                        <div class="flex-1 text-sm font-bold text-slate-700">{{ item.name }}</div>
+                        <div class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">{{ item.amount }} {{ item.unit }}</div>
+                    </div>
+
+                    <div v-if="staples.length > 0" class="mt-6 border-t border-slate-100 pt-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 px-2">Базовое</h3>
+                        <div v-for="item in staples" :key="item.id" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 mb-2">
+                             <div class="w-6 h-6 rounded-full border-2 border-slate-200 shrink-0"></div>
+                             <div class="text-sm font-bold text-slate-700">{{ item.name }}</div>
+                        </div>
+                    </div>
+                </div>
+
              </transition>
         </main>
 
         <nav class="bg-white/95 backdrop-blur-xl border-t border-slate-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 pb-5 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
-            <div class="grid grid-cols-5 h-16 items-center">
+            <div class="grid grid-cols-4 h-16 items-center">
                 <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400'" class="flex flex-col items-center justify-center tap-effect"><span class="material-icons-round text-2xl">{{ tab.icon }}</span><span class="text-[9px] font-bold mt-0.5">{{ tab.label }}</span></button>
             </div>
         </nav>
@@ -139,32 +155,76 @@
                  <h3 class="font-bold text-lg text-slate-800 text-center">{{ formatDate(selectorContext.date) }} - {{ selectorContext.slot }}</h3>
                  <input v-model="selectorSearch" placeholder="Найти блюдо..." class="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none border border-slate-100">
                  <div class="max-h-60 overflow-y-auto space-y-2">
-                     <div @click="selectDishForPlan(null)" class="p-3 bg-rose-50 text-rose-500 font-bold rounded-xl text-sm text-center tap-effect border border-rose-100">Очистить слот</div>
-                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="p-3 bg-white border border-slate-100 rounded-xl font-bold text-sm text-slate-700 tap-effect shadow-sm">{{ dish.name }}</div>
+                     <div @click="selectDishForPlan(null)" class="p-3 bg-rose-50 text-rose-500 font-bold rounded-xl text-sm text-center tap-effect">Очистить слот</div>
+                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="p-3 bg-white border border-slate-100 rounded-xl font-bold text-sm text-slate-700 tap-effect">{{ dish.name }}</div>
                  </div>
              </div>
         </div>
 
+        <transition name="slide-up">
+        <div v-if="showDishModal" class="fixed inset-0 bg-white z-50 flex flex-col">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-white safe-top">
+                <button @click="showDishModal = false" class="text-slate-400 font-bold text-sm">Отмена</button>
+                <h3 class="font-bold text-lg text-slate-800">Новое Блюдо</h3>
+                <button @click="saveDish" :disabled="!newDish.name" class="text-slate-900 font-bold text-sm disabled:opacity-30">Готово</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <input v-model="newDish.name" type="text" placeholder="Название блюда" class="w-full text-2xl font-bold border-b border-slate-100 pb-2 outline-none placeholder-slate-300">
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center"><label class="text-[9px] text-slate-400 uppercase font-bold block">Ккал</label><input v-model="newDish.k" type="number" class="w-full bg-transparent text-center font-bold outline-none" placeholder="0"></div>
+                    </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ингредиенты</h4>
+                    <div class="space-y-2 mb-4">
+                        <div v-for="(ing, idx) in newDishIngredients" :key="idx" class="flex items-center gap-3 bg-white border border-slate-100 p-2 pl-3 rounded-2xl shadow-sm">
+                            <div class="flex-1 text-sm font-bold text-slate-700">{{ ing.name }}</div>
+                            <input v-model.number="ing.amount" type="number" placeholder="0" class="w-16 p-1 text-center bg-slate-50 rounded-lg text-sm font-bold outline-none">
+                            <span class="text-xs text-slate-400 font-bold w-6">{{ ing.unit }}</span>
+                            <button @click="newDishIngredients.splice(idx, 1)" class="text-slate-300"><span class="material-icons-round">close</span></button>
+                        </div>
+                    </div>
+                    
+                    <div class="relative">
+                        <input v-model="ingSearch" type="text" placeholder="+ Добавить продукт" class="w-full p-4 rounded-2xl bg-slate-50 font-bold text-sm outline-none focus:ring-2 focus:ring-slate-900">
+                        <div v-if="ingSearch && filteredIngSuggestions.length" class="absolute bottom-full mb-2 w-full bg-white shadow-xl rounded-2xl border border-slate-100 max-h-48 overflow-y-auto z-20">
+                            <div v-for="prod in filteredIngSuggestions" :key="prod.id" @click="addIngToDish(prod)" class="p-4 border-b border-slate-50 text-sm font-bold text-slate-700 active:bg-slate-50 flex justify-between">
+                                <span>{{ prod.name }}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 rounded">{{ prod.unit }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+        <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center p-4" @click.self="showProdModal = false">
+             <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl mb-4">
+                 <h3 class="text-xl font-bold mb-4">Новый продукт</h3>
+                 <input v-model="newProd.name" placeholder="Название" class="w-full p-4 rounded-2xl bg-slate-50 font-bold mb-4 outline-none">
+                 <div class="grid grid-cols-4 gap-2 mb-6">
+                     <button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'" class="py-2 rounded-xl font-bold text-sm">{{ u }}</button>
+                 </div>
+                 <button @click="createProduct" class="w-full py-3 bg-slate-900 text-white rounded-2xl font-bold">Сохранить</button>
+             </div>
+        </div>
+
         <div class="z-40 pointer-events-none fixed inset-0 max-w-md mx-auto">
-            <button v-if="currentTab === 'dishes'" @click="createDishDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
-            <button v-if="currentTab === 'products'" @click="createProductDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'dishes'" @click="openDishModal" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'products'" @click="showProdModal=true" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
         </div>
     </template>
   </div>
 
   <script>
     // --- ПЕРЕХВАТ ОШИБОК ---
-    window.onerror = function(msg, url, line) {
-        alert("ОШИБКА КОДА:\n" + msg + "\nСтрока: " + line);
-    };
+    window.onerror = function(msg, url, line) { alert("ОШИБКА:\n" + msg + "\nСтрока: " + line); };
 
-    // --- КЛЮЧИ SUPABASE (ВСТАВЛЕНЫ) ---
+    // --- КОНФИГУРАЦИЯ ---
     const SUPABASE_URL = 'https://wwvrgffgtqqxupqvnpzc.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P'; 
     
-    // --- ПРОВЕРКА БИБЛИОТЕК ---
-    if (typeof Vue === 'undefined') alert("Vue.js не загрузился. Проверьте интернет.");
-    if (typeof window.supabase === 'undefined') alert("Supabase JS не загрузился.");
+    if (typeof Vue === 'undefined' || typeof window.supabase === 'undefined') alert("Ошибка загрузки библиотек. Проверьте VPN.");
 
     try {
         const { createApp, ref, computed, onMounted, watch } = Vue;
@@ -172,131 +232,179 @@
 
         createApp({
           setup() {
-            // Состояние пользователя
             const user = ref(null);
-            const authEmail = ref('');
-            const authPass = ref('');
-            const loading = ref(false);
-
+            const authEmail = ref(''); const authPass = ref(''); const loading = ref(false);
+            
             // Данные
             const products = ref([]);
             const dishes = ref([]);
+            const ingredientsMap = ref({}); // { dishId: [ {prodId, amount, name, unit}... ] }
             const planMap = ref({});
+            const staples = ref([]);
             
-            // Интерфейс
+            // UI
             const currentTab = ref('calendar');
             const planViewMode = ref('week');
             const currentDateObj = ref(new Date());
-            const showSelectorModal = ref(false);
-            const selectorContext = ref({ date: null, slot: '' });
+            const genericSearch = ref('');
             
-            // Поиск
-            const prodSearch = ref('');
-            const dishSearch = ref('');
-            const selectorSearch = ref('');
+            // Modals
+            const showSelectorModal = ref(false); const selectorContext = ref({ date: null, slot: '' }); const selectorSearch = ref('');
+            const showDishModal = ref(false); const newDish = ref({ name: '', k: null }); const newDishIngredients = ref([]); const ingSearch = ref('');
+            const showProdModal = ref(false); const newProd = ref({ name: '', unit: 'кг' });
 
             const tabs = [
                 { id: 'calendar', label: 'План', icon: 'calendar_today' },
                 { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu' },
                 { id: 'products', label: 'Продукты', icon: 'kitchen' },
-                { id: 'settings', label: 'Настройки', icon: 'tune' }
+                { id: 'list', label: 'Купить', icon: 'shopping_bag' }
             ];
             const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
 
-            // --- АВТОРИЗАЦИЯ ---
+            // --- AUTH ---
             const handleLogin = async () => {
-                if(!authEmail.value || !authPass.value) return alert('Введите Email и Пароль');
+                if(!authEmail.value || !authPass.value) return alert('Введите данные');
                 loading.value = true;
-                // Вход
                 let { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
                 if (error) {
-                    // Регистрация, если не найден
                     const { data: upData, error: upError } = await supabase.auth.signUp({ email: authEmail.value, password: authPass.value });
-                    if (upError) { alert("Ошибка: " + upError.message); loading.value = false; return; }
-                    data = upData; 
+                    if (upError) { alert(upError.message); loading.value = false; return; }
+                    data = upData;
                 }
-                user.value = data.user;
-                loading.value = false;
+                user.value = data.user; loading.value = false;
                 if(user.value) loadInitialData();
             };
+            const handleLogout = async () => { await supabase.auth.signOut(); user.value = null; };
 
-            const handleLogout = async () => {
-                await supabase.auth.signOut();
-                user.value = null;
-                products.value = []; dishes.value = []; planMap.value = {};
-            };
-
-            // --- ЗАГРУЗКА ДАННЫХ ---
+            // --- LOAD DATA ---
             const loadInitialData = async () => {
                 loading.value = true;
                 try {
-                    // Продукты
+                    // 1. Products
                     const { data: prods } = await supabase.from('products').select('*');
                     if(prods) products.value = prods;
-
-                    // Блюда
+                    // 2. Dishes
                     const { data: d } = await supabase.from('dishes').select('*');
                     if(d) dishes.value = d;
-
-                    // План (вместе с блюдами)
+                    // 3. Ingredients
+                    const { data: ing } = await supabase.from('ingredients').select('*');
+                    if(ing) {
+                        // Группируем ингредиенты по dish_id для быстрого поиска
+                        const map = {};
+                        ing.forEach(row => {
+                            if(!map[row.dish_id]) map[row.dish_id] = [];
+                            // Находим имя продукта локально
+                            const p = products.value.find(x => x.id === row.product_id);
+                            if(p) map[row.dish_id].push({ ...row, name: p.name, unit: p.unit });
+                        });
+                        ingredientsMap.value = map;
+                    }
+                    // 4. Plan
                     const { data: p } = await supabase.from('plan').select('*, dishes(*)');
                     if(p) {
+                        planMap.value = {};
                         p.forEach(row => {
                              const key = row.date + '|' + row.slot;
                              if(row.dishes) planMap.value[key] = { dish: row.dishes, id: row.id };
                         });
                     }
-                } catch(e) { console.error(e); alert("Ошибка загрузки данных: " + e.message); }
+                    // 5. Staples
+                    const { data: s } = await supabase.from('staples').select('*');
+                    if(s) staples.value = s;
+
+                } catch(e) { console.error(e); }
                 loading.value = false;
             };
 
-            // --- ФУНКЦИИ СОЗДАНИЯ (ДЕМО) ---
-            const createProductDemo = async () => {
-                const name = prompt("Название продукта:");
-                if(!name) return;
-                const uid = user.value.id;
-                const { data, error } = await supabase.from('products').insert({ name, user_id: uid }).select();
-                if(error) alert("Ошибка: " + error.message);
+            // --- ACTIONS ---
+            const createProduct = async () => {
+                if(!newProd.value.name) return;
+                const { data } = await supabase.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, user_id: user.value.id }).select();
                 if(data) products.value.push(data[0]);
+                showProdModal.value = false; newProd.value = { name: '', unit: 'кг' };
             };
 
-            const createDishDemo = async () => {
-                const name = prompt("Название блюда:");
-                if(!name) return;
-                const uid = user.value.id;
-                const { data, error } = await supabase.from('dishes').insert({ name, user_id: uid, k: 100 }).select();
-                if(error) alert("Ошибка: " + error.message);
-                if(data) dishes.value.push(data[0]);
+            const openDishModal = () => { newDish.value = { name: '', k: null }; newDishIngredients.value = []; showDishModal.value = true; };
+            const addIngToDish = (prod) => { newDishIngredients.value.push({ product_id: prod.id, name: prod.name, unit: prod.unit, amount: 0 }); ingSearch.value = ''; };
+            
+            const saveDish = async () => {
+                // 1. Создаем Блюдо
+                const { data: dData, error } = await supabase.from('dishes').insert({ 
+                    name: newDish.value.name, k: newDish.value.k || 0, user_id: user.value.id 
+                }).select();
+                
+                if(error || !dData) return alert("Ошибка: " + error?.message);
+                const createdDish = dData[0];
+                dishes.value.push(createdDish);
+
+                // 2. Создаем Ингредиенты
+                if(newDishIngredients.value.length > 0) {
+                    const ingRows = newDishIngredients.value.map(ing => ({
+                        dish_id: createdDish.id,
+                        product_id: ing.product_id,
+                        amount: ing.amount,
+                        user_id: user.value.id
+                    }));
+                    await supabase.from('ingredients').insert(ingRows);
+                    // Обновляем локальную карту
+                    ingredientsMap.value[createdDish.id] = newDishIngredients.value; 
+                }
+                showDishModal.value = false;
             };
 
             const selectDishForPlan = async (dish) => {
                 const { date, slot } = selectorContext.value;
                 const dateStr = date.toISOString().split('T')[0];
-                const uid = user.value.id;
                 const key = dateStr + '|' + slot;
-
-                // 1. Удаляем старое, если было
+                
                 const existing = planMap.value[key];
                 if(existing) {
                     await supabase.from('plan').delete().eq('id', existing.id);
                     delete planMap.value[key];
                 }
 
-                // 2. Добавляем новое
                 if(dish) {
-                    const { data, error } = await supabase.from('plan').insert({
-                        user_id: uid, date: dateStr, slot: slot, dish_id: dish.id
+                    const { data } = await supabase.from('plan').insert({
+                        user_id: user.value.id, date: dateStr, slot: slot, dish_id: dish.id
                     }).select('*, dishes(*)');
-                    
-                    if(error) alert(error.message);
-                    if(data && data[0]) {
-                        planMap.value[key] = { dish: data[0].dishes, id: data[0].id };
-                    }
+                    if(data && data[0]) planMap.value[key] = { dish: data[0].dishes, id: data[0].id };
                 }
                 showSelectorModal.value = false;
             };
 
-            // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+            // --- CALCULATOR LOGIC ---
+            const calculatedShoppingList = computed(() => {
+                const totals = {};
+                // Период: +6 дней от текущей даты
+                const start = new Date(currentDateObj.value); start.setHours(0,0,0,0);
+                const end = new Date(start); end.setDate(end.getDate() + 6);
+                const startStr = start.toISOString().split('T')[0];
+                const endStr = end.toISOString().split('T')[0];
+
+                // Проходим по плану
+                for (const key in planMap.value) {
+                    const [pDate, ] = key.split('|');
+                    if (pDate >= startStr && pDate <= endStr) {
+                        const item = planMap.value[key];
+                        const dishId = item.dish.id;
+                        const portions = 1; // Пока хардкод 1, потом добавим в настройки
+                        
+                        // Берем ингредиенты блюда
+                        const ings = ingredientsMap.value[dishId] || [];
+                        ings.forEach(ing => {
+                            if (!totals[ing.product_id]) {
+                                totals[ing.product_id] = { 
+                                    id: ing.product_id, name: ing.name, unit: ing.unit, amount: 0 
+                                };
+                            }
+                            totals[ing.product_id].amount += (ing.amount * portions);
+                        });
+                    }
+                }
+                return Object.values(totals).sort((a,b) => a.name.localeCompare(b.name));
+            });
+
+            // --- HELPERS ---
             const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
             const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
             const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
@@ -304,20 +412,19 @@
                  const end = new Date(currentDateObj.value); end.setDate(end.getDate() + 6);
                  return `${currentDateObj.value.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})} - ${end.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})}`;
             });
-            
             const planningDays = computed(() => {
-                const days = [];
-                const start = new Date(currentDateObj.value);
-                for(let i=0; i<7; i++) {
-                    const d = new Date(start); d.setDate(d.getDate() + i);
-                    days.push({ date: d, iso: d.toISOString().split('T')[0] });
-                }
+                const days = []; const start = new Date(currentDateObj.value);
+                for(let i=0; i<7; i++) { const d = new Date(start); d.setDate(d.getDate() + i); days.push({ date: d, iso: d.toISOString().split('T')[0] }); }
                 return days;
             });
 
-            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(prodSearch.value.toLowerCase())));
-            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(dishSearch.value.toLowerCase())));
+            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
+            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
             const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
+            const filteredIngSuggestions = computed(() => {
+                if(!ingSearch.value) return [];
+                return products.value.filter(p => p.name.toLowerCase().includes(ingSearch.value.toLowerCase()));
+            });
 
             const getPlannedDish = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.dish;
             const getSlotColor = (slot) => ({ 'Завтрак': 'bg-orange-400', 'Обед': 'bg-teal-400', 'Гарнир': 'bg-amber-400', 'Салат': 'bg-lime-400', 'Перекус': 'bg-indigo-400' }[slot] || 'bg-slate-300');
@@ -326,10 +433,9 @@
             const getDayName = (d) => d.toLocaleDateString('ru-RU', { weekday: 'short' });
 
             const openDishSelector = (date, slot) => { selectorContext.value = { date, slot }; selectorSearch.value = ''; showSelectorModal.value = true; };
-            const openDishDetails = (dish) => { alert(dish.name + (dish.description ? "\n\n" + dish.description : "")); };
+            const openDishDetails = (dish) => { alert(dish.name); }; // Пока просто алерт
             const handleNav = (dir) => { const d = new Date(currentDateObj.value); d.setDate(d.getDate() + (planViewMode.value==='day'?1:7)*dir); currentDateObj.value = d; };
 
-            // Инициализация сессии
             onMounted(async () => {
                 const { data: { session } } = await supabase.auth.getSession();
                 if(session) { user.value = session.user; loadInitialData(); }
@@ -338,18 +444,17 @@
             return {
                 user, authEmail, authPass, loading, handleLogin, handleLogout,
                 currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
-                products, dishes, filteredProducts, filteredDishes, filteredSelectorDishes,
-                prodSearch, dishSearch, selectorSearch, showSelectorModal, selectorContext,
-                currentDateStr, currentDateDisplay, shoppingRangeDisplay,
-                getPlannedDish, getSlotColor, isToday, formatDate, getDayName,
-                createProductDemo, createDishDemo, openDishSelector, selectDishForPlan, openDishDetails, handleNav
+                products, dishes, staples, calculatedShoppingList, shoppingRangeDisplay,
+                filteredProducts, filteredDishes, filteredSelectorDishes, filteredIngSuggestions,
+                genericSearch, selectorSearch, ingSearch, 
+                showSelectorModal, selectorContext, showDishModal, newDish, newDishIngredients, showProdModal, newProd,
+                currentDateStr, currentDateDisplay, getPlannedDish, getSlotColor, isToday, formatDate, getDayName,
+                createProduct, openDishModal, addIngToDish, saveDish, openDishSelector, selectDishForPlan, openDishDetails, handleNav
             };
           }
         }).mount('#app');
     
-    } catch (e) {
-        alert("CRITICAL ERROR:\n" + e);
-    }
+    } catch (e) { alert("CRITICAL:\n" + e); }
   </script>
 </body>
 </html>
