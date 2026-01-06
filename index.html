@@ -10,139 +10,212 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          boxShadow: {
+            'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+            'up': '0 -4px 20px -2px rgba(0, 0, 0, 0.05)',
+          },
+          colors: {
+            slate: { 850: '#151e2e', 900: '#0f172a' } // Глубокий черный
+          }
+        }
+      }
+    }
+  </script>
 
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; overflow: hidden; }
-    input, textarea, select { font-size: 16px !important; }
+    body { background-color: #f8fafc; color: #0f172a; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+    input, textarea, select { font-size: 16px !important; } /* Fix iOS zoom */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     .pt-safe { padding-top: env(safe-area-inset-top); }
-    .tap-effect { transition: transform 0.1s; }
-    .tap-effect:active { transform: scale(0.96); opacity: 0.9; }
-    .glass-header { background: rgba(255, 255, 255, 0.98); border-bottom: 1px solid rgba(0,0,0,0.03); z-index: 40; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.06); }
-    .gpu-layer { transform: translateZ(0); will-change: transform, opacity; }
+    
+    /* UI PATTERNS */
+    .tap-effect { transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.1s; }
+    .tap-effect:active { transform: scale(0.96); opacity: 0.8; }
+    
+    .glass-header { 
+        background: rgba(255, 255, 255, 0.96); 
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(0,0,0,0.04); 
+        z-index: 40; 
+        border-bottom-left-radius: 32px; 
+        border-bottom-right-radius: 32px; 
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.03); 
+    }
+
+    .glass-nav {
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(16px);
+        border-top: 1px solid rgba(0,0,0,0.04);
+        border-top-left-radius: 32px;
+        border-top-right-radius: 32px;
+        box-shadow: 0 -10px 30px -10px rgba(0,0,0,0.03);
+    }
+    
+    .gpu { transform: translateZ(0); will-change: transform, opacity; }
 
     /* ANIMATIONS */
-    .slide-left-enter-active, .slide-left-leave-active, .slide-right-enter-active, .slide-right-leave-active { transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); position: absolute; width: 100%; }
-    .slide-left-enter-from { transform: translateX(30px); opacity: 0; }
-    .slide-left-leave-to { transform: translateX(-30px); opacity: 0; }
-    .slide-right-enter-from { transform: translateX(-30px); opacity: 0; }
-    .slide-right-leave-to { transform: translateX(30px); opacity: 0; }
-
-    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
     
-    .modal-enter-active, .modal-leave-active { transition: all 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
-    .modal-enter-from, .modal-leave-to { opacity: 0; transform: translateY(100%); }
-    
-    .list-move, .list-enter-active, .list-leave-active { transition: all 0.3s ease; }
-    .list-enter-from, .list-leave-to { opacity: 0; transform: translateY(10px); }
-    .list-leave-active { position: absolute; width: 100%; }
+    .slide-left-enter-active, .slide-left-leave-active, .slide-right-enter-active, .slide-right-leave-active { 
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+        position: absolute; width: 100%; 
+    }
+    .slide-left-enter-from { transform: translateX(20px); opacity: 0; }
+    .slide-left-leave-to { transform: translateX(-20px); opacity: 0; }
+    .slide-right-enter-from { transform: translateX(-20px); opacity: 0; }
+    .slide-right-leave-to { transform: translateX(20px); opacity: 0; }
+
+    .modal-enter-active, .modal-leave-active { transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+    .modal-enter-from, .modal-leave-to { transform: translateY(100%); }
+
+    .list-enter-active, .list-leave-active { transition: all 0.3s ease; }
+    .list-enter-from, .list-leave-to { opacity: 0; height: 0; transform: scale(0.95); margin-bottom: 0; }
   </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-900 font-sans">
   <div id="app" class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 shadow-2xl relative overflow-hidden">
     
-    <div v-if="!user" class="absolute inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center p-6 bg-white">
-        <h1 class="text-2xl font-extrabold text-slate-900 mb-2">Smart Meal Planner</h1>
-        <p class="text-slate-400 text-sm mb-8 text-center">Ваш личный план питания теперь в облаке.</p>
-        <div class="w-full space-y-3">
-            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
-            <input v-model="authPass" type="password" placeholder="Пароль" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
-            <button @click="handleLogin" :disabled="loading" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl disabled:opacity-50">
-                {{ loading ? 'Вход...' : 'Войти / Регистрация' }}
+    <div v-if="!user" class="absolute inset-0 z-[100] bg-white flex flex-col items-center justify-center p-8">
+        <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Smart Meal Planner</h1>
+        <p class="text-slate-400 font-bold text-sm mb-10 text-center">Кухонная логистика нового поколения</p>
+        <div class="w-full space-y-4">
+            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-5 rounded-3xl bg-slate-50 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-900 transition-all placeholder-slate-300">
+            <input v-model="authPass" type="password" placeholder="Пароль" class="w-full p-5 rounded-3xl bg-slate-50 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-900 transition-all placeholder-slate-300">
+            <button @click="handleLogin" :disabled="loading" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-extrabold text-lg tap-effect shadow-xl disabled:opacity-50">
+                {{ loading ? 'Вход...' : 'Начать' }}
             </button>
         </div>
     </div>
 
     <template v-else>
-        <header class="glass-header pt-safe flex-shrink-0 relative mb-1">
-            <div class="px-5 py-3 flex justify-between items-center">
+        <header class="glass-header pt-safe flex-shrink-0 relative mb-1 transition-all duration-300">
+            <div class="px-6 py-4 flex justify-between items-center">
                 <div>
-                    <h1 class="text-xl font-extrabold tracking-tight text-slate-900">{{ pageTitle }}</h1>
-                    <div class="text-[10px] font-medium text-slate-400 leading-none mt-0.5">{{ user.email }}</div>
+                    <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ pageTitle }}</h1>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{{ user.email.split('@')[0] }}</div>
                 </div>
-                <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-2 border-slate-200 border-t-slate-800"></div>
-                <button v-else-if="currentTab==='settings'" @click="saveSettings" class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-lg tap-effect">Сохранить</button>
+                <div v-if="loading" class="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 border-t-slate-900"></div>
+                <button v-else-if="currentTab==='settings'" @click="saveSettings" class="text-xs font-black text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-xl tap-effect">Сохранить</button>
             </div>
             
-            <div v-if="currentTab === 'calendar'" class="px-4 pb-5 space-y-3">
-                <div class="flex bg-slate-100/80 p-1 rounded-xl relative h-9">
-                     <div class="absolute top-1 bottom-1 bg-white rounded-lg shadow-sm w-[calc(50%-4px)] transition-all duration-300 ease-out" :class="planViewMode === 'day' ? 'left-1' : 'left-[calc(50%+2px)]'"></div>
-                     <button @click="planViewMode = 'day'" class="flex-1 relative z-10 text-[11px] font-bold flex items-center justify-center gap-1.5" :class="planViewMode === 'day' ? 'text-slate-900' : 'text-slate-400'">День</button>
-                     <button @click="planViewMode = 'week'" class="flex-1 relative z-10 text-[11px] font-bold flex items-center justify-center gap-1.5" :class="planViewMode === 'week' ? 'text-slate-900' : 'text-slate-400'">Сетка</button>
+            <div v-if="currentTab === 'calendar'" class="px-5 pb-6 space-y-4">
+                <div class="flex bg-slate-100 p-1 rounded-2xl relative h-10 shadow-inner">
+                     <div class="absolute top-1 bottom-1 bg-white rounded-xl shadow-sm w-[calc(50%-4px)] transition-all duration-300 ease-[cubic-bezier(0.3,1.2,0.2,1)]" :class="planViewMode === 'day' ? 'left-1' : 'left-[calc(50%+2px)]'"></div>
+                     <button @click="planViewMode = 'day'" class="flex-1 relative z-10 text-xs font-extrabold flex items-center justify-center transition-colors" :class="planViewMode === 'day' ? 'text-slate-900' : 'text-slate-400'">День</button>
+                     <button @click="planViewMode = 'week'" class="flex-1 relative z-10 text-xs font-extrabold flex items-center justify-center transition-colors" :class="planViewMode === 'week' ? 'text-slate-900' : 'text-slate-400'">Сетка</button>
                 </div>
-                <div class="flex items-center justify-between bg-white rounded-xl border border-slate-100 p-1 shadow-sm h-12">
-                     <button @click="handleNav(-1)" class="w-10 h-full flex items-center justify-center text-slate-400 tap-effect"><span class="material-icons-round">chevron_left</span></button>
+                
+                <div class="flex items-center justify-between">
+                     <button @click="handleNav(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400 bg-white rounded-full shadow-soft tap-effect border border-slate-50"><span class="material-icons-round">chevron_left</span></button>
                      <div class="text-center flex-1">
-                        <transition name="fade" mode="out-in">
-                            <div :key="planViewMode === 'day' ? currentDateStr : 'week'" class="flex flex-col items-center justify-center h-full">
-                                <div class="text-sm font-bold text-slate-800">{{ planViewMode === 'day' ? currentDateDisplay : shoppingRangeDisplay }}</div>
-                                <div v-if="planViewMode === 'day'" class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{{ dayNameDisplay }}</div>
-                            </div>
-                        </transition>
+                        <div class="text-base font-black text-slate-900">{{ planViewMode === 'day' ? currentDateDisplay : shoppingRangeDisplay }}</div>
+                        <div v-if="planViewMode === 'day'" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{{ dayNameDisplay }}</div>
                      </div>
-                     <button @click="handleNav(1)" class="w-10 h-full flex items-center justify-center text-slate-400 tap-effect"><span class="material-icons-round">chevron_right</span></button>
+                     <button @click="handleNav(1)" class="w-10 h-10 flex items-center justify-center text-slate-400 bg-white rounded-full shadow-soft tap-effect border border-slate-50"><span class="material-icons-round">chevron_right</span></button>
                 </div>
             </div>
             
-            <div v-else-if="currentTab === 'products' || currentTab === 'dishes'" class="px-4 pb-5">
-                <div class="relative group h-9">
-                    <span class="material-icons-round absolute left-3 top-2 text-slate-400 text-lg">search</span>
-                    <input v-model="genericSearch" type="text" :placeholder="currentTab==='products'?'Поиск продуктов...':'Поиск рецептов...'" class="w-full pl-10 pr-4 h-full bg-slate-100 rounded-xl border-none outline-none focus:ring-2 focus:ring-slate-900 text-xs font-bold text-slate-800 placeholder-slate-400 transition-all">
+            <div v-else-if="currentTab === 'products' || currentTab === 'dishes'" class="px-0 pb-4 space-y-3">
+                <div class="px-5">
+                    <div class="relative group h-11">
+                        <span class="material-icons-round absolute left-4 top-3 text-slate-400">search</span>
+                        <input v-model="genericSearch" type="text" placeholder="Поиск..." class="w-full pl-11 pr-4 h-full bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-slate-900 text-sm font-bold text-slate-900 placeholder-slate-400 transition-all shadow-inner">
+                    </div>
+                </div>
+                <div class="overflow-x-auto pl-5 pr-5 no-scrollbar flex gap-2 pb-2">
+                    <button @click="activeCategory = 'Все'" :class="activeCategory === 'Все' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 shadow-sm'" class="px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap tap-effect transition-all">Все</button>
+                    <button v-for="cat in (currentTab==='dishes' ? dishCategories : productCategories)" :key="cat" @click="activeCategory = cat" :class="activeCategory === cat ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 shadow-sm'" class="px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap tap-effect transition-all">{{ cat }}</button>
                 </div>
             </div>
             
-            <div v-else-if="currentTab === 'list'" class="px-4 pb-5">
-                 <div class="flex items-center justify-between bg-slate-100/80 px-4 rounded-xl h-9">
-                     <div class="flex-1 h-2 bg-white rounded-full overflow-hidden">
-                         <div class="h-full bg-slate-900 transition-all duration-500 ease-out" :style="{ width: shoppingProgress + '%' }"></div>
+            <div v-else-if="currentTab === 'list'" class="px-5 pb-6">
+                 <div class="flex items-center justify-between bg-slate-100 px-4 rounded-2xl h-12 mb-3">
+                     <div class="flex-1 h-2.5 bg-white rounded-full overflow-hidden shadow-inner">
+                         <div class="h-full bg-slate-900 transition-all duration-700 ease-out rounded-full" :style="{ width: shoppingProgress + '%' }"></div>
                      </div>
-                     <span class="ml-3 text-[10px] font-bold text-slate-400">{{ shoppingStats.checked }}/{{ shoppingStats.total }}</span>
+                     <span class="ml-4 text-xs font-black text-slate-400 tabular-nums">{{ shoppingStats.checked }}/{{ shoppingStats.total }}</span>
+                  </div>
+                  <div class="flex gap-2">
+                      <button @click="uncheckAll" class="flex-1 py-3 bg-white border border-slate-100 rounded-xl text-xs font-black text-rose-500 shadow-soft tap-effect">Очистить</button>
+                      <button @click="loadInitialData" class="flex-1 py-3 bg-slate-900 rounded-xl text-xs font-black text-white shadow-lg tap-effect">Обновить</button>
                   </div>
             </div>
         </header>
 
-        <main class="flex-1 relative bg-slate-50 page-container">
+        <main class="flex-1 relative bg-slate-50">
              <transition :name="mainTransitionName">
                 
-                <div v-if="currentTab === 'calendar'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar gpu-layer">
+                <div v-if="currentTab === 'calendar'" class="absolute inset-0 overflow-y-auto p-5 pb-28 no-scrollbar gpu">
                     <transition name="fade" mode="out-in">
-                    <div v-if="planViewMode === 'day'" :key="'day'+currentDateStr" class="space-y-3">
-                         <div v-if="!mealSlots.some(s => getPlannedDish(currentDateStr, s))" class="flex flex-col items-center justify-center h-[50vh] text-center opacity-40">
-                             <span class="material-icons-round text-6xl mb-3 text-slate-300">event_note</span>
-                             <p class="text-sm font-bold text-slate-400">Ничего не запланировано</p>
+                    <div v-if="planViewMode === 'day'" :key="'day'+currentDateStr" class="space-y-4">
+                         
+                         <div class="bg-white rounded-3xl p-4 shadow-soft border border-slate-100 flex items-center justify-between mb-2">
+                             <div class="flex items-center gap-3">
+                                 <div class="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center font-black text-sm">🔥</div>
+                                 <div>
+                                     <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Итого за день</div>
+                                     <div class="text-xl font-black text-slate-900 leading-none">{{ dailyNutrition.k }} <span class="text-xs text-slate-400 font-bold">ккал</span></div>
+                                 </div>
+                             </div>
+                             <div class="flex gap-2 opacity-30 grayscale">
+                                <div class="text-[9px] font-bold text-center"><span class="block text-slate-400">Б</span><span class="text-slate-900">0</span></div>
+                                <div class="text-[9px] font-bold text-center"><span class="block text-slate-400">Ж</span><span class="text-slate-900">0</span></div>
+                                <div class="text-[9px] font-bold text-center"><span class="block text-slate-400">У</span><span class="text-slate-900">0</span></div>
+                             </div>
                          </div>
+
+                         <div v-if="!mealSlots.some(s => getPlannedDish(currentDateStr, s))" class="flex flex-col items-center justify-center py-10 opacity-30">
+                             <span class="material-icons-round text-5xl mb-2 text-slate-300">event_available</span>
+                             <p class="text-xs font-bold text-slate-400">План пуст</p>
+                         </div>
+                         
                          <div v-for="slot in mealSlots" :key="slot">
-                            <div v-if="getPlannedDish(currentDateStr, slot)" @click="openDishDetails(getPlannedDish(currentDateStr, slot))" class="bg-white p-4 rounded-2xl shadow-soft border border-slate-100/50 tap-effect cursor-pointer relative overflow-hidden">
-                                <div class="absolute left-0 top-0 bottom-0 w-1" :class="getSlotColor(slot)"></div>
-                                <div class="flex justify-between items-center mb-1.5 pl-2">
-                                    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">{{ slot }}</span>
+                            <div v-if="getPlannedDish(currentDateStr, slot)" @click="openDishDetails(getPlannedDish(currentDateStr, slot))" class="bg-white p-5 rounded-3xl shadow-soft border border-slate-50 tap-effect cursor-pointer relative overflow-hidden group">
+                                <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="getSlotColor(slot)"></div>
+                                <div class="flex justify-between items-center mb-2 pl-3">
+                                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{{ slot }}</span>
                                     <div class="flex items-center gap-2">
-                                        <span v-if="getPlannedPortions(currentDateStr, slot) > 1" class="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded">x{{ getPlannedPortions(currentDateStr, slot) }}</span>
-                                        <span v-if="isExcluded(currentDateStr, slot)" class="text-[9px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">Не покупать</span>
+                                        <span v-if="getPlannedPortions(currentDateStr, slot) > 1" class="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg">x{{ getPlannedPortions(currentDateStr, slot) }}</span>
+                                        <span v-if="isExcluded(currentDateStr, slot)" class="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg">Не покупать</span>
                                     </div>
                                 </div>
-                                <div class="pl-2"><div class="text-[15px] font-bold text-slate-800 leading-snug">{{ getPlannedDish(currentDateStr, slot).name }}</div></div>
-                                <span class="material-icons-round absolute right-4 top-1/2 -translate-y-1/2 text-slate-200">chevron_right</span>
+                                <div class="pl-3 pr-6">
+                                    <div class="text-lg font-black text-slate-900 leading-tight mb-1">{{ getPlannedDish(currentDateStr, slot).name }}</div>
+                                    <div class="text-xs font-bold text-slate-400">{{ getPlannedDish(currentDateStr, slot).k * getPlannedPortions(currentDateStr, slot) }} ккал</div>
+                                </div>
+                                <span class="material-icons-round absolute right-4 top-1/2 -translate-y-1/2 text-slate-200 group-hover:text-slate-300 transition-colors">chevron_right</span>
                             </div>
-                            <div v-else @click="openDishSelector(currentDateObj, slot)" class="border-2 border-dashed border-slate-200 rounded-2xl p-4 flex items-center justify-center tap-effect opacity-50 hover:opacity-100">
-                                <span class="text-[10px] font-bold uppercase text-slate-400">{{ slot }}</span>
+                            <div v-else @click="openDishSelector(currentDateObj, slot)" class="border-2 border-dashed border-slate-200 rounded-3xl p-5 flex items-center justify-center tap-effect opacity-60 hover:opacity-100 transition-opacity bg-slate-50/50">
+                                <span class="text-[10px] font-extrabold uppercase text-slate-400 tracking-widest">+ {{ slot }}</span>
                             </div>
                         </div>
                     </div>
                     
                     <div v-else :key="'week'" class="space-y-4">
-                        <div v-for="dayObj in planningDays" :key="dayObj.iso" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" :class="isToday(dayObj.date) ? 'border-slate-400 ring-1 ring-slate-400' : ''">
-                            <div class="px-3 py-1 bg-slate-50 border-b border-slate-100 flex justify-between items-center"><div class="flex items-baseline gap-2"><span class="text-xs font-extrabold">{{ formatDate(dayObj.date) }}</span><span class="text-[9px] font-bold uppercase text-slate-400">{{ getDayName(dayObj.date) }}</span></div></div>
-                            <div class="grid grid-cols-5 divide-x divide-slate-100">
-                                <div v-for="slot in mealSlots" :key="slot" @click="openDishSelector(dayObj.date, slot)" class="h-14 flex flex-col items-center justify-center p-1 tap-effect hover:bg-slate-50 cursor-pointer relative group">
+                        <div v-for="dayObj in planningDays" :key="dayObj.iso" class="bg-white rounded-3xl shadow-soft border border-slate-100 overflow-hidden relative">
+                            <div v-if="isToday(dayObj.date)" class="absolute left-0 top-0 bottom-0 w-1 bg-slate-900"></div>
+                            <div class="px-4 py-2 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-sm font-black text-slate-900">{{ formatDate(dayObj.date) }}</span>
+                                    <span class="text-[10px] font-extrabold uppercase text-slate-400">{{ getDayName(dayObj.date) }}</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-5 divide-x divide-slate-50">
+                                <div v-for="slot in mealSlots" :key="slot" @click="openDishSelector(dayObj.date, slot)" class="h-16 flex flex-col items-center justify-center p-1 tap-effect hover:bg-slate-50 cursor-pointer relative group">
                                     <template v-if="getPlannedDish(dayObj.iso, slot)">
-                                        <span class="text-[8.5px] font-bold leading-tight text-slate-700 line-clamp-3 text-center" :class="isExcluded(dayObj.iso, slot) ? 'text-rose-400 line-through' : ''">{{ getPlannedDish(dayObj.iso, slot).name }}</span>
-                                        <div v-if="isExcluded(dayObj.iso, slot)" class="w-1.5 h-1.5 rounded-full bg-rose-400 mt-1"></div>
+                                        <div class="w-2 h-2 rounded-full mb-1" :class="getSlotColor(slot)"></div>
+                                        <span class="text-[8px] font-bold leading-tight text-slate-700 line-clamp-2 text-center w-full" :class="isExcluded(dayObj.iso, slot) ? 'opacity-40 line-through' : ''">{{ getPlannedDish(dayObj.iso, slot).name }}</span>
                                     </template>
-                                    <span v-else class="text-slate-200 material-icons-round text-xs group-hover:text-slate-400">add</span>
+                                    <span v-else class="text-slate-200 material-icons-round text-xs scale-75">add</span>
                                 </div>
                             </div>
                         </div>
@@ -150,97 +223,123 @@
                     </transition>
                 </div>
 
-                <div v-else-if="currentTab === 'dishes'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar gpu-layer space-y-3">
-                    <div v-if="filteredDishes.length===0" class="text-center py-20 opacity-50"><p class="text-sm font-medium">Нет рецептов</p></div>
-                    <div v-for="dish in filteredDishes" :key="dish.id" @click="openDishDetails(dish)" class="bg-white p-4 rounded-2xl shadow-soft border border-slate-100 flex justify-between items-center tap-effect cursor-pointer group">
-                        <div>
-                            <div class="font-bold text-slate-800 text-sm mb-1 group-hover:text-indigo-600 transition-colors">{{ dish.name }}</div>
-                            <div class="text-[10px] text-slate-400 flex items-center gap-2 font-medium"><span class="bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{{ dish.category }}</span><span>{{ dish.k }} ккал</span></div>
+                <div v-else-if="currentTab === 'dishes'" class="absolute inset-0 overflow-y-auto p-5 pb-28 no-scrollbar gpu space-y-3">
+                    <div v-if="filteredDishes.length===0" class="text-center py-20 opacity-50"><p class="text-sm font-bold text-slate-400">Ничего не найдено</p></div>
+                    <div v-for="dish in filteredDishes" :key="dish.id" @click="openDishDetails(dish)" class="bg-white p-4 rounded-3xl shadow-soft border border-slate-50 flex justify-between items-center tap-effect cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner">🍲</div>
+                            <div>
+                                <div class="font-extrabold text-slate-900 text-sm mb-0.5 group-hover:text-indigo-600 transition-colors">{{ dish.name }}</div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200">{{ dish.category || 'Без категории' }}</span>
+                                    <span class="text-[10px] font-bold text-slate-400">🔥 {{ dish.k }}</span>
+                                </div>
+                            </div>
                         </div>
-                        <span class="material-icons-round text-slate-200 text-xl">chevron_right</span>
+                        <span class="material-icons-round text-slate-200">chevron_right</span>
                     </div>
                 </div>
 
-                <div v-else-if="currentTab === 'products'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar gpu-layer space-y-2">
-                    <div v-for="prod in filteredProducts" :key="prod.id" class="bg-white p-4 rounded-2xl shadow-soft flex justify-between items-center border border-slate-100">
-                        <span class="font-bold text-slate-700 text-sm">{{ prod.name }}</span>
-                        <span class="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg uppercase tracking-wider">{{ prod.unit }}</span>
+                <div v-else-if="currentTab === 'products'" class="absolute inset-0 overflow-y-auto p-5 pb-28 no-scrollbar gpu space-y-2">
+                    <div v-for="prod in filteredProducts" :key="prod.id" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <span class="font-bold text-slate-700 text-sm pl-2">{{ prod.name }}</span>
+                        <span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2.5 py-1.5 rounded-lg uppercase tracking-wider">{{ prod.unit }}</span>
                     </div>
                 </div>
 
-                <div v-else-if="currentTab === 'list'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar gpu-layer space-y-4">
-                    <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex justify-between items-center">
-                         <div><h3 class="text-xs font-bold uppercase text-indigo-400 tracking-wider mb-1">Период</h3><div class="text-sm font-bold text-indigo-900">{{ shoppingRangeDisplay }}</div></div>
-                         <button @click="uncheckAll" class="bg-white text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-sm tap-effect">Очистить</button>
-                    </div>
-
-                    <transition-group name="list" tag="div" class="space-y-2">
-                        <div v-for="item in calculatedShoppingList" :key="item.id" @click="toggleProductCheck(item)" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-soft flex items-center gap-3.5 cursor-pointer tap-effect" :class="item.checked ? 'bg-slate-50/50' : ''">
-                            <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all" :class="item.checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200'"><span v-if="item.checked" class="material-icons-round text-white text-xs">check</span></div>
-                            <div class="flex-1 text-sm font-bold transition-all" :class="item.checked ? 'line-through decoration-2 decoration-slate-300 text-slate-400' : 'text-slate-700'">{{ item.name }}</div>
-                            <div class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg" :class="item.checked ? 'opacity-50' : ''">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
-                        </div>
-                    </transition-group>
-
-                    <div class="mt-8 pt-4 border-t border-slate-100">
-                        <div class="flex justify-between items-center mb-4 px-2"><h3 class="font-bold text-slate-400 text-xs uppercase tracking-widest">Базовое</h3><button @click="addStaple" class="text-indigo-500 text-xs font-bold bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100">+ Добавить</button></div>
+                <div v-else-if="currentTab === 'list'" class="absolute inset-0 overflow-y-auto p-5 pb-28 no-scrollbar gpu space-y-4">
+                    <div v-if="calculatedShoppingList.filter(i => !i.checked).length > 0">
+                        <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest mb-3 ml-2">Нужно купить</h3>
                         <transition-group name="list" tag="div" class="space-y-2">
-                             <div v-for="item in staples" :key="item.id" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-soft flex items-center gap-3">
-                                 <div @click="toggleStapleCheck(item)" class="w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer shrink-0" :class="!item.is_active ? 'bg-slate-400 border-slate-400' : 'border-slate-200'"><span v-if="!item.is_active" class="material-icons-round text-white text-xs">check</span></div>
-                                 <div class="flex-1 text-sm font-medium text-slate-700" :class="!item.is_active ? 'line-through decoration-slate-300 text-slate-400' : ''">{{ item.name }}</div>
-                                 <button @click="deleteStaple(item)" class="text-slate-300 hover:text-rose-400 px-2"><span class="material-icons-round text-lg">close</span></button>
-                             </div>
+                            <div v-for="item in calculatedShoppingList.filter(i => !i.checked)" :key="item.id" @click="toggleProductCheck(item)" class="bg-white p-4 rounded-2xl border border-slate-100 shadow-soft flex items-center gap-4 cursor-pointer tap-effect">
+                                <div class="w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center shrink-0"></div>
+                                <div class="flex-1 text-sm font-extrabold text-slate-800">{{ item.name }}</div>
+                                <div class="text-xs font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
+                            </div>
                         </transition-group>
+                    </div>
+
+                    <div v-if="calculatedShoppingList.filter(i => i.checked).length > 0" class="mt-8">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">В корзине</h3>
+                        <transition-group name="list" tag="div" class="space-y-2">
+                            <div v-for="item in calculatedShoppingList.filter(i => i.checked)" :key="item.id" @click="toggleProductCheck(item)" class="bg-white/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4 cursor-pointer tap-effect opacity-60">
+                                <div class="w-6 h-6 rounded-full border-2 border-indigo-500 bg-indigo-500 flex items-center justify-center shrink-0"><span class="material-icons-round text-white text-xs">check</span></div>
+                                <div class="flex-1 text-sm font-bold text-slate-400 line-through decoration-2 decoration-slate-300">{{ item.name }}</div>
+                                <div class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
+                            </div>
+                        </transition-group>
+                    </div>
+
+                    <div class="mt-8 pt-6 border-t border-slate-200/50">
+                        <div class="flex justify-between items-center mb-4 px-2">
+                            <h3 class="font-black text-slate-400 text-xs uppercase tracking-widest">Базовое</h3>
+                            <button @click="addStaple" class="text-indigo-500 text-xs font-black bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 tap-effect">+ Добавить</button>
+                        </div>
+                        <div v-for="item in staples" :key="item.id" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 mb-2">
+                             <div @click="toggleStapleCheck(item)" class="w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer shrink-0 transition-colors" :class="!item.is_active ? 'bg-slate-400 border-slate-400' : 'border-slate-200'"><span v-if="!item.is_active" class="material-icons-round text-white text-xs">check</span></div>
+                             <div class="flex-1 text-sm font-bold text-slate-700" :class="!item.is_active ? 'line-through decoration-slate-300 text-slate-400' : ''">{{ item.name }}</div>
+                             <button @click="deleteStaple(item)" class="text-slate-300 px-2"><span class="material-icons-round text-lg">close</span></button>
+                        </div>
                     </div>
                 </div>
                 
-                <div v-else-if="currentTab === 'settings'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar gpu-layer space-y-4">
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 border-b border-slate-100">
-                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Дней в периоде</label>
-                            <input v-model.number="settings.planning_days" type="number" class="w-full text-lg font-bold text-slate-800 outline-none bg-transparent" placeholder="7">
+                <div v-else-if="currentTab === 'settings'" class="absolute inset-0 overflow-y-auto p-5 pb-28 no-scrollbar gpu space-y-6">
+                    <div class="bg-white rounded-3xl shadow-soft border border-slate-100 overflow-hidden">
+                        <div class="p-5 border-b border-slate-50">
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Дней в периоде</label>
+                            <input v-model.number="settings.planning_days" type="number" class="w-full text-2xl font-black text-slate-900 outline-none bg-transparent placeholder-slate-200" placeholder="7">
                         </div>
-                        <div class="p-4 flex justify-between items-center">
-                            <label class="text-sm font-bold text-slate-700">Порций по умолчанию</label>
-                            <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-1">
-                                <button @click="settings.default_portions = Math.max(1, (settings.default_portions||1) - 1)" class="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-600 font-bold">-</button>
-                                <span class="font-bold text-slate-900 w-4 text-center">{{ settings.default_portions || 1 }}</span>
-                                <button @click="settings.default_portions = (settings.default_portions||1) + 1" class="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-600 font-bold">+</button>
+                        <div class="p-5 flex justify-between items-center">
+                            <label class="text-sm font-extrabold text-slate-900">Порций по умолчанию</label>
+                            <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-1.5">
+                                <button @click="settings.default_portions = Math.max(1, (settings.default_portions||1) - 1)" class="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-900 font-bold">-</button>
+                                <span class="font-black text-slate-900 w-5 text-center">{{ settings.default_portions || 1 }}</span>
+                                <button @click="settings.default_portions = (settings.default_portions||1) + 1" class="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-900 font-bold">+</button>
                             </div>
                         </div>
                     </div>
-                    <button @click="handleLogout" class="w-full py-4 text-rose-500 font-bold bg-rose-50 rounded-2xl tap-effect">Выйти из аккаунта</button>
+                    <button @click="handleLogout" class="w-full py-5 text-rose-500 font-black bg-rose-50 rounded-3xl tap-effect">Выйти из аккаунта</button>
                 </div>
 
              </transition>
         </main>
 
-        <nav class="bg-white/95 backdrop-blur-xl border-t border-slate-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 pb-5 rounded-t-3xl shadow-up">
-            <div class="grid grid-cols-5 h-16 items-center">
-                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400'" class="flex flex-col items-center justify-center tap-effect"><span class="material-icons-round text-2xl transition-transform active:scale-90">{{ tab.icon }}</span><span class="text-[9px] font-bold mt-0.5">{{ tab.label }}</span></button>
+        <nav class="glass-nav fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 pb-safe">
+            <div class="grid grid-cols-5 h-20 items-center px-2">
+                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-300'" class="flex flex-col items-center justify-center tap-effect group relative">
+                    <div v-if="currentTab === tab.id" class="absolute -top-3 w-8 h-1 bg-slate-900 rounded-b-full shadow-lg shadow-slate-900/20"></div>
+                    <span class="material-icons-round text-[26px] transition-transform duration-200 group-active:scale-90" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
+                    <span v-if="currentTab === tab.id" class="text-[9px] font-black mt-1 absolute bottom-3 transition-opacity duration-300">{{ tab.label }}</span>
+                </button>
             </div>
         </nav>
 
         <transition name="modal">
-        <div v-if="showSelectorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center p-4" @click.self="showSelectorModal = false">
-             <div class="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]">
-                 <div class="p-4 border-b border-slate-100 flex items-center gap-3 bg-white z-10">
-                     <button @click="showSelectorModal=false" class="text-slate-400 p-2"><span class="material-icons-round text-2xl">keyboard_arrow_down</span></button>
-                     <div class="flex-1"><h3 class="font-bold text-slate-800 leading-tight text-lg">{{ selectorContext.slot }}</h3><p class="text-xs text-slate-400 font-medium">{{ formatDate(selectorContext.date) }}</p></div>
+        <div v-if="showSelectorModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center" @click.self="showSelectorModal = false">
+             <div class="bg-white w-full max-w-sm rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] pb-safe">
+                 <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-5 shrink-0"></div>
+                 <div class="px-6 pb-4 border-b border-slate-50 flex items-center justify-between">
+                     <div><h3 class="font-black text-slate-900 text-2xl leading-none mb-1">{{ selectorContext.slot }}</h3><p class="text-xs text-slate-400 font-bold uppercase tracking-wide">{{ formatDate(selectorContext.date) }}</p></div>
                  </div>
-                 <div class="px-5 py-4 bg-slate-50 border-b border-slate-100 space-y-4">
-                     <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
-                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wide ml-1">Порции</span>
-                         <div class="flex items-center gap-3"><button @click="selectorContext.portions = Math.max(1, selectorContext.portions - 1)" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-lg text-slate-600 tap-effect font-bold">-</button><span class="font-bold text-slate-900 w-4 text-center">{{ selectorContext.portions }}</span><button @click="selectorContext.portions++" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-lg text-slate-600 tap-effect font-bold">+</button></div>
+                 <div class="px-6 py-4 bg-slate-50 space-y-4 shrink-0">
+                     <div class="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                         <span class="text-xs font-black text-slate-900 uppercase tracking-wide ml-1">Порции</span>
+                         <div class="flex items-center gap-4"><button @click="selectorContext.portions = Math.max(1, selectorContext.portions - 1)" class="w-10 h-10 flex items-center justify-center bg-slate-100 rounded-xl text-slate-900 tap-effect font-bold">-</button><span class="font-black text-slate-900 text-lg w-6 text-center">{{ selectorContext.portions }}</span><button @click="selectorContext.portions++" class="w-10 h-10 flex items-center justify-center bg-slate-100 rounded-xl text-slate-900 tap-effect font-bold">+</button></div>
                      </div>
-                     <label class="flex items-center gap-3 text-sm font-bold text-slate-600 cursor-pointer"><input v-model="selectorContext.exclude" type="checkbox" class="w-5 h-5 rounded text-slate-900 focus:ring-slate-900 border-gray-300"><span>Не покупать</span></label>
+                     <label class="flex items-center gap-4 p-2 cursor-pointer tap-effect">
+                        <div class="relative flex items-center">
+                           <input v-model="selectorContext.exclude" type="checkbox" class="peer h-6 w-6 cursor-pointer appearance-none rounded-lg border-2 border-slate-300 transition-all checked:border-rose-500 checked:bg-rose-500">
+                           <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 material-icons-round text-sm pointer-events-none">check</span>
+                        </div>
+                        <span class="text-sm font-bold text-slate-600">Не покупать (есть в наличии)</span>
+                     </label>
                  </div>
-                 <div class="p-4"><input v-model="selectorSearch" type="text" placeholder="Найти рецепт..." class="w-full p-4 bg-slate-50 rounded-2xl outline-none text-sm font-bold focus:ring-2 focus:ring-slate-900 placeholder-slate-400"></div>
+                 <div class="p-4"><input v-model="selectorSearch" type="text" placeholder="Найти рецепт..." class="w-full p-4 bg-slate-100 rounded-2xl outline-none text-sm font-bold focus:ring-2 focus:ring-slate-900 placeholder-slate-400"></div>
                  <div class="flex-1 overflow-y-auto p-4 space-y-2">
-                     <div @click="selectDishForPlan(null)" class="p-4 bg-rose-50 text-rose-500 font-bold rounded-2xl text-sm text-center tap-effect mb-4">Очистить слот</div>
-                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center tap-effect cursor-pointer">
-                         <div><div class="font-bold text-slate-700 text-sm">{{ dish.name }}</div><div class="text-[10px] text-slate-400 mt-0.5">{{ dish.k * selectorContext.portions }} ккал</div></div>
-                         <span class="material-icons-round text-slate-200">add_circle_outline</span>
+                     <div @click="selectDishForPlan(null)" class="p-4 bg-rose-50 text-rose-500 font-black rounded-2xl text-sm text-center tap-effect mb-2">Очистить слот</div>
+                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center tap-effect cursor-pointer">
+                         <div><div class="font-extrabold text-slate-800 text-sm">{{ dish.name }}</div><div class="text-[10px] font-bold text-slate-400 mt-0.5">{{ dish.k * selectorContext.portions }} ккал</div></div>
+                         <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg"><span class="material-icons-round text-sm">add</span></div>
                      </div>
                  </div>
              </div>
@@ -248,59 +347,76 @@
         </transition>
 
         <transition name="modal">
-        <div v-if="showDetailModal && selectedDish" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showDetailModal = false">
-            <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]">
-                <div class="flex justify-between items-start p-6 pb-0 shrink-0">
-                    <button @click="showDetailModal = false" class="bg-slate-50 text-slate-500 p-2 rounded-full hover:bg-slate-100 tap-effect"><span class="material-icons-round">keyboard_arrow_down</span></button>
-                    </div>
-                <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-white no-scrollbar">
-                    <div class="text-left">
-                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded-lg mb-3 inline-block border border-slate-100 bg-slate-50 text-slate-500">{{ selectedDish.category }}</span>
-                        <h2 class="text-3xl font-extrabold text-slate-900 leading-tight tracking-tight">{{ selectedDish.name }}</h2>
-                    </div>
-                    <div class="grid grid-cols-4 gap-2">
-                        <div class="bg-slate-50 p-3 rounded-2xl text-center border border-slate-100"><div class="text-xl font-bold text-slate-800">{{ selectedDish.k }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Ккал</div></div>
-                    </div>
-                    <div v-if="ingredientsMap[selectedDish.id]">
-                        <h4 class="font-bold text-slate-900 mb-3 text-xs uppercase tracking-wider">Ингредиенты</h4>
-                        <div class="space-y-1">
-                            <div v-for="ing in ingredientsMap[selectedDish.id]" :key="ing.id" class="flex justify-between items-center py-3 border-b border-slate-50 last:border-0">
-                                <span class="text-base font-bold text-slate-700">{{ ing.name }}</span>
-                                <span class="text-sm font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{{ ing.amount }} {{ ing.unit }}</span>
-                            </div>
+        <div v-if="showDetailModal && selectedDish" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center" @click.self="showDetailModal = false">
+            <div class="bg-white w-full max-w-sm rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] pb-safe">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-6 shrink-0"></div>
+                <div class="px-8 pb-6 bg-white overflow-y-auto no-scrollbar">
+                    <span class="text-[10px] font-black uppercase px-3 py-1.5 rounded-lg mb-4 inline-block bg-indigo-50 text-indigo-500 tracking-wider">{{ selectedDish.category || 'Общее' }}</span>
+                    <h2 class="text-3xl font-black text-slate-900 leading-tight mb-6">{{ selectedDish.name }}</h2>
+                    
+                    <div class="flex gap-4 mb-8">
+                        <div class="flex-1 bg-slate-50 p-4 rounded-3xl text-center border border-slate-100">
+                            <div class="text-2xl font-black text-slate-900 mb-1">{{ selectedDish.k }}</div>
+                            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ккал</div>
+                        </div>
+                        <div class="flex-1 bg-slate-50 p-4 rounded-3xl text-center border border-slate-100 opacity-50 grayscale">
+                            <div class="text-2xl font-black text-slate-900 mb-1">-</div>
+                            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">БЖУ</div>
                         </div>
                     </div>
-                    <div v-else class="text-center py-4 text-slate-400 text-sm font-medium">Нет ингредиентов</div>
+
+                    <h4 class="font-black text-slate-900 mb-4 text-xs uppercase tracking-widest pl-2">Ингредиенты</h4>
+                    <div v-if="ingredientsMap[selectedDish.id]" class="space-y-1">
+                        <div v-for="ing in ingredientsMap[selectedDish.id]" :key="ing.id" class="flex justify-between items-center py-4 border-b border-slate-50 last:border-0 px-2">
+                            <span class="text-sm font-extrabold text-slate-700">{{ ing.name }}</span>
+                            <span class="text-xs font-black text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">{{ ing.amount }} {{ ing.unit }}</span>
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-6 text-slate-400 text-sm font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">Список пуст</div>
                 </div>
             </div>
         </div>
         </transition>
 
         <transition name="modal">
-        <div v-if="showDishModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showDishModal = false">
-            <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl relative flex flex-col h-[90vh]">
-                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-10">
-                    <button @click="showDishModal = false" class="text-slate-400 font-bold text-sm px-2">Отмена</button>
-                    <h3 class="font-bold text-lg text-slate-800">Новое Блюдо</h3>
-                    <button @click="saveDish" :disabled="!newDish.name" class="text-slate-900 font-bold text-sm px-2 disabled:opacity-30">Готово</button>
+        <div v-if="showDishModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center" @click.self="showDishModal = false">
+            <div class="bg-white w-full max-w-sm rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col h-[92vh] pb-safe">
+                <div class="px-6 py-5 border-b border-slate-50 flex justify-between items-center bg-white z-10">
+                    <button @click="showDishModal = false" class="text-slate-400 font-bold text-sm">Отмена</button>
+                    <h3 class="font-black text-lg text-slate-900">Новое Блюдо</h3>
+                    <button @click="saveDish" :disabled="!newDish.name" class="text-slate-900 font-black text-sm disabled:opacity-30">Сохранить</button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-white">
-                    <input v-model="newDish.name" type="text" placeholder="Название блюда" class="w-full text-2xl font-bold bg-transparent border-b border-slate-100 pb-2 outline-none placeholder-slate-300 text-slate-900">
-                    <div class="grid grid-cols-4 gap-3"><div class="text-center bg-slate-50 p-2 rounded-2xl border border-slate-100"><label class="text-[9px] text-slate-400 font-bold uppercase block mb-1">Ккал</label><input v-model.number="newDish.k" type="number" placeholder="0" class="w-full text-center bg-transparent font-bold text-slate-800 outline-none"></div></div>
+                    <input v-model="newDish.name" type="text" placeholder="Название блюда" class="w-full text-2xl font-black bg-transparent border-b-2 border-slate-100 pb-2 outline-none placeholder-slate-200 text-slate-900 focus:border-slate-900 transition-colors">
+                    
                     <div>
-                        <div class="flex justify-between items-center mb-3"><label class="text-xs text-slate-400 font-bold uppercase tracking-wider ml-1">Ингредиенты</label></div>
+                        <label class="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-2">Категория</label>
+                        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                            <button v-for="cat in dishCategories.slice(0,5)" :key="cat" @click="newDish.category = cat" :class="newDish.category === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors">{{ cat }}</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                        <label class="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-2 text-center">Калорийность (на порцию)</label>
+                        <input v-model.number="newDish.k" type="number" placeholder="0" class="w-full text-center bg-transparent font-black text-3xl text-slate-900 outline-none">
+                    </div>
+
+                    <div>
+                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">Состав</h4>
                         <div class="space-y-2 mb-4">
-                            <div v-for="(ing, idx) in newDishIngredients" :key="idx" class="flex items-center gap-3 bg-white border border-slate-100 p-2 pl-3 rounded-2xl shadow-sm">
+                            <div v-for="(ing, idx) in newDishIngredients" :key="idx" class="flex items-center gap-3 bg-white border border-slate-100 p-3 rounded-2xl shadow-sm">
                                 <div class="flex-1 text-sm font-bold text-slate-700 truncate">{{ ing.name }}</div>
-                                <input v-model.number="ing.amount" type="number" step="0.1" placeholder="0" class="w-16 p-1 text-center bg-slate-50 rounded-lg text-sm font-bold outline-none"><span class="text-xs text-slate-400 font-medium w-6">{{ ing.unit }}</span>
-                                <button @click="newDishIngredients.splice(idx, 1)" class="text-slate-300 hover:text-rose-400 px-2"><span class="material-icons-round text-lg">close</span></button>
+                                <input v-model.number="ing.amount" type="number" step="0.1" placeholder="0" class="w-16 p-2 text-center bg-slate-50 rounded-xl text-sm font-black outline-none focus:ring-2 focus:ring-slate-900">
+                                <span class="text-xs text-slate-400 font-bold w-6">{{ ing.unit }}</span>
+                                <button @click="newDishIngredients.splice(idx, 1)" class="text-rose-400 px-2"><span class="material-icons-round text-lg">close</span></button>
                             </div>
                         </div>
                         <div class="relative">
-                            <input v-model="ingSearch" type="text" placeholder="+ Добавить продукт" class="w-full p-4 rounded-2xl border-none bg-slate-50 pl-11 outline-none font-bold text-sm focus:ring-2 focus:ring-slate-900"><span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
+                            <input v-model="ingSearch" type="text" placeholder="Найти ингредиент..." class="w-full p-4 pl-11 rounded-2xl bg-slate-100 font-bold text-sm outline-none focus:ring-2 focus:ring-slate-900"><span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
                             <div v-if="ingSearch && filteredIngSuggestions.length > 0" class="absolute bottom-full mb-2 w-full bg-white shadow-xl rounded-2xl border border-slate-100 max-h-48 overflow-y-auto z-20">
-                                <div v-for="prod in filteredIngSuggestions" :key="prod.id" @click="addIngToDish(prod)" class="p-4 border-b border-slate-50 text-sm text-slate-700 active:bg-slate-50 flex justify-between font-bold"><span>{{ prod.name }}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{{ prod.unit }}</span></div>
+                                <div v-for="prod in filteredIngSuggestions" :key="prod.id" @click="addIngToDish(prod)" class="p-4 border-b border-slate-50 text-sm text-slate-700 active:bg-slate-50 flex justify-between font-bold tap-effect"><span>{{ prod.name }}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{{ prod.unit }}</span></div>
                             </div>
+                            <div v-if="ingSearch && filteredIngSuggestions.length === 0" @click="showProdModal=true" class="mt-2 p-3 bg-slate-900 text-white rounded-xl text-center text-xs font-bold tap-effect">Создать "{{ ingSearch }}"</div>
                         </div>
                     </div>
                 </div>
@@ -309,38 +425,33 @@
         </transition>
         
         <transition name="modal">
-        <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showProdModal = false">
-             <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl relative mb-safe">
-                 <h3 class="text-xl font-bold text-slate-800 mb-6">Новый продукт</h3>
-                 <div class="space-y-4">
-                     <input v-model="newProd.name" type="text" placeholder="Название продукта" class="w-full p-4 rounded-2xl border-none bg-slate-50 outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
+        <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end justify-center" @click.self="showProdModal = false">
+             <div class="bg-white w-full max-w-sm rounded-t-[40px] p-8 shadow-2xl relative mb-safe">
+                 <h3 class="text-2xl font-black text-slate-900 mb-6">Новый продукт</h3>
+                 <div class="space-y-5">
+                     <input v-model="newProd.name" type="text" placeholder="Название (напр. Молоко)" class="w-full p-5 rounded-3xl bg-slate-50 outline-none font-bold text-slate-900 focus:ring-2 focus:ring-slate-900 placeholder-slate-300">
                      <div class="grid grid-cols-4 gap-2">
-                         <button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'" class="py-3 rounded-xl text-sm font-bold transition-colors">{{ u }}</button>
+                         <button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-500'" class="py-3 rounded-2xl text-sm font-black transition-all tap-effect">{{ u }}</button>
                      </div>
                  </div>
                  <div class="flex gap-3 mt-8">
                      <button @click="showProdModal = false" class="flex-1 py-4 text-slate-400 font-bold tap-effect rounded-2xl hover:bg-slate-50">Отмена</button>
-                     <button @click="createProduct" :disabled="!newProd.name" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-lg">Сохранить</button>
+                     <button @click="createProduct" :disabled="!newProd.name" class="flex-1 py-4 bg-slate-900 text-white rounded-3xl font-black tap-effect shadow-xl">Создать</button>
                  </div>
              </div>
         </div>
         </transition>
 
         <div class="z-40 pointer-events-none fixed inset-0 max-w-md mx-auto">
-            <button v-if="currentTab === 'dishes'" @click="openDishModal" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
-            <button v-if="currentTab === 'products'" @click="showProdModal=true" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl shadow-slate-900/30 flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'dishes'" @click="openDishModal" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-2xl shadow-slate-900/40 flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'products'" @click="showProdModal=true" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-2xl shadow-slate-900/40 flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
         </div>
     </template>
   </div>
 
   <script>
-    // --- ERROR HANDLER ---
-    window.onerror = function(msg, url, line) { 
-        if(String(msg).includes('Script error')) return; // Ignore CORS noise
-        alert("ОШИБКА:\n" + msg + "\nСтрока: " + line); 
-    };
+    window.onerror = function(msg, url, line) { if(String(msg).includes('Script error')) return; alert("ОШИБКА:\n" + msg + "\nСтрока: " + line); };
 
-    // --- CONFIG ---
     const SUPABASE_URL = 'https://wwvrgffgtqqxupqvnpzc.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P'; 
     
@@ -354,20 +465,18 @@
             const products = ref([]); const dishes = ref([]); const ingredientsMap = ref({}); const planMap = ref({}); const staples = ref([]);
             const settings = ref({ planning_days: 7, default_portions: 1 });
             
-            // UI State
+            // UI
             const currentTab = ref('calendar'); const planViewMode = ref('week'); const currentDateObj = ref(new Date());
-            const genericSearch = ref('');
+            const genericSearch = ref(''); const activeCategory = ref('Все');
             
-            // Modals State
+            // Modals
             const showSelectorModal = ref(false); const selectorContext = ref({ date: null, slot: '', portions: 1, exclude: false }); const selectorSearch = ref('');
-            const showDishModal = ref(false); const newDish = ref({ name: '', k: null }); const newDishIngredients = ref([]); const ingSearch = ref('');
+            const showDishModal = ref(false); const newDish = ref({ name: '', k: null, category: 'Обед' }); const newDishIngredients = ref([]); const ingSearch = ref('');
             const showProdModal = ref(false); const newProd = ref({ name: '', unit: 'кг' });
             const showDetailModal = ref(false); const selectedDish = ref(null);
-
-            // Transitions
+            
             const mainTransitionName = ref('fade');
             const tabOrder = ['calendar', 'dishes', 'products', 'list', 'settings'];
-
             const tabs = [
                 { id: 'calendar', label: 'План', icon: 'calendar_today' },
                 { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu' },
@@ -376,6 +485,8 @@
                 { id: 'settings', label: 'Настройки', icon: 'tune' }
             ];
             const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
+            const dishCategories = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус', 'Суп', 'Десерт'];
+            const productCategories = ['Овощи', 'Фрукты', 'Мясо', 'Молочное', 'Бакалея', 'Специи']; // Пока виртуальные
 
             // --- AUTH ---
             const handleLogin = async () => {
@@ -386,70 +497,37 @@
             };
             const handleLogout = async () => { await supabase.auth.signOut(); user.value = null; };
 
-            // --- DATA LOADING ---
+            // --- LOAD ---
             const loadInitialData = async () => {
                 loading.value = true;
                 try {
-                    // 1. Settings
-                    const { data: setts } = await supabase.from('settings').select('*').maybeSingle();
-                    if(setts) settings.value = setts; 
-                    else { await supabase.from('settings').insert({ user_id: user.value.id }); } // Create defaults
-
-                    // 2. Data
+                    const { data: setts } = await supabase.from('settings').select('*').maybeSingle(); if(setts) settings.value = setts; else { await supabase.from('settings').insert({ user_id: user.value.id }); }
                     const { data: prods } = await supabase.from('products').select('*'); if(prods) products.value = prods;
                     const { data: d } = await supabase.from('dishes').select('*'); if(d) dishes.value = d;
-                    const { data: ing } = await supabase.from('ingredients').select('*');
-                    if(ing) {
-                        const map = {}; ing.forEach(row => { if(!map[row.dish_id]) map[row.dish_id] = []; const p = products.value.find(x => x.id === row.product_id); if(p) map[row.dish_id].push({ ...row, name: p.name, unit: p.unit }); }); ingredientsMap.value = map;
-                    }
-                    const { data: p } = await supabase.from('plan').select('*, dishes(*)');
-                    if(p) { planMap.value = {}; p.forEach(row => { const key = row.date + '|' + row.slot; if(row.dishes) planMap.value[key] = { dish: row.dishes, id: row.id, portions: row.portions, exclude: row.is_excluded }; }); }
+                    const { data: ing } = await supabase.from('ingredients').select('*'); if(ing) { const map = {}; ing.forEach(row => { if(!map[row.dish_id]) map[row.dish_id] = []; const p = products.value.find(x => x.id === row.product_id); if(p) map[row.dish_id].push({ ...row, name: p.name, unit: p.unit }); }); ingredientsMap.value = map; }
+                    const { data: p } = await supabase.from('plan').select('*, dishes(*)'); if(p) { planMap.value = {}; p.forEach(row => { const key = row.date + '|' + row.slot; if(row.dishes) planMap.value[key] = { dish: row.dishes, id: row.id, portions: row.portions, exclude: row.is_excluded }; }); }
                     const { data: s } = await supabase.from('staples').select('*').order('name'); if(s) staples.value = s;
                 } catch(e) { console.error(e); } loading.value = false;
             };
 
-            // --- ACTIONS ---
-            const saveSettings = async () => {
-                await supabase.from('settings').upsert({ user_id: user.value.id, ...settings.value });
-                alert('Настройки сохранены');
-            };
-
+            // --- LOGIC ---
+            const saveSettings = async () => { await supabase.from('settings').upsert({ user_id: user.value.id, ...settings.value }); alert('Настройки сохранены'); };
             const createProduct = async () => { if(!newProd.value.name) return; const { data } = await supabase.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, user_id: user.value.id }).select(); if(data) products.value.push(data[0]); showProdModal.value = false; newProd.value = { name: '', unit: 'кг' }; };
-            const openDishModal = () => { newDish.value = { name: '', k: null }; newDishIngredients.value = []; showDishModal.value = true; };
+            const openDishModal = () => { newDish.value = { name: '', k: null, category: 'Обед' }; newDishIngredients.value = []; showDishModal.value = true; };
             const addIngToDish = (prod) => { newDishIngredients.value.push({ product_id: prod.id, name: prod.name, unit: prod.unit, amount: 0 }); ingSearch.value = ''; };
-            
             const saveDish = async () => {
-                const { data: dData, error } = await supabase.from('dishes').insert({ name: newDish.value.name, k: newDish.value.k || 0, user_id: user.value.id }).select();
+                const { data: dData, error } = await supabase.from('dishes').insert({ name: newDish.value.name, k: newDish.value.k || 0, category: newDish.value.category, user_id: user.value.id }).select();
                 if(error || !dData) return alert("Ошибка: " + error?.message);
                 const createdDish = dData[0]; dishes.value.push(createdDish);
-                if(newDishIngredients.value.length > 0) {
-                    const ingRows = newDishIngredients.value.map(ing => ({ dish_id: createdDish.id, product_id: ing.product_id, amount: ing.amount, user_id: user.value.id }));
-                    await supabase.from('ingredients').insert(ingRows); ingredientsMap.value[createdDish.id] = newDishIngredients.value; 
-                } showDishModal.value = false;
+                if(newDishIngredients.value.length > 0) { const ingRows = newDishIngredients.value.map(ing => ({ dish_id: createdDish.id, product_id: ing.product_id, amount: ing.amount, user_id: user.value.id })); await supabase.from('ingredients').insert(ingRows); ingredientsMap.value[createdDish.id] = newDishIngredients.value; } showDishModal.value = false;
             };
-
-            const openDishSelector = (date, slot) => { 
-                const d = new Date(date);
-                const key = d.toISOString().split('T')[0] + '|' + slot;
-                const existing = planMap.value[key];
-                selectorContext.value = { date: d, slot, portions: existing ? (existing.portions||1) : (settings.value.default_portions||1), exclude: existing ? existing.exclude : false }; 
-                selectorSearch.value = ''; showSelectorModal.value = true; 
-            };
-            
+            const openDishSelector = (date, slot) => { const d = new Date(date); const key = d.toISOString().split('T')[0] + '|' + slot; const existing = planMap.value[key]; selectorContext.value = { date: d, slot, portions: existing ? (existing.portions||1) : (settings.value.default_portions||1), exclude: existing ? existing.exclude : false }; selectorSearch.value = ''; showSelectorModal.value = true; };
             const openDishDetails = (dish) => { selectedDish.value = dish; showDetailModal.value = true; };
-
             const selectDishForPlan = async (dish) => {
-                const { date, slot, portions, exclude } = selectorContext.value;
-                const dateStr = date.toISOString().split('T')[0];
-                const key = dateStr + '|' + slot;
-                const existing = planMap.value[key];
+                const { date, slot, portions, exclude } = selectorContext.value; const dateStr = date.toISOString().split('T')[0]; const key = dateStr + '|' + slot; const existing = planMap.value[key];
                 if(existing) { await supabase.from('plan').delete().eq('id', existing.id); delete planMap.value[key]; }
-                if(dish) {
-                    const { data } = await supabase.from('plan').insert({ user_id: user.value.id, date: dateStr, slot: slot, dish_id: dish.id, portions: portions, is_excluded: exclude }).select('*, dishes(*)');
-                    if(data && data[0]) planMap.value[key] = { dish: data[0].dishes, id: data[0].id, portions, exclude };
-                } showSelectorModal.value = false;
+                if(dish) { const { data } = await supabase.from('plan').insert({ user_id: user.value.id, date: dateStr, slot: slot, dish_id: dish.id, portions: portions, is_excluded: exclude }).select('*, dishes(*)'); if(data && data[0]) planMap.value[key] = { dish: data[0].dishes, id: data[0].id, portions, exclude }; } showSelectorModal.value = false;
             };
-
             const toggleProductCheck = async (item) => { const newState = !item.checked; const pIndex = products.value.findIndex(p => p.id === item.id); if (pIndex !== -1) products.value[pIndex].is_checked = newState; await supabase.from('products').update({ is_checked: newState }).eq('id', item.id); };
             const uncheckAll = async () => { products.value.forEach(p => p.is_checked = false); await supabase.from('products').update({ is_checked: false }).eq('user_id', user.value.id); };
             const addStaple = async () => { const name = prompt("Что добавить?"); if(!name) return; const { data } = await supabase.from('staples').insert({ name, user_id: user.value.id }).select(); if(data) staples.value.push(data[0]); };
@@ -457,39 +535,29 @@
             const toggleStapleCheck = async (item) => { item.is_active = !item.is_active; await supabase.from('staples').update({ is_active: item.is_active }).eq('id', item.id); };
 
             // --- COMPUTED ---
+            const dailyNutrition = computed(() => {
+                let k = 0;
+                mealSlots.forEach(slot => { const d = planMap.value[currentDateStr.value + '|' + slot]; if(d) k += (d.dish.k * d.portions); });
+                return { k };
+            });
+            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase()) && (activeCategory.value === 'Все' || d.category === activeCategory.value)));
+            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase()))); // Filter logic for products needs DB category to work fully
+            const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
+            const filteredIngSuggestions = computed(() => { if(!ingSearch.value) return []; return products.value.filter(p => p.name.toLowerCase().includes(ingSearch.value.toLowerCase())); });
             const calculatedShoppingList = computed(() => {
-                const totals = {};
-                const start = new Date(currentDateObj.value); start.setHours(0,0,0,0);
-                const end = new Date(start); end.setDate(end.getDate() + (settings.value.planning_days || 7) - 1);
-                const startStr = start.toISOString().split('T')[0]; const endStr = end.toISOString().split('T')[0];
-                for (const key in planMap.value) {
-                    const [pDate, ] = key.split('|');
-                    if (pDate >= startStr && pDate <= endStr) {
-                        const item = planMap.value[key];
-                        if (item.exclude) continue;
-                        const ings = ingredientsMap.value[item.dish.id] || [];
-                        ings.forEach(ing => {
-                            if (!totals[ing.product_id]) { const p = products.value.find(x => x.id === ing.product_id); totals[ing.product_id] = { id: ing.product_id, name: ing.name, unit: ing.unit, amount: 0, checked: p ? p.is_checked : false }; }
-                            totals[ing.product_id].amount += (ing.amount * item.portions);
-                        });
-                    }
-                }
+                const totals = {}; const start = new Date(currentDateObj.value); start.setHours(0,0,0,0); const end = new Date(start); end.setDate(end.getDate() + (settings.value.planning_days || 7) - 1); const startStr = start.toISOString().split('T')[0]; const endStr = end.toISOString().split('T')[0];
+                for (const key in planMap.value) { const [pDate, ] = key.split('|'); if (pDate >= startStr && pDate <= endStr) { const item = planMap.value[key]; if (item.exclude) continue; const ings = ingredientsMap.value[item.dish.id] || []; ings.forEach(ing => { if (!totals[ing.product_id]) { const p = products.value.find(x => x.id === ing.product_id); totals[ing.product_id] = { id: ing.product_id, name: ing.name, unit: ing.unit, amount: 0, checked: p ? p.is_checked : false }; } totals[ing.product_id].amount += (ing.amount * item.portions); }); } }
                 return Object.values(totals).sort((a,b) => { if (a.checked === b.checked) return a.name.localeCompare(b.name); return a.checked ? 1 : -1; });
             });
             const shoppingStats = computed(() => { const total = calculatedShoppingList.value.length; const checked = calculatedShoppingList.value.filter(i => i.checked).length; return { total, checked }; });
             const shoppingProgress = computed(() => { if (shoppingStats.value.total === 0) return 0; return (shoppingStats.value.checked / shoppingStats.value.total) * 100; });
             
-            // --- UI HELPERS ---
             const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
             const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
             const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
             const dayNameDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { weekday: 'long' }));
             const shoppingRangeDisplay = computed(() => { const end = new Date(currentDateObj.value); end.setDate(end.getDate() + (settings.value.planning_days || 7) - 1); return `${currentDateObj.value.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})} - ${end.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})}`; });
             const planningDays = computed(() => { const days = []; const start = new Date(currentDateObj.value); for(let i=0; i< (settings.value.planning_days || 7); i++) { const d = new Date(start); d.setDate(d.getDate() + i); days.push({ date: d, iso: d.toISOString().split('T')[0] }); } return days; });
-            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
-            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
-            const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
-            const filteredIngSuggestions = computed(() => { if(!ingSearch.value) return []; return products.value.filter(p => p.name.toLowerCase().includes(ingSearch.value.toLowerCase())); });
             const getPlannedDish = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.dish;
             const getPlannedPortions = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.portions || 1;
             const isExcluded = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.exclude;
@@ -504,14 +572,14 @@
 
             return {
                 user, authEmail, authPass, loading, handleLogin, handleLogout,
-                currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
-                products, dishes, staples, calculatedShoppingList, shoppingRangeDisplay,
-                filteredProducts, filteredDishes, filteredSelectorDishes, filteredIngSuggestions, genericSearch, selectorSearch, ingSearch, 
+                currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots, dishCategories, productCategories,
+                products, dishes, staples, calculatedShoppingList, shoppingRangeDisplay, shoppingProgress, shoppingStats, dailyNutrition,
+                filteredDishes, filteredProducts, filteredSelectorDishes, filteredIngSuggestions, genericSearch, selectorSearch, ingSearch, activeCategory,
                 showSelectorModal, selectorContext, showDishModal, newDish, newDishIngredients, showProdModal, newProd, showDetailModal, selectedDish, ingredientsMap,
                 currentDateStr, currentDateDisplay, dayNameDisplay, currentDateObj, getPlannedDish, getPlannedPortions, isExcluded, getSlotColor, isToday, formatDate, getDayName,
-                createProduct, openDishModal, addIngToDish, saveDish, openDishSelector, selectDishForPlan, handleNav,
+                createProduct, openDishModal, addIngToDish, saveDish, openDishSelector, selectDishForPlan, handleNav, loadInitialData,
                 toggleProductCheck, uncheckAll, addStaple, deleteStaple, toggleStapleCheck, openDishDetails,
-                mainTransitionName, shoppingStats, shoppingProgress, settings, saveSettings
+                mainTransitionName, settings, saveSettings
             };
           }
         }).mount('#app');
