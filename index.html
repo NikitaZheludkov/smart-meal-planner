@@ -48,11 +48,9 @@
   <div id="error-display"></div>
   <script>
     window.onerror = function(msg, url, line) {
-        // Игнорируем ошибки ResizeObserver (они безопасны)
         if(String(msg).includes('ResizeObserver')) return;
-        
         document.getElementById('error-display').style.display = 'block';
-        document.getElementById('error-display').innerHTML += "ОШИБКА:\n" + msg + "\n\nСТРОКА: " + line + "\n\n(Сделайте скриншот этого экрана)";
+        document.getElementById('error-display').innerHTML += "ОШИБКА:\n" + msg + "\n\nСТРОКА: " + line;
         return false;
     };
   </script>
@@ -237,389 +235,352 @@
   </div>
 
   <script>
-    // КОНФИГУРАЦИЯ БАЗЫ ДАННЫХ
     const SUPABASE_URL = 'https://wwvrgffgtqqxupqvnpzc.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P'; 
 
-    const { createApp, ref, computed, onMounted } = Vue;
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    try {
+        const { createApp, ref, computed, onMounted } = Vue;
+        // CHANGE: Rename variable to avoid global conflict with library
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const app = createApp({
-      setup() {
-        // --- STATE ---
-        const user = ref(null);
-        const authEmail = ref('');
-        const authPass = ref('');
-        const loading = ref(false);
-        
-        const products = ref([]);
-        const dishes = ref([]);
-        const ingredientsMap = ref({});
-        const planMap = ref({});
-        const staples = ref([]);
-        const settings = ref({ planning_days: 7, default_portions: 1 });
-        
-        // --- UI ---
-        const currentTab = ref('calendar');
-        const planViewMode = ref('day');
-        const currentDateObj = ref(new Date());
-        const selectedCategory = ref('Все');
-        const genericSearch = ref('');
-        
-        const tabs = [
-            { id: 'calendar', label: 'План', icon: 'calendar_today' },
-            { id: 'dishes', label: 'Блюда', icon: 'restaurant' },
-            { id: 'products', label: 'Продукты', icon: 'kitchen' },
-            { id: 'list', label: 'Купить', icon: 'shopping_bag' },
-            { id: 'settings', label: 'Настройки', icon: 'tune' }
-        ];
-        const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
-        
-        // --- MODALS ---
-        const showDetailModal = ref(false);
-        const selectedDish = ref(null);
-        const showProdModal = ref(false);
-        const newProd = ref({ name: '', unit: 'кг' });
-        const showSelectorModal = ref(false);
-        const selectorContext = ref({ date: null, slot: '', portions: 1, exclude: false });
-        const selectorSearch = ref('');
+        createApp({
+          setup() {
+            const user = ref(null);
+            const authEmail = ref('');
+            const authPass = ref('');
+            const loading = ref(false);
+            
+            const products = ref([]);
+            const dishes = ref([]);
+            const ingredientsMap = ref({});
+            const planMap = ref({});
+            const staples = ref([]);
+            const settings = ref({ planning_days: 7, default_portions: 1 });
+            
+            const currentTab = ref('calendar');
+            const planViewMode = ref('day');
+            const currentDateObj = ref(new Date());
+            const selectedCategory = ref('Все');
+            const genericSearch = ref('');
+            
+            const tabs = [
+                { id: 'calendar', label: 'План', icon: 'calendar_today' },
+                { id: 'dishes', label: 'Блюда', icon: 'restaurant' },
+                { id: 'products', label: 'Продукты', icon: 'kitchen' },
+                { id: 'list', label: 'Купить', icon: 'shopping_bag' },
+                { id: 'settings', label: 'Настройки', icon: 'tune' }
+            ];
+            const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
+            
+            const showDetailModal = ref(false);
+            const selectedDish = ref(null);
+            const showProdModal = ref(false);
+            const newProd = ref({ name: '', unit: 'кг' });
+            const showSelectorModal = ref(false);
+            const selectorContext = ref({ date: null, slot: '', portions: 1, exclude: false });
+            const selectorSearch = ref('');
 
-        // --- AUTH ---
-        const handleLogin = async () => {
-            if (!authEmail.value || !authPass.value) return alert('Введите данные');
-            loading.value = true;
-            let { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
-            if (error) {
-                const { data: upData, error: upError } = await supabase.auth.signUp({ email: authEmail.value, password: authPass.value });
-                if (upError) {
-                    alert(upError.message);
-                    loading.value = false;
-                    return;
+            // --- AUTH ---
+            const handleLogin = async () => {
+                if (!authEmail.value || !authPass.value) return alert('Введите данные');
+                loading.value = true;
+                let { data, error } = await sb.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
+                if (error) {
+                    const { data: upData, error: upError } = await sb.auth.signUp({ email: authEmail.value, password: authPass.value });
+                    if (upError) {
+                        alert(upError.message);
+                        loading.value = false;
+                        return;
+                    }
+                    data = upData;
                 }
-                data = upData;
-            }
-            user.value = data.user;
-            loading.value = false;
-            if (user.value) loadData();
-        };
-
-        const handleLogout = async () => {
-            await supabase.auth.signOut();
-            user.value = null;
-        };
-
-        // --- LOAD DATA ---
-        const loadData = async () => {
-            loading.value = true;
-            try {
-                // Settings
-                const { data: s } = await supabase.from('settings').select('*').maybeSingle();
-                if (s) settings.value = s;
-                else await supabase.from('settings').insert({ user_id: user.value.id });
-                
-                // Products
-                const { data: p } = await supabase.from('products').select('*');
-                if (p) products.value = p;
-                
-                // Dishes
-                const { data: d } = await supabase.from('dishes').select('*');
-                if (d) dishes.value = d;
-                
-                // Ingredients
-                const { data: i } = await supabase.from('ingredients').select('*');
-                if (i) {
-                    const map = {};
-                    i.forEach(row => {
-                        if (!map[row.dish_id]) map[row.dish_id] = [];
-                        const pr = products.value.find(x => x.id === row.product_id);
-                        if (pr) map[row.dish_id].push({ ...row, name: pr.name, unit: pr.unit });
-                    });
-                    ingredientsMap.value = map;
-                }
-                
-                // Plan
-                const { data: pl } = await supabase.from('plan').select('*, dishes(*)');
-                if (pl) {
-                    planMap.value = {};
-                    pl.forEach(r => {
-                        if (r.dishes) {
-                            planMap.value[r.date + '|' + r.slot] = {
-                                dish: r.dishes,
-                                id: r.id,
-                                portions: r.portions,
-                                exclude: r.is_excluded
-                            };
-                        }
-                    });
-                }
-            } catch (e) {
-                console.error(e);
-            }
-            loading.value = false;
-        };
-
-        // --- ACTIONS ---
-        const handleFabClick = () => {
-            if (currentTab.value === 'products') {
-                newProd.value = { name: '', unit: 'кг' };
-                showProdModal.value = true;
-            }
-        };
-
-        const openEditProduct = (prod) => {
-            newProd.value = { ...prod };
-            showProdModal.value = true;
-        };
-
-        const saveProduct = async () => {
-            if (newProd.value.id) {
-                const { error } = await supabase.from('products').update({ name: newProd.value.name, unit: newProd.value.unit }).eq('id', newProd.value.id);
-                if (!error) {
-                    const idx = products.value.findIndex(p => p.id === newProd.value.id);
-                    products.value[idx] = { ...newProd.value };
-                }
-            } else {
-                const { data } = await supabase.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, user_id: user.value.id }).select();
-                if (data) products.value.push(data[0]);
-            }
-            showProdModal.value = false;
-        };
-
-        const saveSettings = async () => {
-            await supabase.from('settings').upsert({ user_id: user.value.id, ...settings.value });
-            alert('Сохранено');
-        };
-
-        const openDishDetails = (dish) => {
-            selectedDish.value = dish;
-            showDetailModal.value = true;
-        };
-
-        const handleNav = (dir) => {
-            const d = new Date(currentDateObj.value);
-            d.setDate(d.getDate() + (planViewMode.value === 'day' ? 1 : 7) * dir);
-            currentDateObj.value = d;
-        };
-
-        const toggleProductCheck = async (item) => {
-            const newState = !item.checked;
-            const pIndex = products.value.findIndex(p => p.id === item.id);
-            if (pIndex !== -1) products.value[pIndex].is_checked = newState;
-            await supabase.from('products').update({ is_checked: newState }).eq('id', item.id);
-        };
-
-        const uncheckAll = async () => {
-            products.value.forEach(p => p.is_checked = false);
-            await supabase.from('products').update({ is_checked: false }).eq('user_id', user.value.id);
-        };
-
-        const openDishSelector = (date, slot) => {
-            const d = new Date(date);
-            const key = d.toISOString().split('T')[0] + '|' + slot;
-            const existing = planMap.value[key];
-            selectorContext.value = {
-                date: d,
-                slot,
-                portions: existing ? (existing.portions || 1) : (settings.value.default_portions || 1),
-                exclude: existing ? existing.exclude : false
+                user.value = data.user;
+                loading.value = false;
+                if (user.value) loadData();
             };
-            selectorSearch.value = '';
-            showSelectorModal.value = true;
-        };
 
-        const selectDishForPlan = async (dish) => {
-            const { date, slot, portions, exclude } = selectorContext.value;
-            const dateStr = date.toISOString().split('T')[0];
-            const key = dateStr + '|' + slot;
-            const existing = planMap.value[key];
+            const handleLogout = async () => {
+                await sb.auth.signOut();
+                user.value = null;
+            };
 
-            if (existing) {
-                await supabase.from('plan').delete().eq('id', existing.id);
-                delete planMap.value[key];
-            }
-
-            if (dish) {
-                const { data } = await supabase.from('plan').insert({
-                    user_id: user.value.id,
-                    date: dateStr,
-                    slot: slot,
-                    dish_id: dish.id,
-                    portions: portions,
-                    is_excluded: exclude
-                }).select('*, dishes(*)');
-
-                if (data && data[0]) {
-                    planMap.value[key] = {
-                        dish: data[0].dishes,
-                        id: data[0].id,
-                        portions,
-                        exclude
-                    };
+            // --- LOAD DATA ---
+            const loadData = async () => {
+                loading.value = true;
+                try {
+                    const { data: s } = await sb.from('settings').select('*').maybeSingle();
+                    if (s) settings.value = s;
+                    else await sb.from('settings').insert({ user_id: user.value.id });
+                    
+                    const { data: p } = await sb.from('products').select('*');
+                    if (p) products.value = p;
+                    
+                    const { data: d } = await sb.from('dishes').select('*');
+                    if (d) dishes.value = d;
+                    
+                    const { data: i } = await sb.from('ingredients').select('*');
+                    if (i) {
+                        const map = {};
+                        i.forEach(row => {
+                            if (!map[row.dish_id]) map[row.dish_id] = [];
+                            const pr = products.value.find(x => x.id === row.product_id);
+                            if (pr) map[row.dish_id].push({ ...row, name: pr.name, unit: pr.unit });
+                        });
+                        ingredientsMap.value = map;
+                    }
+                    
+                    const { data: pl } = await sb.from('plan').select('*, dishes(*)');
+                    if (pl) {
+                        planMap.value = {};
+                        pl.forEach(r => {
+                            if (r.dishes) {
+                                planMap.value[r.date + '|' + r.slot] = {
+                                    dish: r.dishes,
+                                    id: r.id,
+                                    portions: r.portions,
+                                    exclude: r.is_excluded
+                                };
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
-            }
-            showSelectorModal.value = false;
-        };
+                loading.value = false;
+            };
 
-        // --- COMPUTED ---
-        const pageTitle = computed(() => {
-            return tabs.find(t => t.id === currentTab.value)?.label;
-        });
-        
-        const currentDateStr = computed(() => {
-            return currentDateObj.value.toISOString().split('T')[0];
-        });
-        
-        const currentDateDisplay = computed(() => {
-            return currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-        });
-        
-        const dayNameDisplay = computed(() => {
-            return currentDateObj.value.toLocaleDateString('ru-RU', { weekday: 'long' });
-        });
-        
-        const shoppingRangeDisplay = computed(() => {
-            const end = new Date(currentDateObj.value);
-            end.setDate(end.getDate() + 6);
-            return `${currentDateObj.value.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
-        });
+            // --- ACTIONS ---
+            const handleFabClick = () => {
+                if (currentTab.value === 'products') {
+                    newProd.value = { name: '', unit: 'кг' };
+                    showProdModal.value = true;
+                }
+            };
 
-        const planningDays = computed(() => {
-            const days = [];
-            const start = new Date(currentDateObj.value);
-            for (let i = 0; i < (settings.value.planning_days || 7); i++) {
-                const d = new Date(start);
-                d.setDate(d.getDate() + i);
-                days.push({ date: d, iso: d.toISOString().split('T')[0] });
-            }
-            return days;
-        });
+            const openEditProduct = (prod) => {
+                newProd.value = { ...prod };
+                showProdModal.value = true;
+            };
 
-        const filteredProducts = computed(() => {
-            return products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase()));
-        });
-        
-        const filteredDishes = computed(() => {
-            let res = dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase()));
-            if (selectedCategory.value !== 'Все') {
-                res = res.filter(d => d.category === selectedCategory.value);
-            }
-            return res;
-        });
+            const saveProduct = async () => {
+                if (newProd.value.id) {
+                    const { error } = await sb.from('products').update({ name: newProd.value.name, unit: newProd.value.unit }).eq('id', newProd.value.id);
+                    if (!error) {
+                        const idx = products.value.findIndex(p => p.id === newProd.value.id);
+                        products.value[idx] = { ...newProd.value };
+                    }
+                } else {
+                    const { data } = await sb.from('products').insert({ name: newProd.value.name, unit: newProd.value.unit, user_id: user.value.id }).select();
+                    if (data) products.value.push(data[0]);
+                }
+                showProdModal.value = false;
+            };
 
-        const filteredSelectorDishes = computed(() => {
-            return dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase()));
-        });
+            const saveSettings = async () => {
+                await sb.from('settings').upsert({ user_id: user.value.id, ...settings.value });
+                alert('Сохранено');
+            };
 
-        const getPlannedDish = (date, slot) => {
-            return planMap.value[date + '|' + slot]?.dish;
-        };
-        
-        const getPlannedPortions = (date, slot) => {
-            return planMap.value[date + '|' + slot]?.portions || 1;
-        };
-        
-        const getSlotColor = (slot) => {
-            return ({
+            const openDishDetails = (dish) => {
+                selectedDish.value = dish;
+                showDetailModal.value = true;
+            };
+
+            const handleNav = (dir) => {
+                const d = new Date(currentDateObj.value);
+                d.setDate(d.getDate() + (planViewMode.value === 'day' ? 1 : 7) * dir);
+                currentDateObj.value = d;
+            };
+
+            const toggleProductCheck = async (item) => {
+                const newState = !item.checked;
+                const pIndex = products.value.findIndex(p => p.id === item.id);
+                if (pIndex !== -1) products.value[pIndex].is_checked = newState;
+                await sb.from('products').update({ is_checked: newState }).eq('id', item.id);
+            };
+
+            const uncheckAll = async () => {
+                products.value.forEach(p => p.is_checked = false);
+                await sb.from('products').update({ is_checked: false }).eq('user_id', user.value.id);
+            };
+
+            const openDishSelector = (date, slot) => {
+                const d = new Date(date);
+                const key = d.toISOString().split('T')[0] + '|' + slot;
+                const existing = planMap.value[key];
+                selectorContext.value = {
+                    date: d,
+                    slot,
+                    portions: existing ? (existing.portions || 1) : (settings.value.default_portions || 1),
+                    exclude: existing ? existing.exclude : false
+                };
+                selectorSearch.value = '';
+                showSelectorModal.value = true;
+            };
+
+            const selectDishForPlan = async (dish) => {
+                const { date, slot, portions, exclude } = selectorContext.value;
+                const dateStr = date.toISOString().split('T')[0];
+                const key = dateStr + '|' + slot;
+                const existing = planMap.value[key];
+
+                if (existing) {
+                    await sb.from('plan').delete().eq('id', existing.id);
+                    delete planMap.value[key];
+                }
+
+                if (dish) {
+                    const { data } = await sb.from('plan').insert({
+                        user_id: user.value.id,
+                        date: dateStr,
+                        slot: slot,
+                        dish_id: dish.id,
+                        portions: portions,
+                        is_excluded: exclude
+                    }).select('*, dishes(*)');
+
+                    if (data && data[0]) {
+                        planMap.value[key] = {
+                            dish: data[0].dishes,
+                            id: data[0].id,
+                            portions,
+                            exclude
+                        };
+                    }
+                }
+                showSelectorModal.value = false;
+            };
+
+            // --- COMPUTED ---
+            const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
+            const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
+            
+            const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
+            const dayNameDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { weekday: 'long' }));
+            
+            const shoppingRangeDisplay = computed(() => {
+                const end = new Date(currentDateObj.value);
+                end.setDate(end.getDate() + 6);
+                return `${currentDateObj.value.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+            });
+
+            const planningDays = computed(() => {
+                const days = [];
+                const start = new Date(currentDateObj.value);
+                for (let i = 0; i < (settings.value.planning_days || 7); i++) {
+                    const d = new Date(start);
+                    d.setDate(d.getDate() + i);
+                    days.push({ date: d, iso: d.toISOString().split('T')[0] });
+                }
+                return days;
+            });
+
+            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(genericSearch.value.toLowerCase())));
+            
+            const filteredDishes = computed(() => {
+                let res = dishes.value.filter(d => d.name.toLowerCase().includes(genericSearch.value.toLowerCase()));
+                if (selectedCategory.value !== 'Все') {
+                    res = res.filter(d => d.category === selectedCategory.value);
+                }
+                return res;
+            });
+
+            const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
+
+            const getPlannedDish = (date, slot) => planMap.value[date + '|' + slot]?.dish;
+            const getPlannedPortions = (date, slot) => planMap.value[date + '|' + slot]?.portions || 1;
+            
+            const getSlotColor = (slot) => ({
                 'Завтрак': 'bg-orange-400',
                 'Обед': 'bg-teal-400',
                 'Гарнир': 'bg-amber-400',
                 'Салат': 'bg-lime-400',
                 'Перекус': 'bg-indigo-400'
             }[slot] || 'bg-slate-300');
-        };
 
-        const isToday = (d) => {
-            return d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
-        };
-        
-        const formatDate = (d) => {
-            return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-        };
-        
-        const getDayName = (d) => {
-            return d.toLocaleDateString('ru-RU', { weekday: 'short' });
-        };
+            const isToday = (d) => d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+            const formatDate = (d) => d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            const getDayName = (d) => d.toLocaleDateString('ru-RU', { weekday: 'short' });
 
-        const dailyMacros = computed(() => {
-            let k = 0;
-            mealSlots.forEach(slot => {
-                const dish = getPlannedDish(currentDateStr.value, slot);
-                const portions = getPlannedPortions(currentDateStr.value, slot);
-                if (dish) k += (dish.k * portions);
+            const dailyMacros = computed(() => {
+                let k = 0;
+                mealSlots.forEach(slot => {
+                    const dish = getPlannedDish(currentDateStr.value, slot);
+                    const portions = getPlannedPortions(currentDateStr.value, slot);
+                    if (dish) k += (dish.k * portions);
+                });
+                return { k };
             });
-            return { k };
-        });
 
-        const calculatedShoppingList = computed(() => {
-            const totals = {};
-            const start = new Date(currentDateObj.value);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(start);
-            end.setDate(end.getDate() + (settings.value.planning_days || 7) - 1);
-            const startStr = start.toISOString().split('T')[0];
-            const endStr = end.toISOString().split('T')[0];
+            const calculatedShoppingList = computed(() => {
+                const totals = {};
+                const start = new Date(currentDateObj.value);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(start);
+                end.setDate(end.getDate() + (settings.value.planning_days || 7) - 1);
+                const startStr = start.toISOString().split('T')[0];
+                const endStr = end.toISOString().split('T')[0];
 
-            for (const key in planMap.value) {
-                const [pDate, ] = key.split('|');
-                if (pDate >= startStr && pDate <= endStr) {
-                    const item = planMap.value[key];
-                    if (item.exclude) continue;
-                    const ings = ingredientsMap.value[item.dish.id] || [];
-                    ings.forEach(ing => {
-                        if (!totals[ing.product_id]) {
-                            const p = products.value.find(x => x.id === ing.product_id);
-                            totals[ing.product_id] = {
-                                id: ing.product_id,
-                                name: ing.name,
-                                unit: ing.unit,
-                                amount: 0,
-                                checked: p ? p.is_checked : false
-                            };
-                        }
-                        totals[ing.product_id].amount += (ing.amount * item.portions);
-                    });
+                for (const key in planMap.value) {
+                    const [pDate, ] = key.split('|');
+                    if (pDate >= startStr && pDate <= endStr) {
+                        const item = planMap.value[key];
+                        if (item.exclude) continue;
+                        const ings = ingredientsMap.value[item.dish.id] || [];
+                        ings.forEach(ing => {
+                            if (!totals[ing.product_id]) {
+                                const p = products.value.find(x => x.id === ing.product_id);
+                                totals[ing.product_id] = {
+                                    id: ing.product_id,
+                                    name: ing.name,
+                                    unit: ing.unit,
+                                    amount: 0,
+                                    checked: p ? p.is_checked : false
+                                };
+                            }
+                            totals[ing.product_id].amount += (ing.amount * item.portions);
+                        });
+                    }
                 }
-            }
-            return Object.values(totals).sort((a, b) => {
-                if (a.checked === b.checked) return a.name.localeCompare(b.name);
-                return a.checked ? 1 : -1;
+                return Object.values(totals).sort((a, b) => {
+                    if (a.checked === b.checked) return a.name.localeCompare(b.name);
+                    return a.checked ? 1 : -1;
+                });
             });
-        });
 
-        const shoppingStats = computed(() => {
-            const total = calculatedShoppingList.value.length;
-            const checked = calculatedShoppingList.value.filter(i => i.checked).length;
-            return { total, checked };
-        });
+            const shoppingStats = computed(() => {
+                const total = calculatedShoppingList.value.length;
+                const checked = calculatedShoppingList.value.filter(i => i.checked).length;
+                return { total, checked };
+            });
 
-        const shoppingProgress = computed(() => {
-            return shoppingStats.value.total === 0 ? 0 : (shoppingStats.value.checked / shoppingStats.value.total) * 100;
-        });
+            const shoppingProgress = computed(() => shoppingStats.value.total === 0 ? 0 : (shoppingStats.value.checked / shoppingStats.value.total) * 100);
 
-        // --- MOUNT ---
-        onMounted(async () => {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-                user.value = data.session.user;
-                loadData();
-            }
-        });
+            // --- MOUNT ---
+            onMounted(async () => {
+                const { data } = await sb.auth.getSession();
+                if (data.session) {
+                    user.value = data.session.user;
+                    loadData();
+                }
+            });
 
-        return {
-            user, authEmail, authPass, loading, handleLogin, handleLogout,
-            currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
-            products, dishes, settings, genericSearch, selectedCategory, selectorSearch,
-            currentDateStr, currentDateDisplay, dayNameDisplay, shoppingRangeDisplay, currentDateObj,
-            getPlannedDish, getPlannedPortions, getSlotColor, isToday, formatDate, getDayName,
-            dailyMacros, calculatedShoppingList, shoppingStats, shoppingProgress,
-            showDetailModal, selectedDish, showProdModal, newProd, showSelectorModal, selectorContext,
-            handleNav, openDishDetails, openEditProduct, saveProduct, saveSettings, handleFabClick,
-            toggleProductCheck, uncheckAll, ingredientsMap, openDishSelector, selectDishForPlan, filteredProducts, filteredDishes, filteredSelectorDishes
-        };
-      }
-    });
-    
-    app.mount('#app');
+            return {
+                user, authEmail, authPass, loading, handleLogin, handleLogout,
+                currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
+                products, dishes, settings, genericSearch, selectedCategory, selectorSearch,
+                currentDateStr, currentDateDisplay, dayNameDisplay, shoppingRangeDisplay, currentDateObj,
+                getPlannedDish, getPlannedPortions, getSlotColor, isToday, formatDate, getDayName,
+                dailyMacros, calculatedShoppingList, shoppingStats, shoppingProgress,
+                showDetailModal, selectedDish, showProdModal, newProd, showSelectorModal, selectorContext,
+                handleNav, openDishDetails, openEditProduct, saveProduct, saveSettings, handleFabClick,
+                toggleProductCheck, uncheckAll, ingredientsMap, openDishSelector, selectDishForPlan, filteredProducts, filteredDishes, filteredSelectorDishes
+            };
+          }
+        }).mount('#app');
+    } catch (err) {
+        alert("CRITICAL VUE INIT ERROR:\n" + err);
+    }
   </script>
 </body>
 </html>
