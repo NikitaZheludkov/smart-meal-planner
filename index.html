@@ -8,7 +8,9 @@
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
@@ -18,16 +20,14 @@
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     .pt-safe { padding-top: env(safe-area-inset-top); }
     .gpu-layer { transform: translateZ(0); will-change: transform, opacity; }
-    /* Transitions */
+    
+    /* Анимации */
     .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
-    .slide-left-enter-active, .slide-left-leave-active, .slide-right-enter-active, .slide-right-leave-active { transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
-    .slide-left-enter-from { transform: translateX(30px); opacity: 0; }
-    .slide-left-leave-to { transform: translateX(-30px); opacity: 0; }
-    .slide-right-enter-from { transform: translateX(-30px); opacity: 0; }
-    .slide-right-leave-to { transform: translateX(30px); opacity: 0; }
+    
     .tap-effect { transition: transform 0.1s; }
     .tap-effect:active { transform: scale(0.96); opacity: 0.9; }
+    
     .glass-header { background: rgba(255, 255, 255, 0.98); border-bottom: 1px solid rgba(0,0,0,0.03); z-index: 40; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.06); }
   </style>
 </head>
@@ -39,10 +39,10 @@
         <p class="text-slate-400 text-sm mb-8 text-center">Ваш личный план питания теперь в облаке.</p>
         
         <div class="w-full space-y-3">
-            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800">
-            <input v-model="authPass" type="password" placeholder="Пароль" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800">
-            <button @click="handleLogin" :disabled="loading" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl">
-                {{ loading ? 'Вход...' : 'Войти / Регистрация' }}
+            <input v-model="authEmail" type="email" placeholder="Email" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
+            <input v-model="authPass" type="password" placeholder="Пароль (мин. 6 символов)" class="w-full p-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-slate-800 focus:ring-2 focus:ring-slate-900">
+            <button @click="handleLogin" :disabled="loading" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl transition-all disabled:opacity-50">
+                {{ loading ? 'Загрузка...' : 'Войти / Регистрация' }}
             </button>
         </div>
         <p class="mt-4 text-xs text-slate-400 text-center">Если аккаунта нет, он будет создан автоматически.</p>
@@ -56,11 +56,11 @@
                     <div class="text-[10px] font-medium text-slate-400 leading-none mt-0.5">Cloud Edition • {{ user.email }}</div>
                 </div>
                 <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-2 border-slate-200 border-t-slate-800"></div>
-                <button v-else @click="handleLogout" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg">Выйти</button>
+                <button v-else @click="handleLogout" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded-lg tap-effect">Выйти</button>
             </div>
             
             <div v-if="currentTab === 'calendar'" class="px-4 pb-5 space-y-3">
-                 <div class="flex bg-slate-100/80 p-1 rounded-xl relative h-9">
+                <div class="flex bg-slate-100/80 p-1 rounded-xl relative h-9">
                      <div class="absolute top-1 bottom-1 bg-white rounded-lg shadow-sm w-[calc(50%-4px)] transition-all duration-300 ease-out" :class="planViewMode === 'day' ? 'left-1' : 'left-[calc(50%+2px)]'"></div>
                      <button @click="planViewMode = 'day'" class="flex-1 relative z-10 text-[11px] font-bold flex items-center justify-center gap-1.5" :class="planViewMode === 'day' ? 'text-slate-900' : 'text-slate-400'">День</button>
                      <button @click="planViewMode = 'week'" class="flex-1 relative z-10 text-[11px] font-bold flex items-center justify-center gap-1.5" :class="planViewMode === 'week' ? 'text-slate-900' : 'text-slate-400'">Сетка</button>
@@ -83,11 +83,11 @@
         </header>
 
         <main class="flex-1 relative overflow-hidden bg-slate-50">
-            <transition :name="mainTransitionName">
+             <transition name="fade">
                 
                 <div v-if="currentTab === 'calendar'" class="absolute inset-0 overflow-y-auto p-4 pb-24 no-scrollbar">
                     <div v-if="planViewMode === 'day'" class="space-y-3">
-                         <div v-if="isDayEmpty" class="text-center py-20 opacity-40"><span class="material-icons-round text-5xl mb-2 text-slate-300">event_note</span><p class="text-sm font-bold text-slate-400">Пусто</p></div>
+                         <div v-if="!mealSlots.some(s => getPlannedDish(currentDateStr, s))" class="text-center py-20 opacity-40"><span class="material-icons-round text-5xl mb-2 text-slate-300">event_note</span><p class="text-sm font-bold text-slate-400">Пусто</p></div>
                          <div v-for="slot in mealSlots" :key="slot">
                             <div v-if="getPlannedDish(currentDateStr, slot)" @click="openDishDetails(getPlannedDish(currentDateStr, slot))" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 tap-effect relative overflow-hidden">
                                 <div class="absolute left-0 top-0 bottom-0 w-1" :class="getSlotColor(slot)"></div>
@@ -135,206 +135,221 @@
         </nav>
 
         <div v-if="showSelectorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center p-4" @click.self="showSelectorModal = false">
-             <div class="bg-white w-full max-w-sm rounded-3xl p-4 shadow-2xl space-y-4">
-                 <h3 class="font-bold text-lg">{{ formatDate(selectorContext.date) }} - {{ selectorContext.slot }}</h3>
-                 <input v-model="selectorSearch" placeholder="Найти блюдо..." class="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none">
+             <div class="bg-white w-full max-w-sm rounded-3xl p-4 shadow-2xl space-y-4 mb-4">
+                 <h3 class="font-bold text-lg text-slate-800 text-center">{{ formatDate(selectorContext.date) }} - {{ selectorContext.slot }}</h3>
+                 <input v-model="selectorSearch" placeholder="Найти блюдо..." class="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none border border-slate-100">
                  <div class="max-h-60 overflow-y-auto space-y-2">
-                     <div @click="selectDishForPlan(null)" class="p-3 bg-rose-50 text-rose-500 font-bold rounded-xl text-sm text-center">Очистить слот</div>
-                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="p-3 bg-white border border-slate-100 rounded-xl font-bold text-sm text-slate-700 tap-effect">{{ dish.name }}</div>
+                     <div @click="selectDishForPlan(null)" class="p-3 bg-rose-50 text-rose-500 font-bold rounded-xl text-sm text-center tap-effect border border-rose-100">Очистить слот</div>
+                     <div v-for="dish in filteredSelectorDishes" :key="dish.id" @click="selectDishForPlan(dish)" class="p-3 bg-white border border-slate-100 rounded-xl font-bold text-sm text-slate-700 tap-effect shadow-sm">{{ dish.name }}</div>
                  </div>
              </div>
         </div>
 
         <div class="z-40 pointer-events-none fixed inset-0 max-w-md mx-auto">
-            <button v-if="currentTab === 'dishes'" @click="createDishDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect"><span class="material-icons-round text-3xl">add</span></button>
-            <button v-if="currentTab === 'products'" @click="createProductDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'dishes'" @click="createDishDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
+            <button v-if="currentTab === 'products'" @click="createProductDemo" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"><span class="material-icons-round text-3xl">add</span></button>
         </div>
     </template>
   </div>
 
   <script>
-    // --- КОНФИГУРАЦИЯ SUPABASE ---
-    // ЗАМЕНИ ЭТИ ДАННЫЕ НА СВОИ!
+    // --- ПЕРЕХВАТ ОШИБОК ---
+    window.onerror = function(msg, url, line) {
+        alert("ОШИБКА КОДА:\n" + msg + "\nСтрока: " + line);
+    };
+
+    // --- КЛЮЧИ SUPABASE (ВСТАВЛЕНЫ) ---
     const SUPABASE_URL = 'https://wwvrgffgtqqxupqvnpzc.supabase.co'; 
     const SUPABASE_KEY = 'sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P'; 
     
-    const { createApp, ref, computed, onMounted, watch } = Vue;
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // --- ПРОВЕРКА БИБЛИОТЕК ---
+    if (typeof Vue === 'undefined') alert("Vue.js не загрузился. Проверьте интернет.");
+    if (typeof window.supabase === 'undefined') alert("Supabase JS не загрузился.");
 
-    createApp({
-      setup() {
-        const user = ref(null);
-        const authEmail = ref('');
-        const authPass = ref('');
-        const loading = ref(false);
+    try {
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Data Refs
-        const products = ref([]);
-        const dishes = ref([]);
-        const planMap = ref({});
-        const settings = ref({ planning_days: 7 });
+        createApp({
+          setup() {
+            // Состояние пользователя
+            const user = ref(null);
+            const authEmail = ref('');
+            const authPass = ref('');
+            const loading = ref(false);
 
-        // UI Refs
-        const currentTab = ref('calendar');
-        const planViewMode = ref('week');
-        const currentDateObj = ref(new Date());
-        const showSelectorModal = ref(false);
-        const selectorContext = ref({ date: null, slot: '' });
-        
-        // Search Refs
-        const prodSearch = ref('');
-        const dishSearch = ref('');
-        const selectorSearch = ref('');
-
-        const tabs = [
-            { id: 'calendar', label: 'План', icon: 'calendar_today' },
-            { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu' },
-            { id: 'products', label: 'Продукты', icon: 'kitchen' },
-            { id: 'settings', label: 'Настройки', icon: 'tune' }
-        ];
-        const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
-
-        // --- AUTH LOGIC ---
-        const handleLogin = async () => {
-            if(!authEmail.value || !authPass.value) return alert('Введите email и пароль');
-            loading.value = true;
-            // 1. Пробуем войти
-            let { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
-            if (error) {
-                // 2. Если ошибка, пробуем зарегистрировать
-                const { data: upData, error: upError } = await supabase.auth.signUp({ email: authEmail.value, password: authPass.value });
-                if (upError) { alert(upError.message); loading.value = false; return; }
-                data = upData; // Успешная регистрация = Вход
-            }
-            user.value = data.user;
-            loading.value = false;
-            loadInitialData();
-        };
-
-        const handleLogout = async () => {
-            await supabase.auth.signOut();
-            user.value = null;
-            products.value = []; dishes.value = []; planMap.value = {};
-        };
-
-        // --- DATA LOGIC (MIGRATED FROM GAS TO SUPABASE) ---
-        const loadInitialData = async () => {
-            loading.value = true;
-            try {
-                // Загружаем Продукты
-                const { data: prods } = await supabase.from('products').select('*');
-                if(prods) products.value = prods;
-
-                // Загружаем Блюда
-                const { data: d } = await supabase.from('dishes').select('*');
-                if(d) dishes.value = d;
-
-                // Загружаем План
-                const { data: p } = await supabase.from('plan').select('*, dishes(*)');
-                if(p) {
-                    p.forEach(row => {
-                         const key = row.date + '|' + row.slot;
-                         if(row.dishes) planMap.value[key] = { dish: row.dishes, id: row.id };
-                    });
-                }
-            } catch(e) { console.error(e); }
-            loading.value = false;
-        };
-
-        const createProductDemo = async () => {
-            const name = prompt("Название продукта:");
-            if(!name) return;
-            const uid = user.value.id;
-            // Прямая запись в базу
-            const { data, error } = await supabase.from('products').insert({ name, user_id: uid }).select();
-            if(data) products.value.push(data[0]);
-        };
-
-        const createDishDemo = async () => {
-            const name = prompt("Название блюда:");
-            if(!name) return;
-            const uid = user.value.id;
-            const { data } = await supabase.from('dishes').insert({ name, user_id: uid, k: 100 }).select();
-            if(data) dishes.value.push(data[0]);
-        };
-
-        const selectDishForPlan = async (dish) => {
-            const { date, slot } = selectorContext.value;
-            const dateStr = date.toISOString().split('T')[0];
-            const uid = user.value.id;
+            // Данные
+            const products = ref([]);
+            const dishes = ref([]);
+            const planMap = ref({});
             
-            // 1. Очищаем текущий слот в UI и БД
-            const key = dateStr + '|' + slot;
-            const existing = planMap.value[key];
-            if(existing) {
-                await supabase.from('plan').delete().eq('id', existing.id);
-                delete planMap.value[key];
-            }
+            // Интерфейс
+            const currentTab = ref('calendar');
+            const planViewMode = ref('week');
+            const currentDateObj = ref(new Date());
+            const showSelectorModal = ref(false);
+            const selectorContext = ref({ date: null, slot: '' });
+            
+            // Поиск
+            const prodSearch = ref('');
+            const dishSearch = ref('');
+            const selectorSearch = ref('');
 
-            // 2. Если выбрали блюдо, создаем запись
-            if(dish) {
-                const { data } = await supabase.from('plan').insert({
-                    user_id: uid, date: dateStr, slot: slot, dish_id: dish.id
-                }).select('*, dishes(*)');
-                
-                if(data && data[0]) {
-                    planMap.value[key] = { dish: data[0].dishes, id: data[0].id };
+            const tabs = [
+                { id: 'calendar', label: 'План', icon: 'calendar_today' },
+                { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu' },
+                { id: 'products', label: 'Продукты', icon: 'kitchen' },
+                { id: 'settings', label: 'Настройки', icon: 'tune' }
+            ];
+            const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
+
+            // --- АВТОРИЗАЦИЯ ---
+            const handleLogin = async () => {
+                if(!authEmail.value || !authPass.value) return alert('Введите Email и Пароль');
+                loading.value = true;
+                // Вход
+                let { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.value, password: authPass.value });
+                if (error) {
+                    // Регистрация, если не найден
+                    const { data: upData, error: upError } = await supabase.auth.signUp({ email: authEmail.value, password: authPass.value });
+                    if (upError) { alert("Ошибка: " + upError.message); loading.value = false; return; }
+                    data = upData; 
                 }
-            }
-            showSelectorModal.value = false;
-        };
+                user.value = data.user;
+                loading.value = false;
+                if(user.value) loadInitialData();
+            };
 
-        // --- HELPERS ---
-        const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
-        const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
-        const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
-        const shoppingRangeDisplay = computed(() => {
-             const end = new Date(currentDateObj.value); end.setDate(end.getDate() + 6);
-             return `${currentDateObj.value.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})} - ${end.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})}`;
-        });
-        
-        const planningDays = computed(() => {
-            const days = [];
-            const start = new Date(currentDateObj.value); // Начинаем с текущей даты
-            for(let i=0; i<7; i++) {
-                const d = new Date(start); d.setDate(d.getDate() + i);
-                days.push({ date: d, iso: d.toISOString().split('T')[0] });
-            }
-            return days;
-        });
+            const handleLogout = async () => {
+                await supabase.auth.signOut();
+                user.value = null;
+                products.value = []; dishes.value = []; planMap.value = {};
+            };
 
-        const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(prodSearch.value.toLowerCase())));
-        const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(dishSearch.value.toLowerCase())));
-        const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
+            // --- ЗАГРУЗКА ДАННЫХ ---
+            const loadInitialData = async () => {
+                loading.value = true;
+                try {
+                    // Продукты
+                    const { data: prods } = await supabase.from('products').select('*');
+                    if(prods) products.value = prods;
 
-        const getPlannedDish = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.dish;
-        const getSlotColor = (slot) => ({ 'Завтрак': 'bg-orange-400', 'Обед': 'bg-teal-400', 'Гарнир': 'bg-amber-400', 'Салат': 'bg-lime-400', 'Перекус': 'bg-indigo-400' }[slot] || 'bg-slate-300');
-        const isToday = (d) => d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
-        const formatDate = (d) => d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-        const getDayName = (d) => d.toLocaleDateString('ru-RU', { weekday: 'short' });
+                    // Блюда
+                    const { data: d } = await supabase.from('dishes').select('*');
+                    if(d) dishes.value = d;
 
-        const openDishSelector = (date, slot) => { selectorContext.value = { date, slot }; selectorSearch.value = ''; showSelectorModal.value = true; };
-        const openDishDetails = (dish) => { alert("Детали блюда: " + dish.name); }; // Пока заглушка
-        const handleNav = (dir) => { const d = new Date(currentDateObj.value); d.setDate(d.getDate() + (planViewMode.value==='day'?1:7)*dir); currentDateObj.value = d; };
+                    // План (вместе с блюдами)
+                    const { data: p } = await supabase.from('plan').select('*, dishes(*)');
+                    if(p) {
+                        p.forEach(row => {
+                             const key = row.date + '|' + row.slot;
+                             if(row.dishes) planMap.value[key] = { dish: row.dishes, id: row.id };
+                        });
+                    }
+                } catch(e) { console.error(e); alert("Ошибка загрузки данных: " + e.message); }
+                loading.value = false;
+            };
 
-        // Check active session
-        onMounted(async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if(session) { user.value = session.user; loadInitialData(); }
-        });
+            // --- ФУНКЦИИ СОЗДАНИЯ (ДЕМО) ---
+            const createProductDemo = async () => {
+                const name = prompt("Название продукта:");
+                if(!name) return;
+                const uid = user.value.id;
+                const { data, error } = await supabase.from('products').insert({ name, user_id: uid }).select();
+                if(error) alert("Ошибка: " + error.message);
+                if(data) products.value.push(data[0]);
+            };
 
-        return {
-            user, authEmail, authPass, loading, handleLogin, handleLogout,
-            currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
-            products, dishes, filteredProducts, filteredDishes, filteredSelectorDishes,
-            prodSearch, dishSearch, selectorSearch, showSelectorModal, selectorContext,
-            currentDateStr, currentDateDisplay, shoppingRangeDisplay,
-            getPlannedDish, getSlotColor, isToday, formatDate, getDayName,
-            createProductDemo, createDishDemo, openDishSelector, selectDishForPlan, openDishDetails, handleNav,
-            mainTransitionName: 'fade'
-        };
-      }
-    }).mount('#app');
+            const createDishDemo = async () => {
+                const name = prompt("Название блюда:");
+                if(!name) return;
+                const uid = user.value.id;
+                const { data, error } = await supabase.from('dishes').insert({ name, user_id: uid, k: 100 }).select();
+                if(error) alert("Ошибка: " + error.message);
+                if(data) dishes.value.push(data[0]);
+            };
+
+            const selectDishForPlan = async (dish) => {
+                const { date, slot } = selectorContext.value;
+                const dateStr = date.toISOString().split('T')[0];
+                const uid = user.value.id;
+                const key = dateStr + '|' + slot;
+
+                // 1. Удаляем старое, если было
+                const existing = planMap.value[key];
+                if(existing) {
+                    await supabase.from('plan').delete().eq('id', existing.id);
+                    delete planMap.value[key];
+                }
+
+                // 2. Добавляем новое
+                if(dish) {
+                    const { data, error } = await supabase.from('plan').insert({
+                        user_id: uid, date: dateStr, slot: slot, dish_id: dish.id
+                    }).select('*, dishes(*)');
+                    
+                    if(error) alert(error.message);
+                    if(data && data[0]) {
+                        planMap.value[key] = { dish: data[0].dishes, id: data[0].id };
+                    }
+                }
+                showSelectorModal.value = false;
+            };
+
+            // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+            const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
+            const currentDateStr = computed(() => currentDateObj.value.toISOString().split('T')[0]);
+            const currentDateDisplay = computed(() => currentDateObj.value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }));
+            const shoppingRangeDisplay = computed(() => {
+                 const end = new Date(currentDateObj.value); end.setDate(end.getDate() + 6);
+                 return `${currentDateObj.value.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})} - ${end.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'})}`;
+            });
+            
+            const planningDays = computed(() => {
+                const days = [];
+                const start = new Date(currentDateObj.value);
+                for(let i=0; i<7; i++) {
+                    const d = new Date(start); d.setDate(d.getDate() + i);
+                    days.push({ date: d, iso: d.toISOString().split('T')[0] });
+                }
+                return days;
+            });
+
+            const filteredProducts = computed(() => products.value.filter(p => p.name.toLowerCase().includes(prodSearch.value.toLowerCase())));
+            const filteredDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(dishSearch.value.toLowerCase())));
+            const filteredSelectorDishes = computed(() => dishes.value.filter(d => d.name.toLowerCase().includes(selectorSearch.value.toLowerCase())));
+
+            const getPlannedDish = (dateStr, slot) => planMap.value[dateStr + '|' + slot]?.dish;
+            const getSlotColor = (slot) => ({ 'Завтрак': 'bg-orange-400', 'Обед': 'bg-teal-400', 'Гарнир': 'bg-amber-400', 'Салат': 'bg-lime-400', 'Перекус': 'bg-indigo-400' }[slot] || 'bg-slate-300');
+            const isToday = (d) => d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+            const formatDate = (d) => d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            const getDayName = (d) => d.toLocaleDateString('ru-RU', { weekday: 'short' });
+
+            const openDishSelector = (date, slot) => { selectorContext.value = { date, slot }; selectorSearch.value = ''; showSelectorModal.value = true; };
+            const openDishDetails = (dish) => { alert(dish.name + (dish.description ? "\n\n" + dish.description : "")); };
+            const handleNav = (dir) => { const d = new Date(currentDateObj.value); d.setDate(d.getDate() + (planViewMode.value==='day'?1:7)*dir); currentDateObj.value = d; };
+
+            // Инициализация сессии
+            onMounted(async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                if(session) { user.value = session.user; loadInitialData(); }
+            });
+
+            return {
+                user, authEmail, authPass, loading, handleLogin, handleLogout,
+                currentTab, tabs, pageTitle, planViewMode, planningDays, mealSlots,
+                products, dishes, filteredProducts, filteredDishes, filteredSelectorDishes,
+                prodSearch, dishSearch, selectorSearch, showSelectorModal, selectorContext,
+                currentDateStr, currentDateDisplay, shoppingRangeDisplay,
+                getPlannedDish, getSlotColor, isToday, formatDate, getDayName,
+                createProductDemo, createDishDemo, openDishSelector, selectDishForPlan, openDishDetails, handleNav
+            };
+          }
+        }).mount('#app');
+    
+    } catch (e) {
+        alert("CRITICAL ERROR:\n" + e);
+    }
   </script>
 </body>
 </html>
