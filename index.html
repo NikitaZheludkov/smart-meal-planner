@@ -34,8 +34,6 @@
     .segmented-control { background: #f1f5f9; padding: 4px; border-radius: 14px; display: flex; }
     .segmented-item { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 700; color: #94a3b8; border-radius: 10px; transition: all 0.2s; }
     .segmented-item.active { background: white; color: #0f172a; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-    
-    /* Стили для квадратиков макросов (как на скриншоте) */
     .macro-input-group { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 20px; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 85px; }
     .macro-input-group input { background: transparent; width: 100%; text-align: center; font-weight: 800; font-size: 18px; outline: none; color: #0f172a; }
     .macro-input-group label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-top: 4px; }
@@ -157,9 +155,34 @@
                         <div class="text-xs font-extrabold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{{ parseFloat(item.amount.toFixed(2)) }} {{ item.unit }}</div>
                     </div>
                 </div>
+                
                 <div v-else-if="currentTab === 'settings'" class="absolute inset-0 overflow-y-auto p-4 pb-28">
                     <div class="bg-white rounded-3xl shadow-card p-6 space-y-6">
-                        <div><label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Дней в периоде</label><input v-model.number="settings.planning_days" class="text-3xl font-extrabold text-slate-900 w-full outline-none" type="number"></div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Дней в периоде</label>
+                            <input v-model.number="settings.planning_days" class="text-3xl font-extrabold text-slate-900 w-full outline-none" type="number">
+                        </div>
+                        
+                        <div class="border-t border-slate-100 pt-6">
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Начало недели</label>
+                            <div class="flex gap-1 overflow-x-auto no-scrollbar">
+                                <button v-for="(day, idx) in ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']" :key="day" 
+                                    @click="settings.start_week = idx"
+                                    class="w-10 h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center shrink-0"
+                                    :class="settings.start_week === idx ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'">
+                                    {{ day }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-6">
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Порций по умолчанию</label>
+                            <div class="flex items-center gap-4">
+                                <button @click="decrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">-</button>
+                                <span class="text-xl font-extrabold text-slate-900 w-6 text-center">{{ settings.default_portions }}</span>
+                                <button @click="incrementSettingsPortions" class="w-10 h-10 rounded-xl bg-slate-100 font-bold text-slate-600">+</button>
+                            </div>
+                        </div>
                     </div>
                     <button @click="saveSettings" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl mt-4 tap-effect">Сохранить</button>
                     <button @click="handleLogout" class="w-full text-rose-500 py-4 font-bold text-sm mt-2">Выйти</button>
@@ -181,21 +204,16 @@
                      <h3 class="font-bold text-lg text-slate-800">{{ newDish.id ? 'Ред. Блюдо' : 'Новое Блюдо' }}</h3>
                      <button @click="saveDish" :disabled="!newDish.name" class="text-slate-900 font-bold text-sm disabled:opacity-30">Готово</button>
                  </div>
-                 
                  <div class="flex-1 overflow-y-auto p-6 space-y-6">
                      <input v-model="newDish.name" type="text" placeholder="Название блюда" class="w-full text-2xl font-extrabold text-slate-900 border-b border-slate-100 pb-2 outline-none placeholder-slate-300 bg-transparent">
-                     
                      <div class="grid grid-cols-4 gap-3">
                          <div class="macro-input-group"><input v-model.number="newDish.k" type="number" placeholder="0"><label>Ккал</label></div>
                          <div class="macro-input-group"><input v-model.number="newDish.p" type="number" placeholder="0"><label>Белки</label></div>
                          <div class="macro-input-group"><input v-model.number="newDish.f" type="number" placeholder="0"><label>Жиры</label></div>
                          <div class="macro-input-group"><input v-model.number="newDish.c" type="number" placeholder="0"><label>Угл</label></div>
                      </div>
-
                      <div>
-                         <div class="flex justify-between items-center mb-3">
-                             <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ингредиенты</h4>
-                         </div>
+                         <div class="flex justify-between items-center mb-3"><h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ингредиенты</h4></div>
                          <div class="space-y-3 mb-4">
                              <div v-for="(ing, idx) in newDishIngredients" :key="idx" class="flex items-center gap-3 bg-white border border-slate-100 p-2 pl-3 rounded-2xl shadow-sm">
                                  <div class="flex-1 text-sm font-bold text-slate-700">{{ ing.name }}</div>
@@ -204,13 +222,10 @@
                                  <button @click="removeIng(idx)" class="text-slate-300 hover:text-rose-400 px-2"><span class="material-icons-round text-lg">close</span></button>
                              </div>
                          </div>
-                         
                          <div class="relative">
                              <input v-model="ingSearch" type="text" placeholder="+ Добавить продукт" class="w-full p-4 rounded-2xl bg-slate-50 font-bold text-sm outline-none focus:ring-2 focus:ring-slate-900">
                              <div v-if="ingSearch && filteredIngSuggestions.length" class="absolute bottom-full mb-2 w-full bg-white shadow-xl rounded-2xl border border-slate-100 max-h-48 overflow-y-auto z-20">
-                                 <div v-for="prod in filteredIngSuggestions" :key="prod.id" @click="addIngToDish(prod)" class="p-4 border-b border-slate-50 text-sm font-bold text-slate-700 active:bg-slate-50 flex justify-between">
-                                     <span>{{ prod.name }}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 rounded">{{ prod.unit }}</span>
-                                 </div>
+                                 <div v-for="prod in filteredIngSuggestions" :key="prod.id" @click="addIngToDish(prod)" class="p-4 border-b border-slate-50 text-sm font-bold text-slate-700 active:bg-slate-50 flex justify-between"><span>{{ prod.name }}</span><span class="text-xs text-slate-400 bg-slate-100 px-2 rounded">{{ prod.unit }}</span></div>
                              </div>
                          </div>
                      </div>
@@ -219,6 +234,28 @@
         </div>
         </transition>
 
+        <transition name="slide-up">
+        <div v-if="showDetailModal && selectedDish" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showDetailModal = false">
+             <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl h-[85vh] flex flex-col relative overflow-hidden">
+                 <div class="px-6 pt-6 pb-2 flex justify-between items-start shrink-0"><span class="text-[10px] font-bold uppercase px-2 py-1 rounded-lg bg-orange-50 text-orange-500">{{ selectedDish.category || 'Общее' }}</span><button @click="showDetailModal=false" class="bg-slate-50 text-slate-400 rounded-full p-2"><span class="material-icons-round">close</span></button></div>
+                 <div class="px-6 pb-6 shrink-0"><h2 class="text-3xl font-extrabold text-slate-900 leading-tight mb-6">{{ selectedDish.name }}</h2><div class="grid grid-cols-4 gap-2"><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.k }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Ккал</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.p || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Белки</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.f || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Жиры</span></div><div class="macro-box"><span class="text-xl font-extrabold text-slate-900">{{ selectedDish.c || 0 }}</span><span class="text-[9px] font-bold text-slate-400 uppercase mt-1">Угл</span></div></div></div>
+                 <div class="flex-1 bg-white overflow-y-auto px-6 pb-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Ингредиенты</h3>
+                 <button @click="openEditDish" class="text-indigo-500 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-xl">Изменить</button></div>
+                 <div v-if="ingredientsMap[selectedDish.id]" class="space-y-3"><div v-for="ing in ingredientsMap[selectedDish.id]" :key="ing.id" class="flex justify-between items-center py-2 border-b border-slate-50 last:border-0"><span class="font-bold text-slate-700">{{ ing.name }}</span><span class="font-bold text-slate-400 text-sm bg-slate-50 px-2 py-1 rounded-lg">{{ ing.amount }} {{ ing.unit }}</span></div></div><div v-else class="text-center py-10 text-slate-300 font-medium">Нет ингредиентов</div></div>
+             </div>
+        </div>
+        </transition>
+
+        <transition name="slide-up">
+        <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showProdModal = false">
+             <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl relative mb-safe">
+                 <h3 class="text-xl font-extrabold text-slate-900 mb-6">Продукт</h3>
+                 <div class="space-y-4"><input v-model="newProd.name" type="text" placeholder="Название" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800"><div class="flex bg-slate-100 p-1 rounded-xl"><button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500'" class="flex-1 py-3 rounded-lg text-sm font-bold transition-all">{{ u }}</button></div></div>
+                 <button @click="saveProduct" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl mt-4">Сохранить</button>
+             </div>
+        </div>
+        </transition>
+        
         <transition name="slide-up">
         <div v-if="showSelectorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center p-4" @click.self="showSelectorModal = false">
              <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4 mb-4">
@@ -232,20 +269,9 @@
         </div>
         </transition>
 
-        <transition name="slide-up">
-        <div v-if="showProdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end justify-center sm:p-4" @click.self="showProdModal = false">
-             <div class="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl relative mb-safe">
-                 <h3 class="text-xl font-extrabold text-slate-900 mb-6">Продукт</h3>
-                 <div class="space-y-4"><input v-model="newProd.name" type="text" placeholder="Название" class="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-slate-800"><div class="flex bg-slate-100 p-1 rounded-xl"><button v-for="u in ['кг','шт','л','уп']" :key="u" @click="newProd.unit = u" :class="newProd.unit === u ? 'bg-slate-900 text-white' : 'text-slate-500'" class="flex-1 py-3 rounded-lg text-sm font-bold">{{ u }}</button></div></div>
-                 <button @click="saveProduct" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tap-effect shadow-xl mt-4">Сохранить</button>
-             </div>
-        </div>
-        </transition>
-
         <div v-if="currentTab === 'dishes' || currentTab === 'products'" class="z-30 pointer-events-none fixed inset-0 max-w-md mx-auto">
             <button @click="handleFabClick" class="pointer-events-auto absolute bottom-24 right-5 bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect"><span class="material-icons-round text-3xl">add</span></button>
         </div>
-
     </template>
   </div>
 
@@ -263,28 +289,19 @@
             const authEmail = ref(''); const authPass = ref(''); const loading = ref(false);
             
             const products = ref([]); const dishes = ref([]); const ingredientsMap = ref({}); const planMap = ref({});
-            const settings = ref({ planning_days: 7 });
+            const settings = ref({ planning_days: 7, start_week: 0, default_portions: 1 });
             
             const currentTab = ref('calendar');
             const planViewMode = ref('day');
             const currentDateObj = ref(new Date());
             const genericSearch = ref('');
+            const selectedCategory = ref('Все');
             
-            // MODALS STATE
-            const showSelectorModal = ref(false); 
-            const selectorContext = ref({ date: null, slot: '' }); 
-            const selectorSearch = ref('');
-            
-            const showProdModal = ref(false);
-            const newProd = ref({ name: '', unit: 'кг' });
-            
-            const showDishModal = ref(false); 
-            const newDish = ref({ name: '', k: 0, p: 0, f: 0, c: 0 }); // Added P/F/C
-            const newDishIngredients = ref([]);
-            const ingSearch = ref('');
-            
-            const showDetailModal = ref(false); 
-            const selectedDish = ref(null);
+            // MODALS
+            const showSelectorModal = ref(false); const selectorContext = ref({ date: null, slot: '' }); const selectorSearch = ref('');
+            const showProdModal = ref(false); const newProd = ref({ name: '', unit: 'кг' });
+            const showDishModal = ref(false); const newDish = ref({ name: '', k: 0, p: 0, f: 0, c: 0 }); const newDishIngredients = ref([]); const ingSearch = ref('');
+            const showDetailModal = ref(false); const selectedDish = ref(null);
 
             const tabs = [
                 { id: 'calendar', label: 'План', icon: 'calendar_today' },
@@ -294,6 +311,10 @@
                 { id: 'settings', label: 'Настройки', icon: 'tune' }
             ];
             const mealSlots = ['Завтрак', 'Обед', 'Гарнир', 'Салат', 'Перекус'];
+
+            // --- METHODS ---
+            const incrementSettingsPortions = () => { settings.value.default_portions = (settings.value.default_portions||1) + 1; };
+            const decrementSettingsPortions = () => { settings.value.default_portions = Math.max(1, (settings.value.default_portions||1) - 1); };
 
             // --- AUTH ---
             const handleLogin = async () => {
@@ -358,32 +379,51 @@
             const removeIng = (idx) => { newDishIngredients.value.splice(idx, 1); };
 
             const saveDish = async () => {
-                // Save dish with Macros
-                const { data: dData, error } = await sb.from('dishes').insert({ 
-                    name: newDish.value.name, 
-                    k: newDish.value.k || 0,
-                    p: newDish.value.p || 0,
-                    f: newDish.value.f || 0,
-                    c: newDish.value.c || 0,
-                    user_id: user.value.id 
-                }).select();
-                
-                if(error || !dData) return alert("Error saving dish");
-                const createdDish = dData[0];
-                dishes.value.push(createdDish);
+                let dishId = newDish.value.id;
+                // Update or Create Dish
+                if (dishId) {
+                    await sb.from('dishes').update({ 
+                        name: newDish.value.name, k: newDish.value.k, p: newDish.value.p, f: newDish.value.f, c: newDish.value.c 
+                    }).eq('id', dishId);
+                    // Update Local
+                    const dIdx = dishes.value.findIndex(d => d.id === dishId);
+                    if(dIdx !== -1) dishes.value[dIdx] = { ...dishes.value[dIdx], ...newDish.value };
+                } else {
+                    const { data } = await sb.from('dishes').insert({ 
+                        name: newDish.value.name, k: newDish.value.k || 0, p: newDish.value.p || 0, f: newDish.value.f || 0, c: newDish.value.c || 0, user_id: user.value.id 
+                    }).select();
+                    if(data) {
+                        dishId = data[0].id;
+                        dishes.value.push(data[0]);
+                    }
+                }
 
-                // Save ingredients
-                if(newDishIngredients.value.length > 0) {
-                    const ingRows = newDishIngredients.value.map(ing => ({
-                        dish_id: createdDish.id,
-                        product_id: ing.product_id,
-                        amount: ing.amount,
-                        user_id: user.value.id
-                    }));
-                    await sb.from('ingredients').insert(ingRows);
-                    ingredientsMap.value[createdDish.id] = newDishIngredients.value; 
+                // Handle Ingredients (Delete all and re-insert for simplicity)
+                if(dishId) {
+                    await sb.from('ingredients').delete().eq('dish_id', dishId);
+                    if(newDishIngredients.value.length > 0) {
+                        const ingRows = newDishIngredients.value.map(ing => ({
+                            dish_id: dishId, product_id: ing.product_id, amount: ing.amount, user_id: user.value.id
+                        }));
+                        await sb.from('ingredients').insert(ingRows);
+                        ingredientsMap.value[dishId] = newDishIngredients.value; 
+                    } else {
+                        delete ingredientsMap.value[dishId];
+                    }
                 }
                 showDishModal.value = false;
+            };
+
+            const openDishDetails = (dish) => { selectedDish.value = dish; showDetailModal.value = true; };
+            
+            // NEW: Open Edit Mode
+            const openEditDish = () => {
+                newDish.value = { ...selectedDish.value };
+                // Clone ingredients to avoid mutation references
+                const ings = ingredientsMap.value[selectedDish.value.id] || [];
+                newDishIngredients.value = JSON.parse(JSON.stringify(ings));
+                showDetailModal.value = false;
+                showDishModal.value = true;
             };
 
             const toggleProductCheck = async (item) => {
@@ -418,8 +458,6 @@
                 }
                 showSelectorModal.value = false;
             };
-            
-            const openDishDetails = (dish) => { selectedDish.value = dish; showDetailModal.value = true; };
 
             // --- COMPUTED ---
             const pageTitle = computed(() => tabs.find(t => t.id === currentTab.value)?.label);
@@ -492,7 +530,8 @@
                 showDishModal, newDish, newDishIngredients, ingSearch, filteredIngSuggestions,
                 nextDate, prevDate, openDishSelector, clearSlot, selectDishForPlan, toggleProductCheck, uncheckAll, saveSettings, 
                 handleFabClick, openEditProduct, saveProduct, openDishDetails, saveDish, addIngToDish, removeIng,
-                filteredProducts, filteredDishes, filteredSelectorDishes, ingredientsMap, dailyMacros
+                filteredProducts, filteredDishes, filteredSelectorDishes, ingredientsMap, dailyMacros,
+                openEditDish, incrementSettingsPortions, decrementSettingsPortions, selectedCategory
             };
           }
         }).mount('#app');
