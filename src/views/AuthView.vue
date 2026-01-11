@@ -3,25 +3,27 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
-const devInput = ref('')
+const widgetLoaded = ref(false) // Флаг загрузки
 
-// Инициализация виджета Telegram
 onMounted(() => {
-  // Коллбек от виджета
   window.onTelegramAuth = (user) => auth.loginWithUser(user)
 
-  // Вставка скрипта (только если его еще нет)
-  const botName = 'MyMealPlannerBot' // <--- ТВОЙ БОТ
+  // Имя бота (УБЕДИСЬ ЧТО ОНО ВЕРНОЕ!)
+  const botName = 'SmartMeal2025_Bot' // <--- ПРОВЕРЬ ЭТО
   
   if (!document.getElementById('tg-widget-script')) {
     const script = document.createElement('script')
     script.id = 'tg-widget-script'
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.setAttribute('data-telegram-login', botName)
+    script.setAttribute('data-telegram-login', SmartMeal2025_Bot)
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-radius', '12')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     script.setAttribute('data-request-access', 'write')
+    
+    // Слушаем загрузку скрипта
+    script.onload = () => { widgetLoaded.value = true }
+    
     document.getElementById('telegram-login-container')?.appendChild(script)
   }
 })
@@ -41,13 +43,29 @@ onMounted(() => {
         Планируйте рацион, составляйте списки покупок и делитесь с семьей.
       </p>
 
-      <div class="w-full min-h-[50px] flex justify-center items-center mb-6">
+      <div class="w-full min-h-[50px] flex justify-center items-center mb-6 relative">
         <div id="telegram-login-container"></div>
+        
+        <div v-if="!widgetLoaded && !auth.isDev" class="absolute inset-0 flex items-center justify-center">
+           <p class="text-[10px] text-red-400 font-bold bg-red-50 p-2 rounded-lg">
+             Виджет Telegram не загрузился.<br>Попробуйте отключить AdBlock.
+           </p>
+        </div>
       </div>
       
-      <div v-if="!auth.isDev" class="text-[10px] text-slate-300">
-        Если кнопки нет, откройте приложение через Telegram
+      <div class="text-[10px] text-slate-300">
+        Если вы видите это сообщение на ПК — используйте вход ниже.
       </div>
+
+      <div class="mt-8 w-full max-w-xs">
+          <button 
+            @click="auth.loginAsAdmin()" 
+            class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-2xl font-bold transition-all tap-effect flex items-center justify-center gap-3 border border-slate-200"
+          >
+            <span class="material-icons-round text-slate-400">admin_panel_settings</span>
+            <span>Войти как Администратор</span>
+          </button>
+       </div>
 
     </div>
 
@@ -57,38 +75,8 @@ onMounted(() => {
           <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
           <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Dev Mode</span>
         </div>
-        <span class="text-[10px] text-slate-500">Localhost Tools</span>
       </div>
-
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <button 
-          @click="auth.devLogin(777)" 
-          class="bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-xs font-bold transition-colors"
-        >
-          Войти как ADMIN
-        </button>
-        <button 
-          @click="auth.devLogin(101)" 
-          class="bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-xs font-bold transition-colors"
-        >
-          Войти как GUEST
-        </button>
-      </div>
-
-      <div class="flex gap-2">
-        <input 
-          v-model="devInput" 
-          type="number" 
-          placeholder="Любой ID" 
-          class="bg-slate-800 text-white text-xs p-2 rounded-lg outline-none w-20 text-center font-mono"
-        >
-        <button 
-          @click="auth.devLogin(Number(devInput))" 
-          class="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-xs font-bold text-slate-300"
-        >
-          Войти по ID
-        </button>
-      </div>
+      <button @click="auth.devLogin(777)" class="bg-indigo-600 w-full py-2 rounded-lg text-xs font-bold">Login ADMIN</button>
     </div>
 
   </div>
