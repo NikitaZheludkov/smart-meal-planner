@@ -1,20 +1,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { startOfWeek, addDays, format, isSameDay, isToday } from 'date-fns'
+import { startOfWeek, addDays, format, isToday, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../lib/supabase'
 
-// --- СОСТОЯНИЕ ---
+// --- НАСТРОЙКИ ---
 const auth = useAuthStore()
-// 1. Всегда открываем вкладку "День" при старте
-const activeTab = ref('day') 
+const activeTab = ref('day') // 1. При открытии всегда вкладка "День"
 const currentWeekStart = ref(startOfWeek(new Date(), { weekStartsOn: 1 }))
-const selectedDate = ref(new Date()) // Выбранный день для вкладки "День"
+const selectedDate = ref(new Date()) 
 const plan = ref([])
 const loading = ref(false)
 
-// Категории еды
 const categories = [
   { key: 'breakfast', label: 'Завтрак' },
   { key: 'lunch', label: 'Обед' },
@@ -22,10 +20,10 @@ const categories = [
   { key: 'snack', label: 'Перекус' }
 ]
 
-// --- ЗАГРУЗКА ДАННЫХ ---
+// --- ЗАГРУЗКА ---
 const fetchPlan = async () => {
   loading.value = true
-  // Берем план на 2 недели
+  // Грузим с запасом (текущая неделя + следующая)
   const start = format(currentWeekStart.value, 'yyyy-MM-dd')
   const end = format(addDays(currentWeekStart.value, 13), 'yyyy-MM-dd')
 
@@ -36,69 +34,67 @@ const fetchPlan = async () => {
       category,
       dish:dishes ( id, title, image_url, calories )
     `)
-    .eq('household_id', auth.householdId)
+    // Убираем фильтр по household_id, раз мы открыли базу всем, 
+    // но лучше оставить, если ты планируешь потом разделять семьи.
+    // Пока оставим как есть:
     .gte('date', start)
     .lte('date', end)
 
-  if (error) console.error('Ошибка загрузки плана:', error)
+  if (error) console.error(error)
   else plan.value = data || []
   
   loading.value = false
 }
 
 // --- ВЫЧИСЛЕНИЯ ---
-
 const weekDays = computed(() => {
   return Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart.value, i))
 })
 
-const getDishForCell = (dateObj, categoryKey) => {
-  const dateStr = format(dateObj, 'yyyy-MM-dd')
-  return plan.value.find(p => p.date === dateStr && p.category === categoryKey)?.dish
+const getDish = (date, catKey) => {
+  const dStr = format(date, 'yyyy-MM-dd')
+  return plan.value.find(p => p.date === dStr && p.category === catKey)?.dish
 }
 
-// Данные для вкладки "День" (фильтруем план по выбранной дате)
-const currentDayPlan = computed(() => {
-  const dateStr = format(selectedDate.value, 'yyyy-MM-dd')
-  const dayMeals = {}
-  let hasAnyMeal = false
-
+const currentDayData = computed(() => {
+  const dStr = format(selectedDate.value, 'yyyy-MM-dd')
+  // Собираем только существующие блюда
+  const meals = []
   categories.forEach(cat => {
-    const dish = plan.value.find(p => p.date === dateStr && p.category === cat.key)?.dish
+    const dish = plan.value.find(p => p.date === dStr && p.category === cat.key)?.dish
     if (dish) {
-      dayMeals[cat.key] = dish
-      hasAnyMeal = true
+      meals.push({ categoryLabel: cat.label, dish })
     }
   })
-
-  // Возвращаем объект с блюдами и флаг пустоты
-  return { meals: dayMeals, isEmpty: !hasAnyMeal }
+  return meals
 })
 
 // --- ДЕЙСТВИЯ ---
-
-// 2. Кнопка "Сегодня"
 const goToToday = () => {
-  selectedDate.value = new Date()
-  // Если сегодня на другой неделе, переключаем неделю
-  if (!isSameDay(startOfWeek(selectedDate.value, { weekStartsOn: 1 }), currentWeekStart.value)) {
-    currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const today = new Date()
+  selectedDate.value = today
+  // Если "Сегодня" в другой неделе, переключаем сетку
+  if (!isSameDay(startOfWeek(today, { weekStartsOn: 1 }), currentWeekStart.value)) {
+    currentWeekStart.value = startOfWeek(today, { weekStartsOn: 1 })
     fetchPlan()
   }
 }
 
-const changeWeek = (days) => {
-  currentWeekStart.value = addDays(currentWeekStart.value, days)
+const changeDay = (delta) => {
+  selectedDate.value = addDays(selectedDate.value, delta)
+}
+
+const changeWeek = (delta) => {
+  currentWeekStart.value = addDays(currentWeekStart.value, delta)
   fetchPlan()
 }
 
-const changeDay = (days) => {
-  selectedDate.value = addDays(selectedDate.value, days)
-}
-
-// Форматирование даты для шапки (9 янв. СБ)
-const formatDateHeader = (date) => {
-  return format(date, 'd MMM, EEE', { locale: ru }).replace('.', '')
+// Форматирование: "9 янв СБ"
+const formatHeader = (date) => {
+  const dayNum = format(date, 'd')
+  const month = format(date, 'MMM', { locale: ru }).replace('.', '')
+  const dayName = format(date, 'EEE', { locale: ru }).toUpperCase()
+  return { dayNum, month, dayName }
 }
 
 const formatSelectedDate = (date) => {
@@ -106,152 +102,157 @@ const formatSelectedDate = (date) => {
 }
 
 onMounted(() => {
-  if (auth.householdId) fetchPlan()
+  fetchPlan()
 })
 </script>
 
 <template>
   <div class="flex flex-col h-full bg-slate-50">
     
-    <header class="bg-white px-4 py-3 shadow-sm flex justify-between items-center sticky top-0 z-10">
-      <h1 class="text-xl font-bold text-slate-800">План питания</h1>
-      
-      <div class="flex bg-slate-100 p-1 rounded-xl">
+    <div class="bg-white px-4 py-2 shadow-sm z-10 sticky top-0">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-xl font-bold text-slate-800">План питания</h1>
+      </div>
+      <div class="flex bg-slate-100 p-1 rounded-lg">
         <button 
           @click="activeTab = 'day'"
-          class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
-          :class="activeTab === 'day' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+          class="flex-1 py-1.5 text-sm font-semibold rounded-md transition-all"
+          :class="activeTab === 'day' ? 'bg-white shadow text-slate-900' : 'text-slate-500'"
         >
           День
         </button>
         <button 
           @click="activeTab = 'week'"
-          class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
-          :class="activeTab === 'week' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
+          class="flex-1 py-1.5 text-sm font-semibold rounded-md transition-all"
+          :class="activeTab === 'week' ? 'bg-white shadow text-slate-900' : 'text-slate-500'"
         >
           Сетка
         </button>
       </div>
-    </header>
+    </div>
 
-    <div v-if="activeTab === 'day'" class="flex-1 overflow-y-auto pb-20">
+    <div v-if="activeTab === 'day'" class="flex-1 overflow-y-auto">
       
-      <div class="bg-white pb-4 px-4 flex items-center justify-between shadow-sm rounded-b-3xl mb-4">
-        <button @click="changeDay(-1)" class="p-2 text-slate-400 hover:text-slate-600">
+      <div class="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 mb-4">
+        <button @click="changeDay(-1)" class="p-2 text-slate-400">
           <span class="material-icons-round">chevron_left</span>
         </button>
         
-        <div class="text-center">
-          <div class="text-lg font-bold text-slate-800 capitalize">
+        <div class="flex flex-col items-center">
+          <span class="text-lg font-bold text-slate-800 capitalize leading-none">
             {{ formatSelectedDate(selectedDate) }}
-          </div>
+          </span>
           <button 
-            v-if="!isToday(selectedDate)" 
+            v-if="!isToday(selectedDate)"
             @click="goToToday"
-            class="text-xs text-orange-500 font-bold uppercase tracking-wide mt-1"
+            class="text-xs font-bold text-orange-500 mt-1 uppercase tracking-wide"
           >
             Вернуться в Сегодня
           </button>
-          <span v-else class="text-xs text-slate-400 font-medium">Сегодня</span>
+          <span v-else class="text-xs font-medium text-slate-400 mt-1">Сегодня</span>
         </div>
 
-        <button @click="changeDay(1)" class="p-2 text-slate-400 hover:text-slate-600">
+        <button @click="changeDay(1)" class="p-2 text-slate-400">
           <span class="material-icons-round">chevron_right</span>
         </button>
       </div>
 
-      <div class="px-4 space-y-4">
+      <div class="px-4 space-y-3 pb-20">
         
-        <div v-if="currentDayPlan.isEmpty" class="text-center py-10">
-           <span class="text-4xl block mb-2">🍽️</span>
-           <p class="text-slate-400 text-sm mb-4">На этот день ничего не запланировано</p>
-           <button @click="activeTab = 'week'" class="text-orange-500 font-bold text-sm bg-orange-50 px-4 py-2 rounded-lg">
-             Перейти в сетку для планирования
-           </button>
+        <div v-if="currentDayData.length === 0" class="text-center py-12">
+          <div class="text-5xl mb-4">🍽️</div>
+          <p class="text-slate-500 mb-4">День свободен</p>
+          <button 
+            @click="activeTab = 'week'" 
+            class="bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold"
+          >
+            Заполнить в сетке
+          </button>
         </div>
 
-        <div v-for="cat in categories" :key="cat.key">
-          <div v-if="currentDayPlan.meals[cat.key]" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4">
-            
-            <div class="w-20 h-20 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
-              <img 
-                v-if="currentDayPlan.meals[cat.key].image_url" 
-                :src="currentDayPlan.meals[cat.key].image_url" 
-                class="w-full h-full object-cover"
-              >
-              <span v-else class="w-full h-full flex items-center justify-center text-xl">🥘</span>
-            </div>
+        <div 
+          v-for="(item, idx) in currentDayData" 
+          :key="idx"
+          class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex gap-4 items-center"
+        >
+          <div class="w-16 h-16 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+            <img 
+              v-if="item.dish.image_url" 
+              :src="item.dish.image_url" 
+              class="w-full h-full object-cover"
+            >
+            <span v-else class="w-full h-full flex items-center justify-center text-xl">🥘</span>
+          </div>
 
-            <div class="flex-1 flex flex-col justify-center">
-              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                {{ cat.label }}
-              </span>
-              <h3 class="font-bold text-slate-800 leading-tight mb-1">
-                {{ currentDayPlan.meals[cat.key].title }}
-              </h3>
-              <div class="text-xs text-slate-500 font-medium bg-slate-50 px-2 py-1 rounded inline-block self-start">
-                {{ currentDayPlan.meals[cat.key].calories }} ккал
-              </div>
+          <div class="flex-1">
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+              {{ item.categoryLabel }}
             </div>
-
+            <div class="font-bold text-slate-800 leading-tight">
+              {{ item.dish.title }}
+            </div>
+            <div class="text-xs text-slate-500 mt-1">
+              {{ item.dish.calories ? item.dish.calories + ' ккал' : '' }}
+            </div>
           </div>
         </div>
 
       </div>
     </div>
 
-    <div v-else class="flex-1 overflow-y-auto pb-20">
+    <div v-else class="flex-1 overflow-y-auto">
       
-      <div class="flex justify-between items-center px-4 py-2 bg-white border-b border-slate-100">
-        <button @click="changeWeek(-7)" class="p-2 text-slate-400"><span class="material-icons-round">chevron_left</span></button>
-        <span class="text-sm font-bold text-slate-700">Неделя {{ format(currentWeekStart, 'd MMM', { locale: ru }) }}</span>
-        <button @click="changeWeek(7)" class="p-2 text-slate-400"><span class="material-icons-round">chevron_right</span></button>
+      <div class="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-100">
+        <button @click="changeWeek(-7)" class="p-1"><span class="material-icons-round text-slate-400">chevron_left</span></button>
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Неделя {{ format(currentWeekStart, 'd MMM', { locale: ru }) }}
+        </span>
+        <button @click="changeWeek(7)" class="p-1"><span class="material-icons-round text-slate-400">chevron_right</span></button>
       </div>
 
-      <div class="divide-y divide-slate-200">
-        <div v-for="day in weekDays" :key="day" class="flex min-h-[100px] bg-white">
+      <div class="divide-y divide-slate-200 pb-20 bg-white">
+        <div v-for="day in weekDays" :key="day" class="flex min-h-[90px]">
           
           <div 
-            class="w-16 flex-shrink-0 border-r border-slate-100 flex flex-col items-center justify-center p-1"
-            :class="isToday(day) ? 'bg-orange-50 border-r-2 border-r-orange-400' : 'bg-slate-50'"
+            class="w-14 flex-shrink-0 border-r border-slate-100 flex flex-col items-center justify-center p-1"
+            :class="isToday(day) ? 'bg-orange-50' : 'bg-slate-50'"
           >
-            <span 
-              class="text-[10px] font-bold text-center leading-tight uppercase"
-              :class="isToday(day) ? 'text-orange-600' : 'text-slate-500'"
-            >
-              {{ formatDateHeader(day) }}
+            <span class="text-lg font-black leading-none" :class="isToday(day) ? 'text-orange-600' : 'text-slate-700'">
+              {{ formatHeader(day).dayNum }}
+            </span>
+            <span class="text-[10px] font-bold uppercase leading-tight mt-1" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">
+              {{ formatHeader(day).month }}
+            </span>
+            <span class="text-[10px] font-bold uppercase leading-tight" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">
+              {{ formatHeader(day).dayName }}
             </span>
           </div>
 
           <div class="flex-1 grid grid-cols-4 divide-x divide-slate-100">
             <div 
               v-for="cat in categories" 
-              :key="cat.key" 
-              class="relative p-1 h-full flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 active:scale-95 transition-transform"
+              :key="cat.key"
+              class="relative cursor-pointer hover:bg-slate-50 transition-colors"
               @click="$router.push(`/search?date=${format(day, 'yyyy-MM-dd')}&category=${cat.key}`)"
             >
-              <div v-if="getDishForCell(day, cat.key)" class="w-full h-full flex flex-col items-center justify-center">
-                <div class="w-8 h-8 rounded-full bg-slate-100 mb-1 overflow-hidden shadow-sm">
-                  <img 
-                     v-if="getDishForCell(day, cat.key).image_url" 
-                     :src="getDishForCell(day, cat.key).image_url" 
-                     class="w-full h-full object-cover"
-                  >
-                  <span v-else class="text-xs flex items-center justify-center h-full">🥘</span>
+              <div v-if="getDish(day, cat.key)" class="absolute inset-0 p-1 flex flex-col items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shadow-sm mb-1">
+                   <img v-if="getDish(day, cat.key).image_url" :src="getDish(day, cat.key).image_url" class="w-full h-full object-cover">
                 </div>
-                <span class="text-[9px] leading-tight text-slate-900 font-medium line-clamp-2 px-1">
-                  {{ getDishForCell(day, cat.key).title }}
+                <span class="text-[9px] leading-tight text-center font-medium line-clamp-2 text-slate-800">
+                  {{ getDish(day, cat.key).title }}
                 </span>
               </div>
 
-              <div v-else class="flex items-center justify-center h-full w-full">
-                <span class="text-[10px] text-slate-200 font-bold uppercase -rotate-90 md:rotate-0 whitespace-nowrap select-none">
+              <div v-else class="absolute inset-0 flex items-center justify-center">
+                <span class="text-[9px] font-bold text-slate-200 uppercase -rotate-90 md:rotate-0 select-none">
                   {{ cat.label }}
                 </span>
               </div>
 
             </div>
           </div>
+
         </div>
       </div>
     </div>
