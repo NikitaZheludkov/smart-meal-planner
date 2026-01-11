@@ -14,7 +14,7 @@ const selectedDate = ref(new Date()) // Выбранный день для вк�
 const plan = ref([])
 const loading = ref(false)
 
-// Категории еды (порядок важен)
+// Категории еды
 const categories = [
   { key: 'breakfast', label: 'Завтрак' },
   { key: 'lunch', label: 'Обед' },
@@ -25,7 +25,7 @@ const categories = [
 // --- ЗАГРУЗКА ДАННЫХ ---
 const fetchPlan = async () => {
   loading.value = true
-  // Берем план на 2 недели (текущую и следующую) для запаса
+  // Берем план на 2 недели
   const start = format(currentWeekStart.value, 'yyyy-MM-dd')
   const end = format(addDays(currentWeekStart.value, 13), 'yyyy-MM-dd')
 
@@ -48,12 +48,10 @@ const fetchPlan = async () => {
 
 // --- ВЫЧИСЛЕНИЯ ---
 
-// Дни недели для Сетки (7 дней)
 const weekDays = computed(() => {
   return Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart.value, i))
 })
 
-// Получить блюдо для конкретной ячейки
 const getDishForCell = (dateObj, categoryKey) => {
   const dateStr = format(dateObj, 'yyyy-MM-dd')
   return plan.value.find(p => p.date === dateStr && p.category === categoryKey)?.dish
@@ -73,6 +71,7 @@ const currentDayPlan = computed(() => {
     }
   })
 
+  // Возвращаем объект с блюдами и флаг пустоты
   return { meals: dayMeals, isEmpty: !hasAnyMeal }
 })
 
@@ -81,9 +80,11 @@ const currentDayPlan = computed(() => {
 // 2. Кнопка "Сегодня"
 const goToToday = () => {
   selectedDate.value = new Date()
-  // Если сегодня на другой неделе, переключаем сетку тоже
-  currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: 1 })
-  fetchPlan()
+  // Если сегодня на другой неделе, переключаем неделю
+  if (!isSameDay(startOfWeek(selectedDate.value, { weekStartsOn: 1 }), currentWeekStart.value)) {
+    currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: 1 })
+    fetchPlan()
+  }
 }
 
 const changeWeek = (days) => {
@@ -97,14 +98,9 @@ const changeDay = (days) => {
 
 // Форматирование даты для шапки (9 янв. СБ)
 const formatDateHeader = (date) => {
-  return new Intl.DateTimeFormat('ru-RU', { 
-    day: 'numeric', 
-    month: 'short', 
-    weekday: 'short' 
-  }).format(date)
+  return format(date, 'd MMM, EEE', { locale: ru }).replace('.', '')
 }
 
-// Форматирование текущего выбранного дня (для заголовка)
 const formatSelectedDate = (date) => {
   return format(date, 'd MMMM, EEEE', { locale: ru })
 }
@@ -168,8 +164,8 @@ onMounted(() => {
         
         <div v-if="currentDayPlan.isEmpty" class="text-center py-10">
            <span class="text-4xl block mb-2">🍽️</span>
-           <p class="text-slate-400 text-sm">На этот день ничего не запланировано</p>
-           <button @click="activeTab = 'week'" class="mt-4 text-orange-500 font-bold text-sm">
+           <p class="text-slate-400 text-sm mb-4">На этот день ничего не запланировано</p>
+           <button @click="activeTab = 'week'" class="text-orange-500 font-bold text-sm bg-orange-50 px-4 py-2 rounded-lg">
              Перейти в сетку для планирования
            </button>
         </div>
@@ -220,7 +216,7 @@ onMounted(() => {
             :class="isToday(day) ? 'bg-orange-50 border-r-2 border-r-orange-400' : 'bg-slate-50'"
           >
             <span 
-              class="text-xs font-bold text-center leading-tight uppercase"
+              class="text-[10px] font-bold text-center leading-tight uppercase"
               :class="isToday(day) ? 'text-orange-600' : 'text-slate-500'"
             >
               {{ formatDateHeader(day) }}
@@ -249,7 +245,7 @@ onMounted(() => {
               </div>
 
               <div v-else class="flex items-center justify-center h-full w-full">
-                <span class="text-[10px] text-slate-200 font-bold uppercase -rotate-90 md:rotate-0 whitespace-nowrap">
+                <span class="text-[10px] text-slate-200 font-bold uppercase -rotate-90 md:rotate-0 whitespace-nowrap select-none">
                   {{ cat.label }}
                 </span>
               </div>
