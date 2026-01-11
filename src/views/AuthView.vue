@@ -3,28 +3,40 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
-const widgetLoaded = ref(false) // Флаг загрузки
+const widgetLoaded = ref(false)
 
 onMounted(() => {
-  window.onTelegramAuth = (user) => auth.loginWithUser(user)
+  // 1. Создаем функцию, которую Телеграм вызовет после входа
+  window.onTelegramAuth = (user) => {
+    console.log('Telegram User:', user)
+    auth.loginWithUser(user)
+  }
 
-  // Имя бота (УБЕДИСЬ ЧТО ОНО ВЕРНОЕ!)
-  const botName = 'SmartMeal2025_Bot' // <--- ПРОВЕРЬ ЭТО
+  // 2. ИМЯ ТВОЕГО БОТА (Вписано жестко)
+  const botName = 'SmartMeal2025_Bot' 
   
-  if (!document.getElementById('tg-widget-script')) {
+  // 3. Проверяем, не добавлен ли уже скрипт, чтобы не дублировать
+  const container = document.getElementById('telegram-login-container')
+  
+  if (container && !document.getElementById('tg-widget-script')) {
     const script = document.createElement('script')
     script.id = 'tg-widget-script'
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.setAttribute('data-telegram-login', SmartMeal2025_Bot)
+    
+    // Настройки виджета
+    script.setAttribute('data-telegram-login', botName)
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-radius', '12')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     script.setAttribute('data-request-access', 'write')
     
-    // Слушаем загрузку скрипта
-    script.onload = () => { widgetLoaded.value = true }
+    script.onload = () => {
+      console.log('Виджет Telegram загружен')
+      widgetLoaded.value = true
+    }
     
-    document.getElementById('telegram-login-container')?.appendChild(script)
+    // Добавляем скрипт в контейнер
+    container.appendChild(script)
   }
 })
 </script>
@@ -46,35 +58,27 @@ onMounted(() => {
       <div class="w-full min-h-[50px] flex justify-center items-center mb-6 relative">
         <div id="telegram-login-container"></div>
         
-        <div v-if="!widgetLoaded && !auth.isDev" class="absolute inset-0 flex items-center justify-center">
-           <p class="text-[10px] text-red-400 font-bold bg-red-50 p-2 rounded-lg">
-             Виджет Telegram не загрузился.<br>Попробуйте отключить AdBlock.
-           </p>
+        <div v-if="!widgetLoaded" class="absolute inset-0 flex items-center justify-center -z-10 opacity-50">
+           <span class="text-[10px] text-slate-300">Загрузка кнопки...</span>
         </div>
       </div>
-      
-      <div class="text-[10px] text-slate-300">
-        Если вы видите это сообщение на ПК — используйте вход ниже.
-      </div>
 
-      <div class="mt-8 w-full max-w-xs">
-          <button 
-            @click="auth.loginAsAdmin()" 
-            class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-2xl font-bold transition-all tap-effect flex items-center justify-center gap-3 border border-slate-200"
-          >
-            <span class="material-icons-round text-slate-400">admin_panel_settings</span>
-            <span>Войти как Администратор</span>
-          </button>
-       </div>
+      <div class="mt-4 w-full max-w-xs">
+        <button 
+          @click="auth.loginAsAdmin()" 
+          class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-2xl font-bold transition-all tap-effect flex items-center justify-center gap-3 border border-slate-200"
+        >
+          <span class="material-icons-round text-slate-400">admin_panel_settings</span>
+          <span>Войти как Администратор</span>
+        </button>
+      </div>
 
     </div>
 
     <div v-if="auth.isDev" class="bg-slate-900 text-white p-4 rounded-t-3xl shadow-2xl">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-          <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Dev Mode</span>
-        </div>
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+        <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Dev Mode</span>
       </div>
       <button @click="auth.devLogin(777)" class="bg-indigo-600 w-full py-2 rounded-lg text-xs font-bold">Login ADMIN</button>
     </div>
