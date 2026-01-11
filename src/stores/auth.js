@@ -5,38 +5,30 @@ import { supabase } from '../lib/supabase'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null) 
   const householdId = ref(null) 
-  const loading = ref(true) // Состояние глобальной загрузки
+  const loading = ref(true)
   const isAuth = ref(false) 
   
-  // Флаг: мы в режиме разработки? (Vite сам это определяет)
+  // Флаг режима разработки
   const isDev = import.meta.env.DEV 
 
-  // --- 1. ИНИЦИАЛИЗАЦИЯ (SPLASH SCREEN) ---
+  // --- 1. ИНИЦИАЛИЗАЦИЯ ---
   const initApp = async () => {
     loading.value = true
-    
-    // Проверяем среду
     const tg = window.Telegram?.WebApp
-    
-    // Сценарий А: Мы внутри Telegram
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
       console.log('📱 TMA detected. Auto-login.')
       await loginWithUser(tg.initDataUnsafe.user)
-    } 
-    // Сценарий Б: Мы в браузере
-    else {
-      console.log('💻 Web detected. Waiting for user interaction.')
-      loading.value = false // Убираем загрузку, показываем Лендинг
+    } else {
+      loading.value = false
     }
   }
 
-  // --- 2. ЛОГИКА ВХОДА / РЕГИСТРАЦИИ ---
+  // --- 2. ЛОГИКА ВХОДА ---
   const loginWithUser = async (tgUser) => {
     loading.value = true
     user.value = tgUser
 
     try {
-      // Ищем профиль
       let { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -45,23 +37,18 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (error) throw error
 
-      // АВТО-РЕГИСТРАЦИЯ (ЕСЛИ НЕТ ПРОФИЛЯ)
       if (!profile) {
-        console.log('✨ New user! Registering...')
-        
-        // 1. Создаем пространство
+        // Регистрация нового
         const { data: newHouse, error: hError } = await supabase
           .from('households')
           .insert([{ 
              name: 'Мое пространство', 
              invite_code: Math.random().toString(36).substring(2, 7).toUpperCase() 
           }])
-          .select()
-          .single()
+          .select().single()
         
         if (hError) throw hError
 
-        // 2. Создаем профиль
         const { data: newProfile, error: pError } = await supabase
           .from('profiles')
           .insert([{
@@ -70,14 +57,12 @@ export const useAuthStore = defineStore('auth', () => {
             username: tgUser.username,
             household_id: newHouse.id
           }])
-          .select()
-          .single()
+          .select().single()
 
         if (pError) throw pError
         profile = newProfile
       }
 
-      // Успех
       householdId.value = profile.household_id
       isAuth.value = true
 
@@ -90,19 +75,26 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // --- 3. DEV TOOLS (ВХОД ДЛЯ РАЗРАБОТЧИКА) ---
-  const devLogin = async (customId) => {
-    if (!isDev) return // Защита: в продакшене не сработает
-    
-    const fakeUser = {
-      id: customId,
-      first_name: customId === 777 ? 'Administrator' : `Tester ${customId}`,
-      username: 'dev_mode'
-    }
-    await loginWithUser(fakeUser)
+  // --- 3. ВХОД ДЛЯ АДМИНА (Кнопка) ---
+  // 👇 ВОТ ФУНКЦИЯ, КОТОРОЙ НЕ ХВАТАЛО 👇
+  const loginAsAdmin = async () => {
+    await loginWithUser({
+      id: 777000,
+      first_name: 'Super Admin',
+      username: 'admin_sys'
+    })
   }
 
-  // --- 4. СМЕНА СЕМЬИ ---
+  // --- 4. DEV LOGIN (Для панели) ---
+  const devLogin = async (customId) => {
+    await loginWithUser({
+      id: customId,
+      first_name: `User ${customId}`,
+      username: 'dev_mode'
+    })
+  }
+
+  // --- 5. СМЕНА СЕМЬИ ---
   const joinHousehold = async (code) => {
     const { data: house } = await supabase
       .from('households')
@@ -131,16 +123,9 @@ export const useAuthStore = defineStore('auth', () => {
     return data?.invite_code
   }
 
+  // Обязательно возвращаем loginAsAdmin, чтобы кнопка её видела
   return { 
-    user, 
-    householdId, 
-    isAuth, 
-    loading, 
-    isDev, // Экспортируем флаг разработки
-    initApp, 
-    loginWithUser, 
-    devLogin, 
-    joinHousehold, 
-    getInviteCode 
+    user, householdId, isAuth, loading, isDev, 
+    initApp, loginWithUser, loginAsAdmin, devLogin, joinHousehold, getInviteCode 
   }
 })
