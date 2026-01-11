@@ -12,7 +12,7 @@ onMounted(() => {
     auth.loginWithUser(user)
   }
 
-  // 2. ИМЯ ТВОЕГО БОТА (Вписано жестко)
+  // 2. ИМЯ ТВОЕГО БОТА
   const botName = 'SmartMeal2025_Bot' 
   
   // 3. Проверяем, не добавлен ли уже скрипт, чтобы не дублировать
@@ -65,7 +65,7 @@ onMounted(() => {
 
       <div class="mt-4 w-full max-w-xs">
         <button 
-          @click="auth.loginAsAdmin()" 
+          @click="auth.loginWithUser({ id: 777000, first_name: 'Super Admin', username: 'admin_sys' })"
           class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-2xl font-bold transition-all tap-effect flex items-center justify-center gap-3 border border-slate-200"
         >
           <span class="material-icons-round text-slate-400">admin_panel_settings</span>
@@ -80,7 +80,12 @@ onMounted(() => {
         <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
         <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Dev Mode</span>
       </div>
-      <button @click="auth.devLogin(777)" class="bg-indigo-600 w-full py-2 rounded-lg text-xs font-bold">Login ADMIN</button>
+      <button 
+        @click="auth.loginWithUser({ id: 777000, first_name: 'Super Admin', username: 'admin_sys' })" 
+        class="bg-indigo-600 w-full py-2 rounded-lg text-xs font-bold"
+      >
+        Login ADMIN
+      </button>
     </div>
 
   </div>
