@@ -12,10 +12,11 @@ export const useProductStore = defineStore('products', () => {
     if (!auth.householdId) return
 
     loading.value = true
+    // Теперь нам не нужно джойнить таблицу категорий, имя категории лежит прямо внутри продукта
     const { data, error } = await supabase
       .from('products')
-      .select('*')
-      .eq('household_id', auth.householdId) // <--- ФИЛЬТР
+      .select('*') 
+      .eq('household_id', auth.householdId)
       .order('name')
     
     if (error) console.error(error)
@@ -25,29 +26,50 @@ export const useProductStore = defineStore('products', () => {
 
   const addProduct = async (product) => {
     const auth = useAuthStore()
-    const { id, ...newProduct } = product 
-    const productWithHouse = { ...newProduct, household_id: auth.householdId }
+    
+    // Подготавливаем объект для базы
+    const productWithHouse = { 
+        name: product.name,
+        unit: product.unit,
+        category: product.category, // Сохраняем строку (название категории)
+        household_id: auth.householdId
+    }
 
-    const { data, error } = await supabase.from('products').insert([productWithHouse]).select()
+    const { data, error } = await supabase
+        .from('products')
+        .insert([productWithHouse])
+        .select()
+        .single()
     
     if (data) {
-      products.value.push(data[0])
+      products.value.push(data)
       products.value.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (error) {
+        console.error(error)
     }
   }
 
   const updateProduct = async (product) => {
     const auth = useAuthStore()
-    const { error } = await supabase
+    
+    const updates = {
+        name: product.name,
+        unit: product.unit,
+        category: product.category // Обновляем строку
+    }
+
+    const { data, error } = await supabase
       .from('products')
-      .update({ name: product.name, unit: product.unit })
+      .update(updates)
       .eq('id', product.id)
       .eq('household_id', auth.householdId)
+      .select()
+      .single()
 
-    if (!error) {
+    if (!error && data) {
       const index = products.value.findIndex(p => p.id === product.id)
       if (index !== -1) {
-        products.value[index] = { ...product }
+        products.value[index] = data
         products.value.sort((a, b) => a.name.localeCompare(b.name))
       }
     }
@@ -62,7 +84,7 @@ export const useProductStore = defineStore('products', () => {
       .eq('household_id', auth.householdId)
       
     if (!error) {
-      products.value = products.value.filter(p => p.id !== id)
+       products.value = products.value.filter(p => p.id !== id)
     }
   }
 

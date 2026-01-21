@@ -1,0 +1,3182 @@
+
+
+================================================
+FILE: ./.env
+================================================
+
+VITE_SUPABASE_URL=https://wwvrgffgtqqxupqvnpzc.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_uBvfFBnC-6I3clyDM0SCnw_Q4kPdB1P
+
+
+================================================
+FILE: ./.gitignore
+================================================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+================================================
+FILE: ./README.md
+================================================
+
+# Vue 3 + Vite
+
+This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+
+Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+
+
+================================================
+FILE: ./index.html
+================================================
+
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <title>Meal Planner</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+
+
+================================================
+FILE: ./package.json
+================================================
+
+{
+  "name": "smart-meal-planner",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.0",
+    "date-fns": "^4.1.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "vite": "^7.2.4"
+  }
+}
+
+
+================================================
+FILE: ./postcss.config.js
+================================================
+
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+
+================================================
+FILE: ./src/App.vue
+================================================
+
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useAuthStore } from './stores/auth'
+import { useDictionariesStore } from './stores/dictionaries'
+
+// Импортируем ваши компоненты
+import PlanView from './views/PlanView.vue'
+import DishesView from './views/DishesView.vue'
+import ProductsView from './views/ProductsView.vue'
+import ShoppingView from './views/ShoppingView.vue'
+import SettingsView from './views/SettingsView.vue'
+import AuthView from './views/AuthView.vue' 
+
+const auth = useAuthStore()
+const dictionaries = useDictionariesStore()
+const currentTab = ref('plan')
+
+const tabs = [
+  { id: 'plan', label: 'План', icon: 'calendar_today', component: PlanView },
+  { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu', component: DishesView },
+  { id: 'shopping', label: 'Купить', icon: 'shopping_bag', component: ShoppingView },
+  { id: 'products', label: 'Продукты', icon: 'kitchen', component: ProductsView },
+  { id: 'settings', label: 'Настр.', icon: 'tune', component: SettingsView }
+]
+
+const activeComponent = computed(() => {
+  const tab = tabs.find(t => t.id === currentTab.value)
+  return tab ? tab.component : PlanView
+})
+
+// Если авторизовались - грузим справочники
+watch(() => auth.isAuth, (newVal) => {
+  if (newVal) dictionaries.fetchDictionaries()
+})
+
+onMounted(() => {
+  // ИСПРАВЛЕНИЕ:
+  // 1. Убрали await, чтобы не было белого экрана
+  // 2. Исправили название функции: init() вместо initApp()
+  auth.init().then(() => {
+     if (auth.isAuth) dictionaries.fetchDictionaries()
+     
+     // Telegram WebApp настройки
+     if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.expand()
+        window.Telegram.WebApp.ready()
+        window.Telegram.WebApp.setHeaderColor('#F8FAFC') 
+        window.Telegram.WebApp.setBackgroundColor('#F8FAFC')
+     }
+  })
+})
+</script>
+
+<template>
+  <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
+    
+    <div v-if="auth.loading" class="flex-1 flex items-center justify-center">
+      <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
+    </div>
+
+    <div v-else-if="!auth.isAuth" class="flex-1 bg-white">
+      <AuthView />
+    </div>
+
+    <template v-else>
+      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0">
+        <transition name="fade" mode="out-in">
+          <component :is="activeComponent" />
+        </transition>
+      </main>
+
+      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
+        <div class="h-[76px] grid grid-cols-5 items-center">
+          <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'">
+            <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
+            <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
+          </button>
+        </div>
+      </nav>
+    </template>
+  </div>
+</template>
+
+<style>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>
+
+
+================================================
+FILE: ./src/components/DishDetailModal.vue
+================================================
+
+<script setup>
+import { ref, watch, computed } from 'vue'
+import { useDishStore } from '../stores/dishes'
+import { useProductStore } from '../stores/products'
+import { useDictionariesStore } from '../stores/dictionaries'
+
+const props = defineProps({
+  isOpen: Boolean,
+  dish: Object 
+})
+
+const emit = defineEmits(['close'])
+const dishStore = useDishStore()
+const productStore = useProductStore()
+const dictionaries = useDictionariesStore()
+
+const isEditing = ref(false)
+const formData = ref({
+    id: null,
+    name: '',
+    category: '', // Здесь будет строка, например "Супы"
+    description: '',
+    kcal: null, protein: null, fat: null, carbs: null,
+    tags: [],
+    ingredients: []
+})
+
+// --- СПРАВОЧНИКИ (Теперь берутся из констант в dictionaries.js) ---
+const categories = computed(() => dictionaries.dishCategories.map(c => c.name))
+
+// Теги контекста (совпадают с названиями приемов пищи)
+const contextTags = computed(() => {
+    const slotNames = dictionaries.mealSlots.map(s => s.name)
+    return dictionaries.availableTags.filter(t => slotNames.includes(t.name))
+})
+
+const featureTags = computed(() => {
+    const slotNames = dictionaries.mealSlots.map(s => s.name)
+    return dictionaries.availableTags.filter(t => !slotNames.includes(t.name))
+})
+
+// --- ЛОГИКА ТЕГОВ ---
+const isTagSelected = (tag) => {
+    return formData.value.tags.some(t => t.id === tag.id)
+}
+
+const toggleTag = (tag) => {
+    if (isTagSelected(tag)) {
+        formData.value.tags = formData.value.tags.filter(t => t.id !== tag.id)
+    } else {
+        formData.value.tags.push(tag)
+    }
+}
+
+// --- ЛОГИКА ИНГРЕДИЕНТОВ ---
+const productSearchQuery = ref('')
+const showProductDropdown = ref(false)
+const selectedProductToAdd = ref(null)
+const amountToAdd = ref('')
+
+const filteredProducts = computed(() => {
+    const q = productSearchQuery.value.toLowerCase().trim()
+    if (!q) return []
+    return productStore.products
+        .filter(p => p.name.toLowerCase().includes(q))
+        .slice(0, 10)
+})
+
+const selectProductFromSearch = (prod) => {
+    selectedProductToAdd.value = prod
+    productSearchQuery.value = ''
+    showProductDropdown.value = false
+    amountToAdd.value = ''
+}
+
+const addIngredientToForm = () => {
+    if (!selectedProductToAdd.value || !amountToAdd.value) return
+    formData.value.ingredients.push({
+        product_id: selectedProductToAdd.value.id,
+        name: selectedProductToAdd.value.name,
+        unit: selectedProductToAdd.value.unit,
+        amount: parseFloat(amountToAdd.value)
+    })
+    selectedProductToAdd.value = null
+    amountToAdd.value = ''
+}
+
+const removeIngredient = (index) => {
+    formData.value.ingredients.splice(index, 1)
+}
+
+// --- ИНИЦИАЛИЗАЦИЯ ---
+watch(() => props.dish, (newVal) => {
+  if (newVal) {
+    formData.value = JSON.parse(JSON.stringify(newVal))
+    // Гарантируем наличие полей
+    if (!formData.value.ingredients) formData.value.ingredients = []
+    if (!formData.value.tags) formData.value.tags = []
+    if (!formData.value.description) formData.value.description = ''
+    
+    // Если категория пустая (новый), ставим первую по умолчанию
+    if (!formData.value.category && dictionaries.dishCategories.length > 0) {
+        formData.value.category = dictionaries.dishCategories[0].name
+    }
+    
+    // Если ID нет -> режим создания
+    isEditing.value = !newVal.id 
+    
+    productSearchQuery.value = ''
+    selectedProductToAdd.value = null
+  }
+}, { immediate: true })
+
+const handleSave = async () => {
+  if (!formData.value.name) return
+  if (formData.value.id) {
+    await dishStore.updateDish(formData.value.id, formData.value)
+  } else {
+    await dishStore.addDish(formData.value)
+  }
+  isEditing.value = false
+  emit('close')
+}
+
+const handleDelete = async () => {
+    if(confirm('Удалить это блюдо?')) {
+        await dishStore.deleteDish(formData.value.id)
+        emit('close')
+    }
+}
+
+const handleCancel = () => {
+    if (!formData.value.id) emit('close')
+    else {
+        isEditing.value = false
+        formData.value = JSON.parse(JSON.stringify(props.dish))
+    }
+}
+</script>
+
+<template>
+  <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="bg-white w-full max-w-sm h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
+      
+      <div class="px-6 pt-6 pb-2 flex justify-between items-center shrink-0 border-b border-slate-50 bg-white z-20">
+        <button v-if="!isEditing" @click="$emit('close')" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200">
+            <span class="material-icons-round text-xl">close</span>
+        </button>
+        <div v-else class="w-10"></div>
+        
+        <span class="text-sm font-black text-slate-900 uppercase tracking-widest truncate max-w-[150px]">
+            {{ isEditing ? (formData.id ? 'Редактирование' : 'Новое блюдо') : '' }}
+        </span>
+
+        <div class="flex items-center gap-2">
+            <button v-if="isEditing" @click="handleCancel" class="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">Отмена</button>
+            <button v-if="isEditing" @click="handleSave" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect">Готово</button>
+            <button v-if="!isEditing" @click="isEditing = true" class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center tap-effect hover:bg-indigo-100">
+                <span class="material-icons-round text-xl">edit</span>
+            </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-6 pb-8 pt-4 no-scrollbar">
+        
+        <div v-if="!isEditing" class="flex flex-col space-y-6">
+           <div class="text-center">
+              <h2 class="text-2xl font-black text-slate-900 leading-tight mb-2">{{ formData.name }}</h2>
+              <div class="flex flex-wrap justify-center gap-1.5">
+                  <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ formData.category || 'Без категории' }}</span>
+                  <span v-for="tag in formData.tags" :key="tag.id" class="px-2 py-1 bg-indigo-50 text-indigo-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                      {{ tag.name }}
+                  </span>
+              </div>
+           </div>
+
+           <div class="grid grid-cols-4 gap-2">
+              <div class="bg-orange-50 p-2 rounded-2xl border border-orange-100 flex flex-col items-center">
+                  <span class="text-lg font-black text-orange-500">{{ formData.kcal || 0 }}</span>
+                  <span class="text-[9px] font-bold text-orange-300 uppercase">Ккал</span>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
+                  <span class="text-lg font-black text-slate-700">{{ formData.protein || 0 }}</span>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase">Белки</span>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
+                  <span class="text-lg font-black text-slate-700">{{ formData.fat || 0 }}</span>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase">Жиры</span>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
+                  <span class="text-lg font-black text-slate-700">{{ formData.carbs || 0 }}</span>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase">Угле</span>
+              </div>
+           </div>
+
+           <div v-if="formData.ingredients?.length" class="w-full">
+               <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">Состав</h4>
+               <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                   <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm">
+                       <span class="font-bold text-slate-700">{{ ing.name }}</span>
+                       <span class="font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
+                   </div>
+               </div>
+           </div>
+
+           <div v-if="formData.description" class="w-full">
+               <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">Приготовление</h4>
+               <div class="bg-slate-50 p-4 rounded-2xl text-slate-700 text-sm leading-relaxed whitespace-pre-wrap border border-slate-100">
+                   {{ formData.description }}
+               </div>
+           </div>
+
+           <div class="pt-6 flex justify-center">
+                <button @click="handleDelete" class="text-red-400 text-xs font-bold flex items-center gap-1.5 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+                    <span class="material-icons-round text-sm">delete</span> Удалить
+                </button>
+           </div>
+        </div>
+
+
+        <div v-else class="space-y-6 pb-20">
+            
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Название</label>
+                <input v-model="formData.name" placeholder="Название блюда" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 text-lg">
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Категория</label>
+                <div class="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+                    <button v-for="cat in categories" :key="cat" @click="formData.category = cat" class="px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border tap-effect" :class="formData.category === cat ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'">{{ cat }}</button>
+                </div>
+            </div>
+
+            <div v-if="contextTags.length > 0" class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Теги</label>
+                <div class="flex flex-wrap gap-2">
+                    <button 
+                        v-for="tag in contextTags" 
+                        :key="tag.id" 
+                        @click="toggleTag(tag)"
+                        class="px-3 py-2 rounded-xl text-xs font-bold transition-all border tap-effect"
+                        :class="isTagSelected(tag) ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
+                    >
+                        {{ tag.name }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">КБЖУ (на порцию)</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <input v-model.number="formData.kcal" type="number" placeholder="Ккал" class="w-full p-3 bg-orange-50 text-orange-600 font-bold rounded-xl text-center outline-none border border-orange-100 placeholder:text-orange-200">
+                    <input v-model.number="formData.protein" type="number" placeholder="Бел" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
+                    <input v-model.number="formData.fat" type="number" placeholder="Жир" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
+                    <input v-model.number="formData.carbs" type="number" placeholder="Угл" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
+                </div>
+            </div>
+
+            <div class="h-[1px] bg-slate-100 w-full"></div>
+
+            <div class="space-y-3">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ингредиенты</label>
+                
+                <div v-if="formData.ingredients.length > 0" class="space-y-2">
+                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-lg">🥦</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-slate-800 text-sm truncate">{{ ing.name }}</div>
+                        </div>
+                        <div class="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold text-slate-500">
+                             {{ ing.amount }} {{ ing.unit }}
+                        </div>
+                        <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
+                            <span class="material-icons-round text-lg">close</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-3 relative">
+                    <div v-if="!selectedProductToAdd">
+                        <div class="relative">
+                            <span class="material-icons-round absolute left-3 top-3 text-slate-400 text-lg">search</span>
+                            <input 
+                                v-model="productSearchQuery" 
+                                @focus="showProductDropdown = true"
+                                placeholder="Добавить продукт..." 
+                                class="w-full pl-10 p-3 bg-white rounded-xl font-bold text-slate-700 outline-none border border-slate-200 focus:border-indigo-300 transition-colors text-sm"
+                            >
+                            <div v-if="productSearchQuery && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-40 overflow-y-auto">
+                                <button 
+                                    v-for="prod in filteredProducts" 
+                                    :key="prod.id"
+                                    @click="selectProductFromSearch(prod)"
+                                    class="w-full text-left px-4 py-3 hover:bg-indigo-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between"
+                                >
+                                    <span>{{ prod.name }}</span>
+                                    <span class="text-xs text-slate-400">{{ prod.unit }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="flex gap-2 items-center animate-fade-in">
+                        <div class="flex-1 font-bold text-slate-800 text-sm pl-2 truncate">{{ selectedProductToAdd.name }}</div>
+                        <input v-model="amountToAdd" type="number" :placeholder="selectedProductToAdd.unit" class="w-20 p-2 bg-white rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" autoFocus>
+                        <button @click="addIngredientToForm" class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-lg tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round">check</span></button>
+                        <button @click="selectedProductToAdd = null" class="w-10 h-10 text-slate-400 flex items-center justify-center"><span class="material-icons-round">close</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-[1px] bg-slate-100 w-full"></div>
+
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Рецепт / Описание</label>
+                <textarea 
+                    v-model="formData.description" 
+                    placeholder="Опишите процесс приготовления..." 
+                    class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[120px] text-sm"
+                ></textarea>
+            </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.animate-fade-in { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
+
+
+================================================
+FILE: ./src/components/DishProgress.vue
+================================================
+
+<script setup>
+import { computed } from 'vue'
+import { useShoppingStore } from '../stores/shopping'
+
+const props = defineProps({
+  dishes: { type: Array, default: () => [] }
+})
+
+const shoppingStore = useShoppingStore()
+
+const dishesWithProgress = computed(() => {
+    const groups = {}
+
+    props.dishes.forEach(planItem => {
+        const dish = planItem.dishes
+        // Пропускаем, если нет ингредиентов
+        if (!dish || !dish.ingredients || dish.ingredients.length === 0) return
+
+        // Если встречаем блюдо ВПЕРВЫЕ — инициализируем и считаем ингредиенты по рецепту
+        if (!groups[dish.id]) {
+            
+            // 1. Считаем, сколько всего уникальных ингредиентов в рецепте
+            const recipeTotal = dish.ingredients.length
+            
+            // 2. Считаем, сколько из них отмечено галочками
+            const recipeBought = dish.ingredients.reduce((acc, ing) => {
+                return acc + (shoppingStore.isChecked(ing.product_id) ? 1 : 0)
+            }, 0)
+
+            groups[dish.id] = {
+                id: dish.id,
+                name: dish.name,
+                count: 0,       // Счетчик количества раз в плане
+                total: recipeTotal,
+                bought: recipeBought
+            }
+        }
+
+        // Просто увеличиваем счетчик "сколько раз готовим"
+        groups[dish.id].count++
+        
+        // ВАЖНО: Мы больше НЕ суммируем total и bought здесь,
+        // так как рецепт один и тот же.
+    })
+
+    return Object.values(groups).map(item => {
+        const percent = item.total > 0 ? Math.round((item.bought / item.total) * 100) : 0
+        
+        return {
+            ...item,
+            percent,
+            isReady: percent === 100
+        }
+    })
+})
+</script>
+
+<template>
+  <div v-if="dishesWithProgress.length > 0" class="mb-6 animate-fade-in">
+      <h3 class="font-black text-slate-300 uppercase tracking-widest text-xs mb-3 pl-2">Готовность блюд</h3>
+      
+      <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
+          <div 
+            v-for="item in dishesWithProgress" 
+            :key="item.id"
+            class="min-w-[140px] max-w-[140px] bg-white rounded-2xl p-3 border shadow-sm flex flex-col justify-between transition-all duration-300"
+            :class="item.isReady ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100'"
+          >
+              <div class="mb-2">
+                  <div class="font-bold text-slate-800 text-xs leading-tight line-clamp-2 mb-1 h-8" :title="item.name">
+                      {{ item.name }}
+                      <span v-if="item.count > 1" class="text-indigo-500 ml-0.5">x{{ item.count }}</span>
+                  </div>
+                  
+                  <div class="text-[10px] font-bold transition-colors" :class="item.isReady ? 'text-emerald-600' : 'text-slate-400'">
+                      {{ item.isReady ? 'Все продукты есть!' : `${item.bought} из ${item.total}` }}
+                  </div>
+              </div>
+
+              <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full rounded-full transition-all duration-500 ease-out"
+                    :class="item.isReady ? 'bg-emerald-500' : 'bg-indigo-500'"
+                    :style="{ width: item.percent + '%' }"
+                  ></div>
+              </div>
+          </div>
+      </div>
+  </div>
+</template>
+
+<style scoped>
+.animate-fade-in { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+
+
+================================================
+FILE: ./src/components/DishSelector.vue
+================================================
+
+<script setup>
+import { ref, computed } from 'vue'
+import { useDishStore } from '../stores/dishes'
+import { usePlanStore } from '../stores/plan'
+import { useProductStore } from '../stores/products'
+import { useSettingsStore } from '../stores/settings'
+
+const props = defineProps({
+  preferredCategory: String, // Название слота (Завтрак, Обед...)
+  suggestedItems: { type: Array, default: () => [] }, // Вчерашние блюда
+  existingItems: { type: Array, default: () => [] }, // Уже в этом слоте
+})
+
+const emit = defineEmits(['close', 'select', 'remove', 'toggle-shopping'])
+const dishStore = useDishStore()
+const planStore = usePlanStore()
+const productStore = useProductStore()
+const settingsStore = useSettingsStore()
+
+const searchQuery = ref('')
+const activeTab = ref('dishes') // 'dishes' | 'products'
+
+// --- 1. ЛОГИКА БИБЛИОТЕКИ БЛЮД ---
+const sortedDishes = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  let list = [...dishStore.dishes]
+  
+  // Фильтрация поиском
+  if (q) {
+    list = list.filter(d => d.name.toLowerCase().includes(q))
+  }
+
+  // СОРТИРОВКА ПО КОНТЕКСТУ
+  // Если слот "Завтрак", поднимаем блюда с тегом "Завтрак" наверх
+  if (props.preferredCategory) {
+      list.sort((a, b) => {
+          const aHasTag = a.tags && a.tags.some(t => t.name === props.preferredCategory)
+          const bHasTag = b.tags && b.tags.some(t => t.name === props.preferredCategory)
+          
+          if (aHasTag && !bHasTag) return -1
+          if (!aHasTag && bHasTag) return 1
+          return 0
+      })
+  }
+  
+  return list
+})
+
+const filteredProducts = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  if (!q) return [] // Не показываем продукты пока нет поиска (чтобы не мусорить)
+  return productStore.products.filter(p => p.name.toLowerCase().includes(q)).slice(0, 10)
+})
+
+// Проверка: Подходит ли блюдо под текущий слот (для подсветки)
+const isContextMatch = (dish) => {
+    return dish.tags && dish.tags.some(t => t.name === props.preferredCategory)
+}
+
+// --- 2. ДЕЙСТВИЯ ---
+
+// Добавление (Окно НЕ закрывается)
+const handleAdd = (item, type = 'dish') => {
+    const defaultPortions = settingsStore.defaultPortions || 1
+    
+    emit('select', { 
+        ...item, 
+        type,
+        amount: defaultPortions 
+    })
+    // Очищаем поиск для удобства следующего выбора, но не закрываем
+    // searchQuery.value = '' 
+}
+
+// Изменение порций у УЖЕ добавленного
+const updatePortions = (item, delta) => {
+    const newAmount = Math.max(1, (item.portions || 1) + delta)
+    planStore.updatePlanItem(item.id, { portions: newAmount })
+}
+
+// Тоггл корзины у УЖЕ добавленного
+const toggleShopping = (item) => {
+    planStore.updatePlanItem(item.id, { ignore_shopping: !item.ignore_shopping })
+}
+
+// Удаление
+const removeItem = (item) => {
+    planStore.removeFromPlan(item.id)
+}
+
+</script>
+
+<template>
+  <div class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="bg-white w-full max-w-md h-[92vh] sm:h-[800px] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
+      
+      <div class="px-5 pt-5 pb-3 bg-white z-20 border-b border-slate-100 flex justify-between items-center shrink-0">
+          <div>
+              <h2 class="text-xl font-black text-slate-900">{{ preferredCategory || 'Выбор блюда' }}</h2>
+              <p class="text-[11px] font-bold text-slate-400">Составьте меню для этого приема</p>
+          </div>
+          <button @click="$emit('close')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold tap-effect shadow-lg shadow-slate-900/20">
+              Готово
+          </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto bg-slate-50">
+          
+          <div v-if="existingItems.length > 0" class="px-4 py-4 space-y-3">
+              <div class="flex items-center gap-2 mb-2">
+                  <span class="material-icons-round text-sm text-indigo-500">restaurant</span>
+                  <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Выбрано</h3>
+              </div>
+              
+              <transition-group name="list">
+                <div v-for="item in existingItems" :key="item.id" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                             <div class="w-10 h-10 rounded-xl bg-slate-50 overflow-hidden flex-shrink-0 flex items-center justify-center text-lg">
+                                <img v-if="item.dish_id && item.dishes.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
+                                <span v-else>{{ item.product_id ? '🥦' : '🥘' }}</span>
+                             </div>
+                             <div>
+                                 <div class="font-bold text-slate-900 text-sm leading-tight">
+                                     {{ item.dish_id ? item.dishes.name : item.products.name }}
+                                 </div>
+                                 <div class="text-[10px] font-bold text-slate-400 mt-0.5">
+                                     {{ item.dish_id ? item.dishes.kcal + ' ккал' : item.products.unit }}
+                                 </div>
+                             </div>
+                        </div>
+                        <button @click="removeItem(item)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
+                            <span class="material-icons-round text-lg">delete</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-slate-50 rounded-xl p-1">
+                        
+                        <div class="flex items-center gap-3 px-2">
+                             <button @click="updatePortions(item, -1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-500 active:scale-90 transition-transform disabled:opacity-50">
+                                 <span class="material-icons-round text-xs">remove</span>
+                             </button>
+                             <div class="text-xs font-black text-slate-700 w-12 text-center">
+                                 {{ item.portions }} порц
+                             </div>
+                             <button @click="updatePortions(item, 1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm text-slate-500 active:scale-90 transition-transform">
+                                 <span class="material-icons-round text-xs">add</span>
+                             </button>
+                        </div>
+
+                        <button 
+                            @click="toggleShopping(item)"
+                            class="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[10px] font-bold"
+                            :class="item.ignore_shopping ? 'bg-slate-200 text-slate-500' : 'bg-green-100 text-green-700'"
+                        >
+                            <span class="material-icons-round text-sm">{{ item.ignore_shopping ? 'remove_shopping_cart' : 'shopping_cart' }}</span>
+                            {{ item.ignore_shopping ? 'Не покупать' : 'Купить' }}
+                        </button>
+                    </div>
+                </div>
+              </transition-group>
+          </div>
+
+          <div v-if="suggestedItems.length > 0" class="px-4 pb-4 pt-2">
+               <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 pl-1">Было вчера</h3>
+               <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                   <button 
+                      v-for="item in suggestedItems" 
+                      :key="'sug'+item.id"
+                      @click="handleAdd(item.dish_id ? item.dishes : item.products, item.dish_id ? 'dish' : 'product')"
+                      class="min-w-[140px] max-w-[140px] bg-white p-2 rounded-2xl border border-slate-100 flex flex-col items-center text-center gap-2 tap-effect"
+                   >
+                       <div class="w-12 h-12 rounded-xl bg-slate-50 overflow-hidden flex-shrink-0 flex items-center justify-center text-xl">
+                            <img v-if="item.dish_id && item.dishes.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
+                            <span v-else>{{ item.product_id ? '🥦' : '🥘' }}</span>
+                       </div>
+                       <div class="font-bold text-slate-800 text-xs leading-tight line-clamp-2">
+                           {{ item.dish_id ? item.dishes.name : item.products.name }}
+                       </div>
+                       <span class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md w-full">Добавить +</span>
+                   </button>
+               </div>
+          </div>
+
+          <div class="bg-white rounded-t-[32px] shadow-[0_-4px_20px_rgba(0,0,0,0.03)] min-h-[400px] px-5 pt-6 pb-20">
+               
+               <div class="relative mb-6">
+                  <span class="material-icons-round absolute left-3 top-3.5 text-slate-400">search</span>
+                  <input v-model="searchQuery" placeholder="Найти рецепт или продукт..." class="w-full pl-10 p-3 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 ring-indigo-500/10 transition-all border border-slate-100">
+               </div>
+
+               <div v-if="searchQuery" class="flex gap-2 mb-4">
+                   <button @click="activeTab = 'dishes'" class="px-4 py-2 rounded-xl text-xs font-bold transition-colors border" :class="activeTab === 'dishes' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'">Блюда</button>
+                   <button @click="activeTab = 'products'" class="px-4 py-2 rounded-xl text-xs font-bold transition-colors border" :class="activeTab === 'products' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'">Продукты</button>
+               </div>
+               
+               <div v-else class="flex items-center gap-2 mb-4">
+                  <span class="material-icons-round text-sm text-indigo-500">menu_book</span>
+                  <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Все рецепты</h3>
+               </div>
+
+               <div v-if="activeTab === 'dishes'" class="space-y-2">
+                   <div 
+                      v-for="dish in sortedDishes" 
+                      :key="dish.id" 
+                      @click="handleAdd(dish, 'dish')"
+                      class="flex items-center gap-3 p-2 pr-3 rounded-2xl border transition-all cursor-pointer group"
+                      :class="isContextMatch(dish) ? 'bg-indigo-50/30 border-indigo-100 hover:bg-indigo-50' : 'bg-white border-slate-50 hover:bg-slate-50'"
+                   >
+                       <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center text-xl bg-slate-100">
+                            <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
+                            <span v-else>🥘</span>
+                       </div>
+                       <div class="flex-1 min-w-0">
+                           <div class="flex items-center gap-2">
+                               <div class="font-bold text-slate-900 text-sm truncate">{{ dish.name }}</div>
+                               <span v-if="isContextMatch(dish)" class="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded">рек</span>
+                           </div>
+                           <div class="text-[10px] font-bold text-slate-400 mt-0.5 flex gap-2">
+                               <span>{{ dish.kcal }} ккал</span>
+                               <span class="text-slate-300">•</span>
+                               <span>{{ dish.category }}</span>
+                           </div>
+                       </div>
+                       <div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors" :class="isContextMatch(dish) ? 'bg-indigo-500 text-white shadow-md' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-500 group-hover:text-white'">
+                           <span class="material-icons-round text-lg">add</span>
+                       </div>
+                   </div>
+               </div>
+
+               <div v-if="activeTab === 'products' && searchQuery" class="space-y-2">
+                    <div v-for="prod in filteredProducts" :key="prod.id" @click="handleAdd(prod, 'product')" class="flex items-center gap-3 p-3 rounded-2xl border border-slate-50 hover:bg-slate-50 cursor-pointer">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg">🥦</div>
+                        <div class="flex-1 font-bold text-slate-900 text-sm">{{ prod.name }}</div>
+                        <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                           <span class="material-icons-round text-lg">add</span>
+                       </div>
+                    </div>
+               </div>
+          </div>
+
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Анимации списка */
+.list-enter-active, .list-leave-active { transition: all 0.3s ease; }
+.list-enter-from, .list-leave-to { opacity: 0; transform: translateX(-20px); }
+</style>
+
+
+================================================
+FILE: ./src/lib/supabase.js
+================================================
+
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+
+================================================
+FILE: ./src/main.js
+================================================
+
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from './App.vue'
+import './style.css'
+
+const app = createApp(App)
+
+app.use(createPinia())
+
+app.mount('#app')
+
+
+================================================
+FILE: ./src/stores/auth.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref(null)
+  const householdId = ref(null)
+  const isAuth = ref(false)
+  const loading = ref(true)
+
+  // Инициализация при загрузке приложения
+  const init = async () => {
+    loading.value = true
+    
+    // Получаем текущую сессию
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (session?.user) {
+      await handleUserSession(session.user)
+    } else {
+      resetState()
+    }
+    
+    // Слушаем изменения состояния (например, логаут в соседней вкладке)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await handleUserSession(session.user)
+      } else {
+        resetState()
+      }
+      loading.value = false
+    })
+    
+    loading.value = false
+  }
+
+  // Общая логика обработки пользователя
+  const handleUserSession = async (authUser) => {
+    user.value = authUser
+    isAuth.value = true
+    
+    // Загружаем ID семьи из профиля
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('household_id')
+        .eq('id', authUser.id)
+        .single()
+        
+    if (data && data.household_id) {
+        householdId.value = data.household_id
+    } else {
+        console.error('Household ID не найден для этого пользователя!')
+    }
+  }
+
+  const resetState = () => {
+    user.value = null
+    householdId.value = null
+    isAuth.value = false
+  }
+
+  // --- ACTIONS ---
+
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    if (error) throw error
+  }
+
+  const register = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    if (error) throw error
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    resetState()
+    window.location.reload()
+  }
+
+  return { 
+    user, 
+    householdId, 
+    isAuth, 
+    loading, 
+    init, 
+    login, 
+    register, 
+    signOut
+  }
+})
+
+
+================================================
+FILE: ./src/stores/dictionaries.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useDictionariesStore = defineStore('dictionaries', () => {
+  
+  // --- 1. ЖЕСТКО ЗАФИКСИРОВАННЫЕ КОНСТАНТЫ ---
+  
+  // Время приемов пищи
+  const mealSlots = ref([
+    { id: 'slot_1', name: 'Завтрак', sort_order: 1 },
+    { id: 'slot_2', name: 'Обед', sort_order: 2 },
+    { id: 'slot_3', name: 'Ужин', sort_order: 3 },
+    { id: 'slot_4', name: 'Перекус', sort_order: 4 }
+  ])
+
+  // Категории блюд
+  const dishCategories = ref([
+    { id: 'cat_1', name: 'Горячее', sort_order: 1 },
+    { id: 'cat_2', name: 'Супы', sort_order: 2 },
+    { id: 'cat_3', name: 'Салаты', sort_order: 3 },
+    { id: 'cat_4', name: 'Закуски', sort_order: 4 },
+    { id: 'cat_5', name: 'Десерты', sort_order: 5 },
+    { id: 'cat_6', name: 'Напитки', sort_order: 6 },
+    { id: 'cat_7', name: 'Выпечка', sort_order: 7 }
+  ])
+
+  // Категории продуктов (НОВОЕ: теперь тоже жестко зафиксированы)
+  const productCategories = ref([
+    { id: 'pcat_1', name: 'Овощи и фрукты' },
+    { id: 'pcat_2', name: 'Молочные продукты' },
+    { id: 'pcat_3', name: 'Мясо, птица, рыба' },
+    { id: 'pcat_4', name: 'Бакалея и хлеб' },
+    { id: 'pcat_5', name: 'Заморозка' },
+    { id: 'pcat_6', name: 'Напитки' },
+    { id: 'pcat_7', name: 'Бытовая химия' },
+    { id: 'pcat_8', name: 'Разное' }
+  ])
+  
+  // Теги (например: "Быстро", "ПП", "Праздничное")
+  // Теги можно оставить динамическими, если захотим потом давать юзерам создавать свои
+  const availableTags = ref([]) 
+  
+  const loading = ref(false)
+
+  // --- 2. ЗАГРУЗКА ТОЛЬКО ТЕГОВ ---
+  const fetchDictionaries = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    loading.value = true
+    try {
+      // Загружаем только теги
+      const { data } = await supabase
+          .from('dish_tags')
+          .select('*')
+          .eq('household_id', auth.householdId)
+          .order('name')
+
+      availableTags.value = data || []
+
+    } catch (e) {
+      console.error('Ошибка справочников:', e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { 
+    mealSlots, 
+    dishCategories, 
+    productCategories, 
+    availableTags, 
+    loading, 
+    fetchDictionaries 
+  }
+})
+
+
+================================================
+FILE: ./src/stores/dishes.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useDishStore = defineStore('dishes', () => {
+  const dishes = ref([])
+  const loading = ref(false)
+
+  const fetchDishes = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    loading.value = true
+    const { data, error } = await supabase
+      .from('dishes')
+      .select(`
+        *,
+        dish_tag_links (
+          dish_tags ( * )
+        ),
+        ingredients (
+          product_id,
+          amount,
+          products ( name, unit )
+        )
+      `)
+      .eq('household_id', auth.householdId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error(error)
+    } else {
+      dishes.value = data.map(dish => ({
+        ...dish,
+        tags: dish.dish_tag_links 
+          ? dish.dish_tag_links.map(link => link.dish_tags).filter(t => t) 
+          : [],
+        ingredients: dish.ingredients 
+          ? dish.ingredients.map(ing => ({
+              product_id: ing.product_id,
+              name: ing.products?.name || 'Неизвестно',
+              amount: ing.amount,
+              unit: ing.products?.unit || ''
+            }))
+          : []
+      }))
+    }
+    loading.value = false
+  }
+
+  const addDish = async (dishData) => {
+    const auth = useAuthStore()
+    
+    // 1. Создаем
+    const { data: newDish, error } = await supabase
+      .from('dishes')
+      .insert({
+        name: dishData.name,
+        category: dishData.category,
+        description: dishData.description || '', // Сохраняем рецепт
+        kcal: dishData.kcal || 0,
+        protein: dishData.protein || 0,
+        fat: dishData.fat || 0,
+        carbs: dishData.carbs || 0,
+        household_id: auth.householdId
+      })
+      .select()
+      .single()
+
+    if (error) { console.error(error); return }
+
+    // 2. Теги
+    if (dishData.tags && dishData.tags.length > 0) {
+       const links = dishData.tags.map(tag => ({
+           dish_id: newDish.id,
+           tag_id: tag.id
+       }))
+       await supabase.from('dish_tag_links').insert(links)
+    }
+
+    // 3. Ингредиенты
+    if (dishData.ingredients && dishData.ingredients.length > 0) {
+        const ingRows = dishData.ingredients.map(ing => ({
+            dish_id: newDish.id,
+            product_id: ing.product_id,
+            amount: parseFloat(ing.amount)
+        }))
+        await supabase.from('ingredients').insert(ingRows)
+    }
+
+    await fetchDishes()
+  }
+
+  const updateDish = async (id, dishData) => {
+    // 1. Обновляем
+    const { error } = await supabase
+      .from('dishes')
+      .update({
+        name: dishData.name,
+        category: dishData.category,
+        description: dishData.description,
+        kcal: dishData.kcal,
+        protein: dishData.protein,
+        fat: dishData.fat,
+        carbs: dishData.carbs
+      })
+      .eq('id', id)
+
+    if (error) { console.error(error); return }
+
+    // 2. Теги (удалить старые -> добавить новые)
+    await supabase.from('dish_tag_links').delete().eq('dish_id', id)
+    if (dishData.tags && dishData.tags.length > 0) {
+        const links = dishData.tags.map(tag => ({ dish_id: id, tag_id: tag.id }))
+        await supabase.from('dish_tag_links').insert(links)
+    }
+
+    // 3. Ингредиенты (удалить -> добавить)
+    await supabase.from('ingredients').delete().eq('dish_id', id)
+    if (dishData.ingredients && dishData.ingredients.length > 0) {
+        const ingRows = dishData.ingredients.map(ing => ({
+            dish_id: id,
+            product_id: ing.product_id,
+            amount: parseFloat(ing.amount)
+        }))
+        await supabase.from('ingredients').insert(ingRows)
+    }
+
+    await fetchDishes()
+  }
+
+  const deleteDish = async (id) => {
+    await supabase.from('dishes').delete().eq('id', id)
+    await fetchDishes()
+  }
+
+  return { dishes, loading, fetchDishes, addDish, updateDish, deleteDish }
+})
+
+
+================================================
+FILE: ./src/stores/plan.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const usePlanStore = defineStore('plan', () => {
+  const plan = ref([])
+  const loading = ref(false)
+
+  const fetchPlan = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    loading.value = true
+    
+    const { data, error } = await supabase
+      .from('plan')
+      .select(`
+        *,
+        dishes (
+          *,
+          ingredients (
+            product_id,
+            amount,
+            products ( * )
+          )
+        ),
+        products ( * )
+      `)
+      .eq('household_id', auth.householdId)
+    
+    if (error) console.error('Ошибка загрузки плана:', error)
+    else plan.value = data || []
+    
+    loading.value = false
+  }
+
+  const addToPlan = async (date, slotName, slotId, item) => {
+    const auth = useAuthStore()
+    const payload = {
+      date,
+      slot: slotName,
+      // ИСПРАВЛЕНИЕ: Передаем null, так как у нас теперь жесткие ID (slot_1), 
+      // а база ждет UUID. Мы будем ориентироваться по названию слота (slot).
+      slot_id: null, 
+      household_id: auth.householdId,
+      ignore_shopping: item.ignore_shopping || false 
+    }
+
+    if (item.type === 'dish') {
+      payload.dish_id = item.id
+      payload.portions = item.amount || 1
+    } else {
+      payload.product_id = item.id
+      payload.portions = item.amount || 1
+    }
+
+    // Оптимистичное обновление (сразу добавляем в массив, чтобы интерфейс не тупил)
+    // Генерируем временный ID
+    const tempItem = { ...payload, id: 'temp_' + Date.now() }
+    if (item.type === 'dish') tempItem.dishes = item
+    else tempItem.products = item
+    
+    plan.value.push(tempItem)
+
+    const { data, error } = await supabase
+        .from('plan')
+        .insert(payload)
+        .select()
+        .single()
+        
+    if (error) {
+        console.error('Ошибка сохранения:', error)
+        // Откат, если ошибка
+        plan.value = plan.value.filter(i => i.id !== tempItem.id)
+    } else {
+        // Заменяем временный объект реальным из базы
+        await fetchPlan()
+    }
+  }
+
+  const updatePlanItem = async (id, updates) => {
+    const index = plan.value.findIndex(i => i.id === id)
+    if (index !== -1) {
+        plan.value[index] = { ...plan.value[index], ...updates }
+    }
+
+    const { error } = await supabase
+      .from('plan')
+      .update(updates)
+      .eq('id', id)
+
+    if (error) {
+        console.error('Ошибка обновления:', error)
+        await fetchPlan() 
+    }
+  }
+
+  const removeFromPlan = async (id) => {
+    plan.value = plan.value.filter(i => i.id !== id)
+    
+    const { error } = await supabase.from('plan').delete().eq('id', id)
+    if (error) await fetchPlan()
+  }
+
+  const toggleIgnoreShopping = async (planId, currentState) => {
+    await updatePlanItem(planId, { ignore_shopping: !currentState })
+  }
+
+  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, toggleIgnoreShopping, updatePlanItem }
+})
+
+
+================================================
+FILE: ./src/stores/products.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useProductStore = defineStore('products', () => {
+  const products = ref([])
+  const loading = ref(false)
+
+  const fetchProducts = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    loading.value = true
+    // Теперь нам не нужно джойнить таблицу категорий, имя категории лежит прямо внутри продукта
+    const { data, error } = await supabase
+      .from('products')
+      .select('*') 
+      .eq('household_id', auth.householdId)
+      .order('name')
+    
+    if (error) console.error(error)
+    else products.value = data
+    loading.value = false
+  }
+
+  const addProduct = async (product) => {
+    const auth = useAuthStore()
+    
+    // Подготавливаем объект для базы
+    const productWithHouse = { 
+        name: product.name,
+        unit: product.unit,
+        category: product.category, // Сохраняем строку (название категории)
+        household_id: auth.householdId
+    }
+
+    const { data, error } = await supabase
+        .from('products')
+        .insert([productWithHouse])
+        .select()
+        .single()
+    
+    if (data) {
+      products.value.push(data)
+      products.value.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (error) {
+        console.error(error)
+    }
+  }
+
+  const updateProduct = async (product) => {
+    const auth = useAuthStore()
+    
+    const updates = {
+        name: product.name,
+        unit: product.unit,
+        category: product.category // Обновляем строку
+    }
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', product.id)
+      .eq('household_id', auth.householdId)
+      .select()
+      .single()
+
+    if (!error && data) {
+      const index = products.value.findIndex(p => p.id === product.id)
+      if (index !== -1) {
+        products.value[index] = data
+        products.value.sort((a, b) => a.name.localeCompare(b.name))
+      }
+    }
+  }
+
+  const deleteProduct = async (id) => {
+    const auth = useAuthStore()
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .eq('household_id', auth.householdId)
+      
+    if (!error) {
+       products.value = products.value.filter(p => p.id !== id)
+    }
+  }
+
+  return { products, loading, fetchProducts, addProduct, updateProduct, deleteProduct }
+})
+
+
+================================================
+FILE: ./src/stores/settings.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useSettingsStore = defineStore('settings', () => {
+  // Значения по умолчанию
+  const startDay = ref(1) 
+  const periodLength = ref(7)
+  const defaultPortions = ref(1)
+
+  // Ключ для LocalStorage
+  const LS_KEY = 'app_settings_v1'
+
+  // Загрузка настроек
+  const fetchSettings = async () => {
+    // 1. Сначала грузим из LocalStorage (Это мгновенно и надежно)
+    const localData = localStorage.getItem(LS_KEY)
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData)
+        if (parsed.startDay !== undefined) startDay.value = parsed.startDay
+        if (parsed.periodLength !== undefined) periodLength.value = parsed.periodLength
+        if (parsed.defaultPortions !== undefined) defaultPortions.value = parsed.defaultPortions
+        console.log('✅ Настройки загружены из LocalStorage')
+      } catch (e) {
+        console.error('Ошибка чтения LocalStorage', e)
+      }
+    }
+
+    // 2. Пытаемся подтянуть из базы (для синхронизации), если есть реальный юзер
+    const auth = useAuthStore()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('start_day, period_length, default_portions')
+        .eq('id', user.id)
+        .single()
+
+      if (data && !error) {
+        // База имеет приоритет, если там есть данные
+        if (data.start_day !== null) startDay.value = data.start_day
+        if (data.period_length !== null) periodLength.value = data.period_length
+        if (data.default_portions !== null) defaultPortions.value = data.default_portions
+        
+        // Обновляем локалку актуальными данными из базы
+        saveToLocal()
+      }
+    }
+  }
+
+  // Сохранение в LocalStorage (внутренняя функция)
+  const saveToLocal = () => {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      startDay: startDay.value,
+      periodLength: periodLength.value,
+      defaultPortions: defaultPortions.value
+    }))
+  }
+
+  // Основная функция сохранения (вызывается из кнопки)
+  const saveSettings = async (day, period, portions) => {
+    // 1. Обновляем состояние (State)
+    startDay.value = day
+    periodLength.value = period
+    defaultPortions.value = portions
+
+    // 2. СОХРАНЯЕМ В LOCALSTORAGE (Гарантия от сброса)
+    saveToLocal()
+    console.log('💾 Сохранено в LocalStorage')
+
+    // 3. Пытаемся отправить в базу (если есть доступ)
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      const payload = { 
+          start_day: day, 
+          period_length: period,
+          default_portions: portions
+      }
+      
+      // Используем update вместо upsert, это безопаснее для RLS
+      const { error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', user.id)
+
+      if (error) console.warn('⚠️ Не удалось сохранить в облако (но локально сохранено):', error.message)
+      else console.log('☁️ Успешно синхронизировано с облаком')
+    } else {
+      console.log('ℹ️ Работаем в оффлайн/Dev режиме. Данные сохранены только локально.')
+    }
+  }
+
+  return { startDay, periodLength, defaultPortions, fetchSettings, saveSettings }
+})
+
+
+================================================
+FILE: ./src/stores/shopping.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useShoppingStore = defineStore('shopping', () => {
+  // Храним ID купленных продуктов в Set для мгновенного доступа O(1)
+  const checkedIds = ref(new Set())
+  const loading = ref(false)
+
+  // Загрузка состояния из базы
+  const fetchChecklist = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    loading.value = true
+    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
+    const { data, error } = await supabase
+      .from('shopping_cart')
+      .select('product_id')
+      .eq('household_id', auth.householdId)
+      .eq('is_checked', true)
+
+    if (error) {
+      console.error('Ошибка загрузки списка покупок:', error)
+    } else {
+      // Превращаем массив объектов [{product_id: 1}, {product_id: 2}] в Set(1, 2)
+      checkedIds.value = new Set(data.map(item => item.product_id))
+    }
+    loading.value = false
+  }
+
+  // Переключение галочки
+  const toggleProduct = async (productId, newState) => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    // 1. Оптимистичное обновление интерфейса (мгновенно)
+    if (newState) {
+      checkedIds.value.add(productId)
+    } else {
+      checkedIds.value.delete(productId)
+    }
+
+    // 2. Отправка в базу
+    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
+    const { error } = await supabase
+      .from('shopping_cart')
+      .upsert({ 
+        household_id: auth.householdId, 
+        product_id: productId, 
+        is_checked: newState,
+        // user_id желательно тоже добавлять, если есть в таблице, но пока household критичнее
+        updated_at: new Date()
+      }, { onConflict: 'household_id, product_id' }) // Уточняем конфликт, если нужно
+
+    if (error) console.error('Ошибка сохранения галочки:', error)
+  }
+
+  // Проверка: куплен ли продукт?
+  const isChecked = (productId) => {
+    return checkedIds.value.has(productId)
+  }
+
+  // Сброс списка (например, начало новой недели)
+  const clearList = async () => {
+      const auth = useAuthStore()
+      if (!auth.householdId) return
+      
+      // Чистим локально
+      checkedIds.value.clear()
+      
+      // Чистим в базе
+      await supabase
+          .from('shopping_cart')
+          .delete()
+          .eq('household_id', auth.householdId)
+  }
+
+  return { 
+    checkedIds, 
+    loading, 
+    fetchChecklist, 
+    toggleProduct, 
+    isChecked,
+    clearList
+  }
+})
+
+
+================================================
+FILE: ./src/stores/ui.js
+================================================
+
+import { defineStore } from 'pinia'
+import { ref, watch } from 'vue'
+
+export const useUIStore = defineStore('ui', () => {
+  
+  // Загружаем сохраненное или создаем пустое
+  const savedState = JSON.parse(localStorage.getItem('meal-planner-ui') || '{}')
+
+  // Хелпер для дат
+  const restoreDate = (dateString) => dateString ? new Date(dateString) : new Date()
+
+  // --- ПЛАН ---
+  const plan = ref({
+    activeTab: savedState.plan?.activeTab || 'day',
+    selectedDate: restoreDate(savedState.plan?.selectedDate),
+    currentWeekStart: restoreDate(savedState.plan?.currentWeekStart)
+  })
+
+  // --- БЛЮДА ---
+  const dishes = ref({
+    activeCategory: savedState.dishes?.activeCategory || 'Все',
+    activeTag: savedState.dishes?.activeTag || null,
+    searchQuery: savedState.dishes?.searchQuery || ''
+  })
+
+  // --- ПОКУПКИ (НОВОЕ) ---
+  const shopping = ref({
+    activeTab: savedState.shopping?.activeTab || 'list', // 'list' (Надо купить) или 'purchased' (Куплено)
+    filterMode: savedState.shopping?.filterMode || 'category' // 'category' (По отделам) или 'az' (А-Я)
+  })
+
+  // АВТО-СОХРАНЕНИЕ
+  watch(
+    [plan, dishes, shopping],
+    ([newPlan, newDishes, newShopping]) => {
+      const stateToSave = {
+        plan: newPlan,
+        dishes: newDishes,
+        shopping: newShopping
+      }
+      localStorage.setItem('meal-planner-ui', JSON.stringify(stateToSave))
+    },
+    { deep: true }
+  )
+
+  return { plan, dishes, shopping }
+})
+
+
+================================================
+FILE: ./src/style.css
+================================================
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', sans-serif; /* Новый шрифт */
+}
+
+body {
+  background-color: #F8FAFC; /* Чуть более холодный оттенок фона */
+}
+
+/* Эффект нажатия */
+.tap-effect {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+  cursor: pointer;
+}
+.tap-effect:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Скрываем скроллбар */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Ручка модалки */
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  background-color: #E2E8F0;
+  border-radius: 10px;
+  margin: 0 auto 12px auto;
+}
+
+
+================================================
+FILE: ./src/views/AuthView.vue
+================================================
+
+<script setup>
+import { ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+
+const isRegister = ref(false) // Переключатель Вход/Регистрация
+const email = ref('')
+const password = ref('')
+const loading = ref(false)
+const errorMsg = ref('')
+
+const handleSubmit = async () => {
+  if (!email.value || !password.value) return
+  
+  loading.value = true
+  errorMsg.value = ''
+  
+  try {
+    if (isRegister.value) {
+      // Регистрация
+      await auth.register(email.value, password.value)
+    } else {
+      // Вход
+      await auth.login(email.value, password.value)
+    }
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-white">
+    <div class="flex-1 flex flex-col items-center justify-center p-8 w-full max-w-md mx-auto">
+      
+      <div class="w-20 h-20 bg-slate-50 rounded-[24px] flex items-center justify-center mb-6 border border-slate-100 shadow-sm">
+        <span class="text-4xl">🥗</span>
+      </div>
+
+      <h1 class="text-2xl font-black text-slate-900 mb-2 tracking-tight">Smart Meal Planner</h1>
+      <p class="text-slate-400 text-sm font-bold mb-8">Планируй. Готовь. Наслаждайся.</p>
+
+      <div class="flex bg-slate-100 p-1 rounded-2xl mb-8 w-full">
+        <button 
+          @click="isRegister = false; errorMsg = ''" 
+          class="flex-1 py-3 text-xs font-bold rounded-xl transition-all" 
+          :class="!isRegister ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'"
+        >
+          Вход
+        </button>
+        <button 
+          @click="isRegister = true; errorMsg = ''" 
+          class="flex-1 py-3 text-xs font-bold rounded-xl transition-all" 
+          :class="isRegister ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'"
+        >
+          Регистрация
+        </button>
+      </div>
+
+      <form @submit.prevent="handleSubmit" class="w-full space-y-4">
+        
+        <div class="space-y-1">
+          <label class="text-[10px] font-bold text-slate-400 uppercase ml-2">Email</label>
+          <input 
+            v-model="email" 
+            type="email" 
+            required
+            placeholder="hello@example.com"
+            class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-slate-900/10 border border-slate-100 transition-all placeholder:font-medium placeholder:text-slate-300"
+          >
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-[10px] font-bold text-slate-400 uppercase ml-2">Пароль</label>
+          <input 
+            v-model="password" 
+            type="password" 
+            required
+            minlength="2" 
+            placeholder="••••••"
+            class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-slate-900/10 border border-slate-100 transition-all placeholder:font-medium placeholder:text-slate-300"
+          >
+        </div>
+
+        <div v-if="errorMsg" class="bg-red-50 text-red-500 text-xs font-bold p-3 rounded-xl text-center">
+          {{ errorMsg }}
+        </div>
+
+        <button 
+          type="submit" 
+          :disabled="loading"
+          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl tap-effect mt-4 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+          <span v-if="loading" class="material-icons-round animate-spin text-sm">sync</span>
+          <span>{{ isRegister ? 'Создать аккаунт' : 'Войти' }}</span>
+        </button>
+
+      </form>
+    </div>
+    
+    <div class="p-6 text-center">
+        <p class="text-[10px] text-slate-300 font-bold">Smart Meal v0.2.0 • Clear</p>
+    </div>
+  </div>
+</template>
+
+
+================================================
+FILE: ./src/views/DishesView.vue
+================================================
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import { useDishStore } from '../stores/dishes'
+import { useProductStore } from '../stores/products'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { useUIStore } from '../stores/ui'
+import DishDetailModal from '../components/DishDetailModal.vue'
+
+const dishStore = useDishStore()
+const productStore = useProductStore()
+const dictionaries = useDictionariesStore()
+const uiStore = useUIStore()
+
+const CONTEXT_TAGS = ['Завтрак', 'Обед', 'Ужин', 'Перекус']
+
+// Список категорий для фильтра
+const filterCategories = computed(() => {
+  const cats = dictionaries.dishCategories.map(c => c.name)
+  return ['Все', ...cats]
+})
+
+// --- МОДАЛКА (Единая для просмотра и создания) ---
+const showDetailModal = ref(false)
+const viewingDish = ref(null)
+
+// 1. Открыть существующее (Просмотр)
+const openDish = (dish) => {
+  viewingDish.value = dish
+  showDetailModal.value = true
+}
+
+// 2. Открыть создание (Новое)
+const openCreateDish = () => {
+  // Определяем категорию по умолчанию (текущий фильтр или первая из списка)
+  const defaultCat = uiStore.dishes.activeCategory !== 'Все' 
+    ? uiStore.dishes.activeCategory 
+    : (dictionaries.dishCategories[0]?.name || '')
+    
+  // Передаем пустой объект (id: null запускает режим редактирования в модалке)
+  viewingDish.value = {
+      id: null, 
+      name: '',
+      category: defaultCat,
+      kcal: null, protein: null, fat: null, carbs: null,
+      tags: [],
+      ingredients: [] // Пустой состав
+  }
+  showDetailModal.value = true
+}
+
+// Загрузка данных
+onMounted(async () => {
+  if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
+  if (productStore.products.length === 0) await productStore.fetchProducts()
+  dictionaries.fetchDictionaries()
+})
+
+// Фильтрация (берет данные из uiStore)
+const filteredDishes = computed(() => {
+  let result = dishStore.dishes
+  
+  // 1. Фильтр по Тегу (Завтрак/Обед...)
+  if (uiStore.dishes.activeTag) {
+    result = result.filter(d => d.tags && d.tags.some(t => t.name === uiStore.dishes.activeTag))
+  }
+  
+  // 2. Фильтр по Категории
+  if (uiStore.dishes.activeCategory !== 'Все') {
+    result = result.filter(d => d.category === uiStore.dishes.activeCategory)
+  }
+  
+  // 3. Поиск
+  if (uiStore.dishes.searchQuery) {
+    const q = uiStore.dishes.searchQuery.toLowerCase()
+    result = result.filter(d => d.name.toLowerCase().includes(q))
+  }
+  
+  return result
+})
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50">
+    
+    <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20 shadow-sm border-b border-slate-100">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Блюда</h1>
+      
+      <div class="relative mb-4">
+        <span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
+        <input 
+          v-model="uiStore.dishes.searchQuery" 
+          type="text" 
+          placeholder="Найти рецепт..." 
+          class="w-full pl-11 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all"
+        >
+      </div>
+      
+      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-3 mb-1">
+        <button 
+          @click="uiStore.dishes.activeTag = null" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black uppercase transition-all tap-effect border" 
+          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200'"
+        >
+          Все
+        </button>
+
+        <button 
+          v-for="tag in CONTEXT_TAGS" 
+          :key="tag" 
+          @click="uiStore.dishes.activeTag = tag" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black uppercase transition-all tap-effect border" 
+          :class="uiStore.dishes.activeTag === tag ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
+        >
+            {{ tag }}
+        </button>
+      </div>
+
+      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-2">
+        <button 
+          v-for="cat in filterCategories" 
+          :key="cat" 
+          @click="uiStore.dishes.activeCategory = cat" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all tap-effect border" 
+          :class="uiStore.dishes.activeCategory === cat ? 'bg-white text-slate-900 border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+        >
+            {{ cat }}
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 pb-32 space-y-3 pt-4">
+      
+      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
+        <div class="text-5xl mb-2">🍳</div>
+        <p class="font-bold text-slate-400">Нет блюд</p>
+        <p v-if="uiStore.dishes.activeTag || uiStore.dishes.activeCategory !== 'Все'" class="text-xs text-slate-300 mt-1">
+            Попробуйте изменить фильтры
+        </p>
+      </div>
+
+      <div 
+        v-for="dish in filteredDishes" 
+        :key="dish.id" 
+        @click="openDish(dish)" 
+        class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group"
+      >
+        <div class="flex justify-between items-start">
+          <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
+          <span class="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0">
+              {{ dish.category }}
+          </span>
+        </div>
+        
+        <div v-if="dish.tags && dish.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+            <span 
+                v-for="tag in dish.tags" 
+                :key="tag.id" 
+                class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50" 
+                :class="tag.name === uiStore.dishes.activeTag ? 'border-indigo-200 text-indigo-600 bg-indigo-50' : 'border-slate-100'"
+            >
+               #{{ tag.name }}
+            </span>
+        </div>
+        
+        <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
+           <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
+           <span>Б {{ dish.protein || 0 }}</span>
+           <span>Ж {{ dish.fat || 0 }}</span>
+           <span>У {{ dish.carbs || 0 }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="fixed bottom-24 right-5 z-30">
+      <button 
+        @click="openCreateDish" 
+        class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"
+      >
+        <span class="material-icons-round text-3xl">add</span>
+      </button>
+    </div>
+
+    <DishDetailModal 
+       :is-open="showDetailModal" 
+       :dish="viewingDish"
+       @close="showDetailModal = false"
+    />
+
+  </div>
+</template>
+
+
+================================================
+FILE: ./src/views/PlanView.vue
+================================================
+
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { startOfWeek, addDays, subDays, format, isToday, isSameDay } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { useAuthStore } from '../stores/auth'
+import { usePlanStore } from '../stores/plan'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { useSettingsStore } from '../stores/settings'
+import { useDishStore } from '../stores/dishes'
+import { useUIStore } from '../stores/ui' 
+import DishSelector from '../components/DishSelector.vue'
+import DishDetailModal from '../components/DishDetailModal.vue'
+
+const auth = useAuthStore()
+const planStore = usePlanStore()
+const dictionaries = useDictionariesStore()
+const settingsStore = useSettingsStore()
+const dishStore = useDishStore()
+const uiStore = useUIStore()
+
+// --- ИНИЦИАЛИЗАЦИЯ ---
+const currentWeekStart = ref(new Date(uiStore.plan.currentWeekStart))
+const selectedDate = ref(new Date(uiStore.plan.selectedDate))
+
+const showSelector = ref(false)
+const targetSlot = ref(null)
+
+// Реактивный список для модалки
+const existingSlotItems = computed(() => {
+    if (!targetSlot.value) return []
+    const dateObj = new Date(targetSlot.value.date)
+    // ИСПРАВЛЕНИЕ: передаем name, а не id
+    return getSlotItems(dateObj, targetSlot.value.slotName)
+})
+
+const suggestedItems = ref([]) 
+
+watch(currentWeekStart, (val) => uiStore.plan.currentWeekStart = val)
+watch(selectedDate, (val) => uiStore.plan.selectedDate = val)
+
+const getSlotIcon = (slotName) => {
+    if (!slotName) return '🥘'
+    const name = slotName.toLowerCase()
+    if (name.includes('завтрак')) return '🍳'
+    if (name.includes('обед')) return '🍲'
+    if (name.includes('ужин')) return '🍗'
+    if (name.includes('перекус') || name.includes('полдник')) return '🥪'
+    return '🥘'
+}
+
+const categoryPriorities = computed(() => {
+  const map = {}
+  dictionaries.dishCategories.forEach(c => { map[c.name] = c.sort_order || 100 })
+  return map
+})
+
+// ИСПРАВЛЕНИЕ: Фильтруем по ИМЕНИ слота, а не по ID
+const getSlotItems = (date, slotName) => {
+  const dStr = format(date, 'yyyy-MM-dd')
+  const items = planStore.plan.filter(p => 
+    p.date === dStr && p.slot === slotName
+  )
+  return items.sort((a, b) => {
+    const getPrio = (item) => {
+      if (item.product_id) return 999 
+      const catName = item.dishes?.category
+      return categoryPriorities.value[catName] || 500
+    }
+    return getPrio(a) - getPrio(b)
+  })
+}
+
+const openSelector = (date, slot) => {
+  targetSlot.value = { 
+    date: format(date, 'yyyy-MM-dd'), 
+    slotName: slot.name, 
+    slotId: slot.id 
+  }
+  
+  // Предложка (блюда за вчера)
+  const prevDate = subDays(date, 1)
+  // ИСПРАВЛЕНИЕ: передаем name
+  suggestedItems.value = getSlotItems(prevDate, slot.name)
+  
+  showSelector.value = true
+}
+
+const onDishSelected = async (payload) => {
+  if (targetSlot.value && payload) {
+    await planStore.addToPlan(targetSlot.value.date, targetSlot.value.slotName, targetSlot.value.slotId, payload)
+  }
+}
+
+const showDishModal = ref(false)
+const viewingDish = ref(null)
+
+const openDishDetails = async (item) => {
+  if (item.dish_id) {
+    if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
+    const fullDish = dishStore.dishes.find(d => d.id === item.dish_id)
+    viewingDish.value = fullDish || item.dishes
+    showDishModal.value = true
+  }
+}
+
+const mealSlots = computed(() => dictionaries.mealSlots)
+
+const loadData = async () => {
+  await planStore.fetchPlan()
+  await settingsStore.fetchSettings()
+  if (dishStore.dishes.length === 0) dishStore.fetchDishes()
+  
+  if (!uiStore.plan.currentWeekStart) {
+      const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+      currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: userStartDay })
+  }
+}
+
+const weekDays = computed(() => {
+  const length = settingsStore.periodLength || 7
+  return Array.from({ length }, (_, i) => addDays(currentWeekStart.value, i))
+})
+
+const currentDayData = computed(() => {
+  return mealSlots.value.map(slot => {
+    // ИСПРАВЛЕНИЕ: передаем name
+    const items = getSlotItems(selectedDate.value, slot.name)
+    return { slot, items, hasItems: items.length > 0 }
+  })
+})
+
+const dailyTotals = computed(() => {
+  let totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 }
+  currentDayData.value.forEach(group => {
+    group.items.forEach(item => {
+      if (item.dish_id && item.dishes) {
+        const mult = item.portions || 1
+        totals.kcal += (Number(item.dishes.kcal) || 0) * mult
+        totals.protein += (Number(item.dishes.protein) || 0) * mult
+        totals.fat += (Number(item.dishes.fat) || 0) * mult
+        totals.carbs += (Number(item.dishes.carbs) || 0) * mult
+      }
+    })
+  })
+  return totals
+})
+
+const displayDateLabel = computed(() => {
+  if (uiStore.plan.activeTab === 'day') {
+    return format(selectedDate.value, 'd MMMM, EEEE', { locale: ru })
+  } else {
+    const length = settingsStore.periodLength || 7
+    const start = currentWeekStart.value
+    const end = addDays(start, length - 1)
+    return `${format(start, 'd MMM', { locale: ru })} — ${format(end, 'd MMM', { locale: ru })}`
+  }
+})
+
+const showTodayBtn = computed(() => {
+  if (uiStore.plan.activeTab === 'day') return !isToday(selectedDate.value)
+  const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+  const realCurrentWeekStart = startOfWeek(new Date(), { weekStartsOn: userStartDay })
+  return !isSameDay(currentWeekStart.value, realCurrentWeekStart)
+})
+
+const goToToday = () => {
+  const today = new Date()
+  const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+  currentWeekStart.value = startOfWeek(today, { weekStartsOn: userStartDay })
+  selectedDate.value = today
+}
+
+const changePeriod = (direction) => {
+  if (uiStore.plan.activeTab === 'day') {
+      selectedDate.value = addDays(selectedDate.value, direction)
+  } else {
+      const length = settingsStore.periodLength || 7
+      currentWeekStart.value = addDays(currentWeekStart.value, direction * length)
+  }
+}
+
+watch(() => auth.isAuth, (val) => { if (val) loadData() })
+onMounted(() => { if (auth.isAuth) loadData() })
+</script>
+
+<template>
+  <div class="flex flex-col h-full bg-slate-50 relative">
+    
+    <div class="bg-white px-5 pt-6 pb-2 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Мой План</h1>
+        <div v-if="planStore.loading" class="w-6 h-6">
+           <span class="material-icons-round animate-spin text-slate-300">sync</span>
+        </div>
+      </div>
+      
+      <div class="flex bg-slate-100 p-1.5 rounded-2xl mb-4">
+        <button @click="uiStore.plan.activeTab = 'day'" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all" :class="uiStore.plan.activeTab === 'day' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'">День</button>
+        <button @click="uiStore.plan.activeTab = 'week'" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all" :class="uiStore.plan.activeTab === 'week' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'">Сетка</button>
+      </div>
+
+      <div class="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl mb-2">
+        <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
+            <span class="material-icons-round">chevron_left</span>
+        </button>
+        <div class="flex flex-col items-center">
+          <span class="text-sm font-bold text-slate-800 capitalize transition-all">{{ displayDateLabel }}</span>
+          <transition name="pop">
+             <button v-if="showTodayBtn" @click="goToToday" class="text-[10px] font-bold text-orange-500 uppercase mt-0.5 bg-orange-50 px-2 py-0.5 rounded-md">Сегодня</button>
+          </transition>
+        </div>
+        <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
+            <span class="material-icons-round">chevron_right</span>
+        </button>
+      </div>
+    </div>
+
+    
+    <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto pb-20 pt-2 px-4">
+      <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
+         <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
+         <div class="h-6 w-[1px] bg-slate-100"></div>
+         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.protein) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Белки</div></div>
+         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.fat) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Жиры</div></div>
+         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.carbs) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Угле</div></div>
+      </div>
+      
+      <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="text-center py-20 opacity-40">
+         <div class="text-4xl mb-2">🍽️</div>
+         <p class="text-sm font-bold text-slate-400">День свободен</p>
+         <button @click="uiStore.plan.activeTab = 'week'" class="mt-4 text-indigo-500 font-bold text-xs bg-indigo-50 px-4 py-2 rounded-xl">Перейти к сетке</button>
+      </div>
+
+      <div class="space-y-6 mt-2">
+        <div v-for="group in currentDayData" :key="group.slot.id">
+            <div v-if="group.hasItems">
+                <div class="flex items-center justify-between px-2 mb-2">
+                    <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
+                </div>
+                <div class="space-y-2">
+                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
+                        <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
+                            <img v-if="item.dish_id && item.dishes.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
+                            <span v-else-if="item.product_id">🥦</span>
+                            <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
+                        </div>
+                        <div class="flex-1 min-w-0 py-1">
+                            <div class="text-base font-bold text-slate-800 truncate leading-tight">
+                                {{ item.dish_id ? item.dishes.name : item.products.name }}
+                                <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
+                            </div>
+                            <div class="mt-1.5 flex flex-wrap gap-2">
+                                <template v-if="item.dish_id">
+                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes.category || 'Блюдо' }}</span>
+                                    <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes.kcal }} ккал</span>
+                                </template>
+                                <template v-else>
+                                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products.unit }}</span>
+                                </template>
+                            </div>
+                        </div>
+                        <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="flex-1 overflow-y-auto pb-20 pt-2 px-4 space-y-3 mt-2">
+      <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex items-stretch gap-4">
+        
+        <div class="flex flex-col items-center justify-center w-8 flex-shrink-0 border-r border-slate-50 pr-3">
+          <span class="text-lg font-black text-slate-800">{{ format(day, 'd') }}</span>
+          <span class="text-[9px] font-bold uppercase" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">{{ format(day, 'EEE', { locale: ru }) }}</span>
+        </div>
+
+        <div class="flex-1 grid grid-cols-4 gap-2">
+          
+          <button 
+            v-for="slot in mealSlots" 
+            :key="slot.id" 
+            @click="openSelector(day, slot)" 
+            class="w-full h-28 rounded-2xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-all bg-white shadow-sm border-slate-100" 
+            :class="getSlotItems(day, slot.name).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
+          >
+            
+            <span v-if="getSlotItems(day, slot.name).length === 0" class="text-[7px] font-bold text-slate-300 uppercase text-center break-all px-1">
+                {{ slot.name.substring(0, 3) }}
+            </span>
+
+            <template v-else-if="getSlotItems(day, slot.name).length === 1">
+              <template v-if="getSlotItems(day, slot.name)[0].dish_id && getSlotItems(day, slot.name)[0].dishes.image_url">
+                    <img :src="getSlotItems(day, slot.name)[0].dishes.image_url" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'bg-red-500/30' : ''"></div>
+                    <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent"></div>
+                    <div class="absolute bottom-1.5 left-1.5 right-1.5 z-10 text-left">
+                        <div class="text-[9px] font-bold text-white leading-tight line-clamp-2 shadow-sm">
+                            <span v-if="getSlotItems(day, slot.name)[0].ignore_shopping" class="text-[8px] mr-1">🚫</span>
+                            {{ getSlotItems(day, slot.name)[0].dishes.name }}
+                            <span v-if="getSlotItems(day, slot.name)[0].portions > 1" class="text-yellow-300 ml-0.5">x{{ getSlotItems(day, slot.name)[0].portions }}</span>
+                        </div>
+                    </div>
+                </template>
+                <template v-else>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'bg-red-50' : 'bg-white'">
+                        <div class="text-xl mb-1">
+                            {{ getSlotItems(day, slot.name)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
+                        </div>
+                        <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'text-red-500 line-through' : 'text-slate-800'">
+                            {{ getSlotItems(day, slot.name)[0].dish_id ? getSlotItems(day, slot.name)[0].dishes.name : getSlotItems(day, slot.name)[0].products.name }}
+                        </div>
+                        <div v-if="getSlotItems(day, slot.name)[0].portions > 1" class="text-[8px] font-black text-indigo-500">
+                             x{{ getSlotItems(day, slot.name)[0].portions }}
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <template v-else>
+               <div class="flex flex-col w-full h-full p-1 gap-1">
+                   <div 
+                      v-for="(item, idx) in getSlotItems(day, slot.name).slice(0, 3)" 
+                      :key="item.id" 
+                      class="flex-1 w-full rounded-lg border flex items-center justify-center px-1 overflow-hidden"
+                      :class="item.ignore_shopping ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'"
+                   >
+                      <span class="text-[7px] font-bold text-center leading-tight line-clamp-2 w-full break-words" :class="item.ignore_shopping ? 'text-red-500 line-through' : 'text-slate-700'">
+                          {{ item.dish_id ? item.dishes.name : item.products.name }}
+                          <span v-if="item.portions > 1" class="text-indigo-500"> x{{ item.portions }}</span>
+                      </span>
+                   </div>
+                   
+                   <div v-if="getSlotItems(day, slot.name).length > 3" class="h-2 w-full bg-slate-100 rounded-sm flex items-center justify-center">
+                       <span class="text-[6px] font-bold text-slate-400">...</span>
+                   </div>
+               </div>
+            </template>
+
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <transition name="fade">
+        <DishSelector 
+            v-if="showSelector" 
+            :preferred-category="targetSlot?.slotName" 
+            :suggested-items="suggestedItems"
+            :existing-items="existingSlotItems" 
+            @close="showSelector = false" 
+            @select="onDishSelected" 
+        />
+    </transition>
+
+    <DishDetailModal :is-open="showDishModal" :dish="viewingDish" @close="showDishModal = false" />
+  </div>
+</template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.pop-enter-active { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.pop-leave-active { animation: popOut 0.2s ease-in; }
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes popOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.5); opacity: 0; } }
+</style>
+
+
+================================================
+FILE: ./src/views/ProductsView.vue
+================================================
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import { useProductStore } from '../stores/products'
+import { useDictionariesStore } from '../stores/dictionaries'
+
+const store = useProductStore()
+const dictionaries = useDictionariesStore()
+const searchQuery = ref('')
+
+const showModal = ref(false)
+const isEditing = ref(false)
+
+// Модель формы: теперь используем 'category' (строка)
+const form = ref({ id: null, name: '', unit: 'кг', category: '' }) 
+
+const units = ['кг', 'г', 'л', 'мл', 'шт', 'уп']
+
+const openCreate = () => {
+  isEditing.value = false
+  // При создании ставим первую категорию по умолчанию, если она есть
+  const defaultCat = dictionaries.productCategories[0]?.name || ''
+  form.value = { id: null, name: '', unit: 'шт', category: defaultCat }
+  showModal.value = true
+}
+
+const openEdit = (product) => {
+  isEditing.value = true
+  // Копируем данные
+  form.value = { ...product }
+  // Если у старого продукта нет категории, ставим дефолт
+  if (!form.value.category) {
+      form.value.category = dictionaries.productCategories[0]?.name || ''
+  }
+  showModal.value = true
+}
+
+const save = async () => {
+  if (!form.value.name) return
+  if (isEditing.value) {
+    await store.updateProduct(form.value)
+  } else {
+    await store.addProduct(form.value)
+  }
+  showModal.value = false
+}
+
+const remove = async (id) => {
+  if(confirm('Удалить продукт?')) await store.deleteProduct(id)
+  showModal.value = false
+}
+
+onMounted(async () => {
+  if (store.products.length === 0) store.fetchProducts()
+  dictionaries.fetchDictionaries() 
+})
+
+const filteredProducts = computed(() => {
+  if (!searchQuery.value) return store.products
+  return store.products.filter(p => p.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+})
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50">
+    
+    <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Продукты</h1>
+      
+      <div class="relative mb-2">
+        <span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Найти продукт..." 
+          class="w-full pl-11 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all"
+        >
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 pb-32 space-y-3 pt-2">
+      
+      <div v-if="filteredProducts.length === 0" class="text-center py-20 opacity-40">
+        <div class="text-5xl mb-2">🥕</div>
+        <p class="font-bold text-slate-400">Список пуст</p>
+      </div>
+
+      <div 
+        v-for="product in filteredProducts" 
+        :key="product.id"
+        class="bg-white p-4 rounded-[20px] shadow-sm flex items-center justify-between border border-slate-100/50 tap-effect"
+        @click="openEdit(product)"
+      >
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center font-bold text-xs text-slate-400 uppercase shrink-0">
+              {{ product.name.substring(0,1) }}
+          </div>
+          <div>
+            <div class="font-bold text-slate-900 text-[15px] leading-tight">{{ product.name }}</div>
+            <div class="text-[10px] font-bold text-slate-400 mt-0.5">
+                {{ product.category || 'Без категории' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="font-bold text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg uppercase">
+          {{ product.unit }}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="fixed bottom-24 right-5 z-30">
+      <button 
+        @click="openCreate"
+        class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"
+      >
+        <span class="material-icons-round text-3xl">add</span>
+      </button>
+    </div>
+
+    <transition name="modal">
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="showModal = false">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"></div>
+        <div class="bg-white w-full max-w-sm rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative z-10 mb-safe animate-slide-up">
+          <div class="modal-handle"></div>
+          
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-slate-900">{{ isEditing ? 'Продукт' : 'Новый продукт' }}</h3>
+            <button v-if="isEditing" @click="remove(form.id)" class="bg-red-50 text-red-500 p-2 rounded-xl"><span class="material-icons-round text-sm">delete</span></button>
+          </div>
+          
+          <div class="space-y-5">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Название</label>
+              <input v-model="form.name" type="text" placeholder="Напр. Морковь" class="w-full p-4 rounded-2xl bg-slate-100 font-bold outline-none text-slate-900 placeholder:text-slate-400 focus:ring-2 ring-slate-900/10">
+            </div>
+
+            <div>
+               <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Категория</label>
+               <div class="relative">
+                   <select v-model="form.category" class="w-full p-4 rounded-2xl bg-slate-100 font-bold outline-none text-slate-900 appearance-none">
+                       <option v-for="cat in dictionaries.productCategories" :key="cat.id" :value="cat.name">
+                           {{ cat.name }}
+                       </option>
+                   </select>
+                   <span class="material-icons-round absolute right-4 top-4 text-slate-400 pointer-events-none">expand_more</span>
+               </div>
+            </div>
+
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Единица измерения</label>
+              <div class="grid grid-cols-6 gap-2">
+                <button 
+                  v-for="u in units" 
+                  :key="u"
+                  @click="form.unit = u"
+                  class="py-2 rounded-xl text-xs font-bold border transition-all"
+                  :class="form.unit === u ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-400'"
+                >
+                  {{ u }}
+                </button>
+              </div>
+            </div>
+
+            <button @click="save" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl tap-effect mt-4">
+              Сохранить
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </transition>
+
+  </div>
+</template>
+
+<style scoped>
+.modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+</style>
+
+
+================================================
+FILE: ./src/views/SettingsView.vue
+================================================
+
+<script setup>
+import { onMounted, ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
+
+const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+
+// Локальные модели
+const selectedStartDay = ref(1)
+const selectedPeriod = ref(7)
+const selectedPortions = ref(1)
+
+// Состояние кнопки
+const isSaving = ref(false)
+const saveButtonText = ref('Сохранить изменения')
+
+// Опции
+const weekDays = [
+  { val: 1, label: 'Понедельник' },
+  { val: 2, label: 'Вторник' },
+  { val: 3, label: 'Среда' },
+  { val: 4, label: 'Четверг' },
+  { val: 5, label: 'Пятница' },
+  { val: 6, label: 'Суббота' },
+  { val: 0, label: 'Воскресенье' }
+]
+
+const periods = [
+  { val: 3, label: '3 дня' },
+  { val: 7, label: 'Неделя (7 дней)' },
+  { val: 14, label: '2 Недели' }
+]
+
+// 1. Загрузка данных (при открытии)
+onMounted(async () => {
+  if (!authStore.user) {
+      // Небольшая задержка, если юзер еще грузится
+      await new Promise(r => setTimeout(r, 200)) 
+  }
+  
+  await settingsStore.fetchSettings()
+  
+  // Заполняем поля значениями из стора
+  selectedStartDay.value = settingsStore.startDay
+  selectedPeriod.value = settingsStore.periodLength
+  selectedPortions.value = settingsStore.defaultPortions || 1
+})
+
+// 2. Сохранение
+const handleSave = async () => {
+  isSaving.value = true
+  saveButtonText.value = 'Сохраняем...'
+  
+  try {
+      await settingsStore.saveSettings(
+          selectedStartDay.value, 
+          selectedPeriod.value, 
+          selectedPortions.value
+      )
+      
+      saveButtonText.value = 'Успешно!'
+      setTimeout(() => {
+          saveButtonText.value = 'Сохранить изменения'
+      }, 2000)
+  } catch (e) {
+      alert('Ошибка сохранения')
+      saveButtonText.value = 'Ошибка'
+  } finally {
+      isSaving.value = false
+  }
+}
+
+const handleLogout = async () => {
+  if (confirm('Вы точно хотите выйти?')) {
+    await authStore.signOut()
+  }
+}
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50 relative">
+    
+    <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
+      <p class="text-sm font-bold text-slate-400 mt-1">Персонализация</p>
+    </div>
+
+    <div class="flex-1 px-5 py-6 space-y-6 overflow-y-auto pb-32">
+      
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Вид Планировщика</h3>
+        
+        <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
+          
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                <span class="material-icons-round">today</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Начало недели</div>
+                <div class="text-[10px] font-bold text-slate-400">С какого дня показывать сетку</div>
+              </div>
+            </div>
+            <select 
+              v-model="selectedStartDay" 
+              class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-blue-500 transition-colors"
+            >
+              <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
+            </select>
+          </div>
+
+          <div class="h-[1px] bg-slate-50 w-full"></div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
+                <span class="material-icons-round">date_range</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Период</div>
+                <div class="text-[10px] font-bold text-slate-400">Сколько дней отображать</div>
+              </div>
+            </div>
+            <select 
+              v-model="selectedPeriod" 
+              class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-purple-500 transition-colors"
+            >
+              <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
+            </select>
+          </div>
+
+          <div class="h-[1px] bg-slate-50 w-full"></div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+                <span class="material-icons-round">restaurant_menu</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Порции</div>
+                <div class="text-[10px] font-bold text-slate-400">По умолчанию при добавлении</div>
+              </div>
+            </div>
+            
+            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
+                <button 
+                  @click="selectedPortions = Math.max(1, selectedPortions - 1)"
+                  class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 tap-effect"
+                >
+                  <span class="material-icons-round text-sm">remove</span>
+                </button>
+                <span class="w-8 text-center font-black text-slate-800 text-sm">{{ selectedPortions }}</span>
+                <button 
+                  @click="selectedPortions++"
+                  class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 tap-effect"
+                >
+                  <span class="material-icons-round text-sm">add</span>
+                </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Аккаунт</h3>
+        
+        <button 
+          @click="handleLogout" 
+          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-between tap-effect active:scale-[0.98] transition-transform"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center">
+              <span class="material-icons-round text-2xl">logout</span>
+            </div>
+            <div class="text-left">
+              <div class="font-bold text-slate-900 text-base">Выйти</div>
+              <div class="text-[11px] font-bold text-slate-400 leading-tight">Завершить сеанс</div>
+            </div>
+          </div>
+          <span class="material-icons-round text-slate-300">chevron_right</span>
+        </button>
+      </div>
+      
+      <div class="text-center py-4">
+        <p class="text-[10px] font-bold text-slate-300 uppercase">Версия 1.0.0 Release</p>
+      </div>
+
+    </div>
+
+    <div class="absolute bottom-20 left-0 right-0 p-5 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-20">
+        <button 
+            @click="handleSave"
+            :disabled="isSaving"
+            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2"
+            :class="saveButtonText === 'Успешно!' ? 'bg-green-500 shadow-green-500/30' : 'bg-slate-900 shadow-slate-900/30'"
+        >
+            <span v-if="isSaving" class="material-icons-round animate-spin text-sm">sync</span>
+            <span v-if="saveButtonText === 'Успешно!'" class="material-icons-round text-sm">check</span>
+            {{ saveButtonText }}
+        </button>
+    </div>
+
+  </div>
+</template>
+
+
+================================================
+FILE: ./src/views/ShoppingView.vue
+================================================
+
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { startOfWeek, addDays, format, isSameDay, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { usePlanStore } from '../stores/plan'
+import { useProductStore } from '../stores/products'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { useUIStore } from '../stores/ui'
+import { useSettingsStore } from '../stores/settings'
+import { useShoppingStore } from '../stores/shopping' 
+
+import DishProgress from '../components/DishProgress.vue' 
+
+const planStore = usePlanStore()
+const productStore = useProductStore()
+const dictionaries = useDictionariesStore()
+const uiStore = useUIStore()
+const settingsStore = useSettingsStore()
+const shoppingStore = useShoppingStore() 
+
+const isLoading = ref(false)
+
+// --- ДАТЫ ---
+const currentWeekStart = ref(new Date(uiStore.plan.currentWeekStart || new Date()))
+watch(currentWeekStart, (val) => uiStore.plan.currentWeekStart = val)
+
+onMounted(async () => {
+    if (uiStore.plan.currentWeekStart) {
+        currentWeekStart.value = new Date(uiStore.plan.currentWeekStart)
+    }
+    await loadData()
+})
+
+const periodLength = computed(() => settingsStore.periodLength || 7)
+const periodEnd = computed(() => addDays(currentWeekStart.value, periodLength.value - 1))
+
+const displayDateLabel = computed(() => {
+    const start = currentWeekStart.value
+    const end = periodEnd.value
+    return `${format(start, 'd MMM', { locale: ru })} — ${format(end, 'd MMM', { locale: ru })}`
+})
+
+const showTodayBtn = computed(() => {
+    const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+    const realCurrentWeekStart = startOfWeek(new Date(), { weekStartsOn: userStartDay })
+    return !isSameDay(currentWeekStart.value, realCurrentWeekStart)
+})
+
+const changePeriod = (direction) => {
+    currentWeekStart.value = addDays(currentWeekStart.value, direction * periodLength.value)
+}
+
+const goToToday = () => {
+    const today = new Date()
+    const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+    currentWeekStart.value = startOfWeek(today, { weekStartsOn: userStartDay })
+}
+
+// --- ЗАГРУЗКА ---
+const loadData = async () => {
+  const hasData = planStore.plan.length > 0
+  if (!hasData) isLoading.value = true
+
+  await Promise.all([
+    planStore.fetchPlan(),
+    dictionaries.fetchDictionaries(),
+    productStore.fetchProducts(),
+    settingsStore.fetchSettings(),
+    shoppingStore.fetchChecklist() 
+  ])
+
+  isLoading.value = false
+}
+
+// --- ФИЛЬТРАЦИЯ ---
+const planItemsInPeriod = computed(() => {
+    const interval = {
+        start: startOfDay(currentWeekStart.value),
+        end: endOfDay(periodEnd.value)
+    }
+    return planStore.plan.filter(item => {
+        if (item.ignore_shopping) return false
+        const itemDate = parseISO(item.date)
+        return isWithinInterval(itemDate, interval)
+    })
+})
+
+// --- ЛОГИКА СПИСКА ---
+const rawShoppingList = computed(() => {
+  const list = []
+  
+  planItemsInPeriod.value.forEach(item => {
+    const portionsMultiplier = Number(item.portions) || 1
+
+    // ВАРИАНТ 1: Блюдо
+    if (item.dish_id && item.dishes && item.dishes.ingredients) {
+       item.dishes.ingredients.forEach(ing => {
+          if (ing.products) {
+              list.push({
+                 id: ing.product_id, 
+                 name: ing.products.name,
+                 // Теперь category - это строка прямо в продукте
+                 categoryName: ing.products.category || 'Разное', 
+                 amount: (Number(ing.amount) || 0) * portionsMultiplier,
+                 unit: ing.products.unit || '',
+                 checked: shoppingStore.isChecked(ing.product_id) 
+              })
+          }
+       })
+    } 
+    // ВАРИАНТ 2: Продукт
+    else if (item.product_id && item.products) {
+       list.push({
+          id: item.product_id,
+          name: item.products.name,
+          categoryName: item.products.category || 'Разное',
+          amount: Number(item.portions) || 0,
+          unit: item.products.unit,
+          checked: shoppingStore.isChecked(item.product_id)
+       })
+    }
+  })
+  return list
+})
+
+const consolidatedList = computed(() => {
+    const map = {}
+    rawShoppingList.value.forEach(item => {
+        if (!map[item.id]) {
+            map[item.id] = { ...item }
+        } else {
+            map[item.id].amount += item.amount
+        }
+    })
+    return Object.values(map)
+})
+
+const displayList = computed(() => {
+    let list = [...consolidatedList.value]
+
+    if (uiStore.shopping.filterMode === 'az') {
+        list.sort((a, b) => a.name.localeCompare(b.name))
+        return [{ title: 'Список покупок (А-Я)', items: list }]
+    } else {
+        const groups = {}
+        list.forEach(item => {
+            const catName = item.categoryName
+            if (!groups[catName]) groups[catName] = []
+            groups[catName].push(item)
+        })
+        
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === 'Разное') return 1
+            if (b === 'Разное') return -1
+            return a.localeCompare(b)
+        })
+
+        return sortedKeys.map(name => ({
+            title: name,
+            items: groups[name].sort((a, b) => a.name.localeCompare(b.name))
+        }))
+    }
+})
+
+// --- ДЕЙСТВИЯ ---
+const toggleItem = (item) => {
+    shoppingStore.toggleProduct(item.id, !item.checked)
+}
+
+const setFilterMode = (mode) => uiStore.shopping.filterMode = mode
+
+const clearChecks = async () => {
+    if(confirm('Снять все отметки "Куплено" для текущего списка?')) {
+        await shoppingStore.clearList()
+        await shoppingStore.fetchChecklist() 
+    }
+}
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50">
+    
+    <div class="bg-white px-5 pt-12 pb-2 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Купить</h1>
+        
+        <div class="flex gap-2">
+            <button @click="clearChecks" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 tap-effect">
+                <span class="material-icons-round">refresh</span>
+            </button>
+            
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+                <button @click="setFilterMode('category')" class="w-10 h-10 flex items-center justify-center rounded-lg transition-all tap-effect" :class="uiStore.shopping.filterMode === 'category' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'"><span class="material-icons-round">category</span></button>
+                <button @click="setFilterMode('az')" class="w-10 h-10 flex items-center justify-center rounded-lg transition-all tap-effect" :class="uiStore.shopping.filterMode === 'az' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'"><span class="material-icons-round">sort_by_alpha</span></button>
+            </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl mb-2">
+        <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
+            <span class="material-icons-round">chevron_left</span>
+        </button>
+        <div class="flex flex-col items-center">
+          <span class="text-sm font-bold text-slate-800 capitalize transition-all">{{ displayDateLabel }}</span>
+          <transition name="pop">
+             <button v-if="showTodayBtn" @click="goToToday" class="text-[10px] font-bold text-orange-500 uppercase mt-0.5 bg-orange-50 px-2 py-0.5 rounded-md">Сегодня</button>
+          </transition>
+        </div>
+        <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
+            <span class="material-icons-round">chevron_right</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-6 space-y-2">
+        
+        <DishProgress :dishes="planItemsInPeriod.filter(i => i.dish_id)" />
+
+        <div v-if="isLoading" class="flex flex-col items-center justify-center py-20 opacity-50 space-y-4">
+            <span class="material-icons-round animate-spin text-4xl text-slate-300">sync</span>
+            <p class="text-sm font-bold text-slate-300">Считаем продукты...</p>
+        </div>
+
+        <div v-else-if="consolidatedList.length === 0" class="text-center py-20 opacity-40">
+            <div class="text-5xl mb-2">🛒</div>
+            <p class="font-bold text-slate-400">Список пуст</p>
+            <p class="text-xs text-slate-300 mt-1">На эту неделю ничего не запланировано</p>
+        </div>
+
+        <div v-else v-for="group in displayList" :key="group.title" class="animate-fade-in mb-6">
+            <h3 v-if="uiStore.shopping.filterMode === 'category'" class="font-black text-slate-300 uppercase tracking-widest text-xs mb-3 ml-2 sticky top-0">
+                {{ group.title }}
+            </h3>
+            
+            <div class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden">
+                <div 
+                    v-for="(item, idx) in group.items" 
+                    :key="item.id" 
+                    @click="toggleItem(item)"
+                    class="p-4 flex items-center gap-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer group select-none"
+                    :class="item.checked ? 'bg-slate-50/50' : ''"
+                >
+                    <div 
+                        class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300"
+                        :class="item.checked ? 'bg-emerald-500 border-emerald-500 scale-110' : 'border-slate-200 group-hover:border-indigo-300'"
+                    >
+                        <span v-if="item.checked" class="material-icons-round text-white text-sm">check</span>
+                    </div>
+
+                    <div class="flex-1 min-w-0" :class="item.checked ? 'opacity-40' : ''">
+                        <div class="font-bold text-slate-800 text-base leading-tight transition-all" :class="item.checked ? 'line-through text-slate-400' : ''">{{ item.name }}</div>
+                        <div class="text-[10px] font-bold text-slate-400 mt-0.5" v-if="uiStore.shopping.filterMode === 'az'">
+                           {{ item.categoryName }}
+                        </div>
+                    </div>
+
+                    <div 
+                        class="px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-colors"
+                        :class="item.checked ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'"
+                    >
+                        {{ Math.round(item.amount * 100) / 100 }} {{ item.unit }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="h-20"></div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.animate-fade-in { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.pop-enter-active { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.pop-leave-active { animation: popOut 0.2s ease-in; }
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes popOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.5); opacity: 0; } }
+</style>
+
+
+================================================
+FILE: ./tailwind.config.js
+================================================
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+
+================================================
+FILE: ./vite.config.js
+================================================
+
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+})

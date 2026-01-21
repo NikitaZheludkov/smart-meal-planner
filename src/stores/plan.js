@@ -12,68 +12,102 @@ export const usePlanStore = defineStore('plan', () => {
     if (!auth.householdId) return
 
     loading.value = true
+    
     try {
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('plan')
-        .select('*, dishes(*, ingredients(*, products(*)))')
-        .eq('household_id', auth.householdId) // <--- ФИЛЬТР
-        .order('date')
-      
-      if (error) throw error
-      plan.value = data
+        .select(`
+            *,
+            dishes (
+            *,
+            ingredients (
+                product_id,
+                amount,
+                products ( * )
+            )
+            ),
+            products ( * )
+        `)
+        .eq('household_id', auth.householdId)
+        
+        if (error) throw error
+        plan.value = data || []
+
     } catch (e) {
-      console.error(e)
+        console.error('Ошибка загрузки плана:', e)
     } finally {
-      loading.value = false
+        // ЭТО САМОЕ ВАЖНОЕ ИСПРАВЛЕНИЕ:
+        // Выключаем спиннер в любом случае
+        loading.value = false
     }
   }
 
-  const addToPlan = async (date, slotName, dishId) => {
+  const addToPlan = async (date, slotName, slotId, item) => {
     const auth = useAuthStore()
-    // Временный объект для быстрого отображения в UI
-    const tempId = Date.now()
-    const tempEntry = { id: tempId, date, slot: slotName, dish_id: dishId, dishes: { id: dishId, name: '...' } }
-    plan.value.push(tempEntry)
+    
+    const payload = {
+      date,
+      slot: slotName,
+      household_id: auth.householdId,
+      ignore_shopping: item.ignore_shopping || false 
+    }
 
-    try {
-      const { data, error } = await supabase
+    if (item.type === 'dish') {
+      payload.dish_id = item.id
+      payload.portions = item.amount || 1
+    } else {
+      payload.product_id = item.id
+      payload.portions = item.amount || 1
+    }
+
+    // Оптимистик UI
+    const tempItem = { ...payload, id: 'temp_' + Date.now() }
+    if (item.type === 'dish') tempItem.dishes = item
+    else tempItem.products = item
+    
+    plan.value.push(tempItem)
+
+    // Не включаем глобальный loading, чтобы не мигал весь интерфейс
+    // просто отправляем запрос
+    const { data, error } = await supabase
         .from('plan')
-        .insert([{ 
-            date, 
-            slot: slotName, 
-            dish_id: dishId, 
-            portions: 1,
-            household_id: auth.householdId // <--- ПРИВЯЗКА
-        }])
-        .select('*, dishes(*, ingredients(*, products(*)))')
-      
-      if (error) throw error
-      
-      // Заменяем временный объект на реальный из базы
-      const idx = plan.value.findIndex(p => p.id === tempId)
-      if (idx !== -1 && data) {
-        plan.value[idx] = data[0]
-      }
-    } catch (e) {
-      console.error(e)
-      // Если ошибка - убираем из UI
-      plan.value = plan.value.filter(p => p.id !== tempId)
+        .insert(payload)
+        .select()
+        .single()
+        
+    if (error) {
+        console.error('Ошибка сохранения:', error)
+        plan.value = plan.value.filter(i => i.id !== tempItem.id)
+    } else {
+        await fetchPlan()
+    }
+  }
+
+  const updatePlanItem = async (id, updates) => {
+    // Мгновенное обновление UI
+    const index = plan.value.findIndex(i => i.id === id)
+    if (index !== -1) {
+        plan.value[index] = { ...plan.value[index], ...updates }
+    }
+
+    // Запрос
+    const { error } = await supabase
+      .from('plan')
+      .update(updates)
+      .eq('id', id)
+
+    if (error) {
+        console.error('Ошибка обновления:', error)
+        await fetchPlan() // Откат при ошибке
     }
   }
 
   const removeFromPlan = async (id) => {
-    const auth = useAuthStore()
-    const prevPlan = [...plan.value]
-    plan.value = plan.value.filter(p => p.id !== id)
+    plan.value = plan.value.filter(i => i.id !== id)
     
-    const { error } = await supabase
-        .from('plan')
-        .delete()
-        .eq('id', id)
-        .eq('household_id', auth.householdId) // <--- ЗАЩИТА
-        
-    if (error) plan.value = prevPlan
+    const { error } = await supabase.from('plan').delete().eq('id', id)
+    if (error) await fetchPlan()
   }
 
-  return { plan, loading, fetchPlan, addToPlan, removeFromPlan }
+  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }
 })

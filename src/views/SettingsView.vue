@@ -1,17 +1,23 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useSettingsStore } from '../stores/settings'
+import { onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 
-const settings = useSettingsStore()
-const auth = useAuthStore()
+const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
-const inviteCode = ref('...')
-const showCopied = ref(false)
-const showJoinInput = ref(false)
-const joinCode = ref('')
+// ИСПРАВЛЕНИЕ: Инициализируем сразу значениями из стора!
+// App.vue уже загрузил их, поэтому они доступны синхронно.
+const selectedStartDay = ref(settingsStore.startDay)
+const selectedPeriod = ref(settingsStore.periodLength)
+const selectedPortions = ref(settingsStore.defaultPortions)
 
-const daysOfWeek = [
+// Состояние кнопки
+const isSaving = ref(false)
+const saveButtonText = ref('Сохранить изменения')
+
+// Опции
+const weekDays = [
   { val: 1, label: 'Понедельник' },
   { val: 2, label: 'Вторник' },
   { val: 3, label: 'Среда' },
@@ -21,105 +27,167 @@ const daysOfWeek = [
   { val: 0, label: 'Воскресенье' }
 ]
 
-const periodOptions = [
+const periods = [
   { val: 3, label: '3 дня' },
   { val: 7, label: 'Неделя (7 дней)' },
-  { val: 14, label: '2 недели (14 дней)' }
+  { val: 14, label: '2 Недели' }
 ]
 
-const save = () => settings.updateSettings(settings.startDay, settings.periodLength)
-
-const copyCode = () => {
-  navigator.clipboard.writeText(inviteCode.value)
-  showCopied.value = true
-  setTimeout(() => showCopied.value = false, 2000)
-}
-
-const handleJoin = async () => {
+// Сохранение
+const handleSave = async () => {
+  isSaving.value = true
+  saveButtonText.value = 'Сохраняем...'
+  
   try {
-    if(!joinCode.value) return
-    if(confirm('Внимание! Вы переключитесь на базу данных другого пользователя. Ваши текущие данные станут недоступны (пока вы не вернетесь). Продолжить?')) {
-       await auth.joinHousehold(joinCode.value)
-    }
+      await settingsStore.saveSettings(
+          selectedStartDay.value, 
+          selectedPeriod.value, 
+          selectedPortions.value
+      )
+      
+      saveButtonText.value = 'Успешно!'
+      setTimeout(() => {
+          saveButtonText.value = 'Сохранить изменения'
+      }, 2000)
   } catch (e) {
-    alert('Ошибка: ' + e.message)
+      alert('Ошибка сохранения')
+      saveButtonText.value = 'Ошибка'
+  } finally {
+      isSaving.value = false
   }
 }
 
-onMounted(async () => {
-  settings.fetchSettings()
-  inviteCode.value = await auth.getInviteCode()
-})
+const handleLogout = async () => {
+  if (confirm('Вы точно хотите выйти?')) {
+    await authStore.signOut()
+  }
+}
 </script>
 
 <template>
-  <div class="p-5 space-y-6 pb-24 bg-slate-50 min-h-full">
+  <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Настройки</h2>
-
-    <div class="flex items-center gap-4 bg-white p-5 rounded-[24px] shadow-sm border border-slate-100">
-      <div class="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-2xl shadow-lg">
-        {{ auth.user?.first_name?.charAt(0) || 'U' }}
-      </div>
-      <div>
-        <div class="font-bold text-slate-900 text-lg">{{ auth.user?.first_name || 'Пользователь' }}</div>
-        <div class="text-xs font-bold text-slate-400">ID: {{ auth.user?.id }}</div>
-      </div>
+    <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
+      <p class="text-sm font-bold text-slate-400 mt-1">Персонализация</p>
     </div>
 
-    <div class="bg-indigo-600 rounded-[28px] p-6 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
-      <div class="absolute -right-10 -top-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
+    <div class="flex-1 px-5 py-6 space-y-6 overflow-y-auto pb-32">
       
-      <div class="relative z-10">
-        <h3 class="font-bold text-lg mb-1">Совместный доступ</h3>
-        <p class="text-indigo-100 text-xs font-medium mb-4 opacity-80 leading-relaxed">
-          Отправьте этот код партнеру, чтобы он мог пользоваться вашей базой продуктов и планом.
-        </p>
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Вид Планировщика</h3>
         
-        <div @click="copyCode" class="bg-white/10 backdrop-blur-md rounded-xl p-3 flex justify-between items-center cursor-pointer border border-white/20 tap-effect">
-          <span class="font-mono font-bold text-xl tracking-widest pl-2">{{ inviteCode }}</span>
-          <div class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
-            {{ showCopied ? 'Скопировано' : 'Копировать' }}
+        <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
+          
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                <span class="material-icons-round">today</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Начало недели</div>
+                <div class="text-[10px] font-bold text-slate-400">С какого дня показывать сетку</div>
+              </div>
+            </div>
+            <select 
+              v-model="selectedStartDay" 
+              class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-blue-500 transition-colors"
+            >
+              <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
+            </select>
           </div>
+
+          <div class="h-[1px] bg-slate-50 w-full"></div>
+
+          <div class="flex items-center justify-between">
+             <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
+                <span class="material-icons-round">date_range</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Период</div>
+                 <div class="text-[10px] font-bold text-slate-400">Сколько дней отображать</div>
+              </div>
+            </div>
+            <select 
+              v-model="selectedPeriod" 
+              class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-purple-500 transition-colors"
+            >
+              <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
+            </select>
+          </div>
+
+          <div class="h-[1px] bg-slate-50 w-full"></div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+               <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+                <span class="material-icons-round">restaurant_menu</span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-sm">Порции</div>
+                <div class="text-[10px] font-bold text-slate-400">По умолчанию при добавлении</div>
+              </div>
+            </div>
+            
+            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
+                <button 
+                  @click="selectedPortions = Math.max(1, selectedPortions - 1)"
+                  class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 tap-effect"
+                >
+                  <span class="material-icons-round text-sm">remove</span>
+                </button>
+                <span class="w-8 text-center font-black text-slate-800 text-sm">{{ selectedPortions }}</span>
+                 <button 
+                  @click="selectedPortions++"
+                  class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 tap-effect"
+                >
+                  <span class="material-icons-round text-sm">add</span>
+                 </button>
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
 
-    <div class="text-center">
-      <button v-if="!showJoinInput" @click="showJoinInput = true" class="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">
-        Подключиться к чужой базе (ввести код)
-      </button>
-      
-      <div v-else class="bg-white p-2 pl-4 rounded-2xl flex items-center shadow-sm border border-slate-100 animate-fade-in mt-2">
-        <input v-model="joinCode" type="text" placeholder="КОД ПРИГЛАШЕНИЯ" class="flex-1 font-bold text-slate-700 outline-none uppercase text-sm">
-        <button @click="handleJoin" class="bg-slate-900 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-md tap-effect">
-          <span class="material-icons-round text-sm">arrow_forward</span>
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Аккаунт</h3>
+        
+        <button 
+          @click="handleLogout" 
+          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-between tap-effect active:scale-[0.98] transition-transform"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center">
+              <span class="material-icons-round text-2xl">logout</span>
+            </div>
+            <div class="text-left">
+               <div class="font-bold text-slate-900 text-base">Выйти</div>
+              <div class="text-[11px] font-bold text-slate-400 leading-tight">Завершить сеанс</div>
+            </div>
+          </div>
+          <span class="material-icons-round text-slate-300">chevron_right</span>
         </button>
       </div>
+      
+      <div class="text-center py-4">
+         <p class="text-[10px] font-bold text-slate-300 uppercase">Версия 1.0.0 Release</p>
+      </div>
+
     </div>
 
-    <div class="space-y-3 pt-2">
-      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">Календарь</h3>
-      
-      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
-        <span class="font-bold text-slate-700 text-sm">Начало недели</span>
-        <select v-model="settings.startDay" @change="save" class="bg-slate-50 text-slate-900 font-bold text-xs py-2 px-3 rounded-xl outline-none border-none text-right">
-          <option v-for="day in daysOfWeek" :key="day.val" :value="day.val">{{ day.label }}</option>
-        </select>
-      </div>
-
-      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
-        <span class="font-bold text-slate-700 text-sm">Дней в периоде</span>
-        <select v-model="settings.periodLength" @change="save" class="bg-slate-50 text-slate-900 font-bold text-xs py-2 px-3 rounded-xl outline-none border-none text-right">
-          <option v-for="opt in periodOptions" :key="opt.val" :value="opt.val">{{ opt.label }}</option>
-        </select>
-      </div>
+    <div class="absolute bottom-20 left-0 right-0 p-5 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-20">
+        <button 
+            @click="handleSave"
+            :disabled="isSaving"
+            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2"
+             :class="saveButtonText === 'Успешно!' ? 'bg-green-500 shadow-green-500/30' : 'bg-slate-900 shadow-slate-900/30'"
+        >
+            <span v-if="isSaving" class="material-icons-round animate-spin text-sm">sync</span>
+            <span v-if="saveButtonText === 'Успешно!'" class="material-icons-round text-sm">check</span>
+            {{ saveButtonText }}
+        </button>
     </div>
 
   </div>
 </template>
-
-<style>
-.animate-fade-in { animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-</style>

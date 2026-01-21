@@ -4,87 +4,85 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 
 export const useShoppingStore = defineStore('shopping', () => {
-  const list = ref([])
+  // Храним ID купленных продуктов в Set для мгновенного доступа O(1)
+  const checkedIds = ref(new Set())
   const loading = ref(false)
 
-  const generateList = async (startDate, endDate) => {
+  // Загрузка состояния из базы
+  const fetchChecklist = async () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
     loading.value = true
-    list.value = []
+    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
+    const { data, error } = await supabase
+      .from('shopping_cart')
+      .select('product_id')
+      .eq('household_id', auth.householdId)
+      .eq('is_checked', true)
 
-    try {
-      // 1. Получаем План Семьи
-      const { data: planData } = await supabase
-        .from('plan')
-        .select('dish_id')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .eq('household_id', auth.householdId)
-
-      if (!planData || planData.length === 0) return
-
-      const dishIds = planData.map(p => p.dish_id).filter(Boolean)
-      if (dishIds.length === 0) return
-
-      // 2. Получаем Ингредиенты
-      const { data: ingredientsData } = await supabase
-        .from('ingredients')
-        .select('amount, product_id, products (id, name, unit)')
-        .in('dish_id', dishIds)
-
-      // 3. Получаем Галочки Семьи
-      const { data: checksData } = await supabase
-        .from('shopping_cart')
-        .select('product_id')
-        .eq('household_id', auth.householdId)
-
-      const checkedIds = new Set(checksData?.map(c => c.product_id) || [])
-
-      // 4. Считаем сумму
-      const aggregated = {}
-      ingredientsData?.forEach(item => {
-        const prodId = item.product_id
-        if (!aggregated[prodId]) {
-          aggregated[prodId] = {
-            id: prodId,
-            name: item.products?.name,
-            unit: item.products?.unit,
-            amount: 0,
-            checked: checkedIds.has(prodId)
-          }
-        }
-        aggregated[prodId].amount += parseFloat(item.amount) || 0
-      })
-
-      list.value = Object.values(aggregated).sort((a, b) => a.name.localeCompare(b.name))
-
-    } catch (e) {
-      console.error(e)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const toggleItem = async (id) => {
-    const auth = useAuthStore()
-    const item = list.value.find(i => i.id === id)
-    if (!item) return
-    
-    item.checked = !item.checked
-
-    if (item.checked) {
-      await supabase.from('shopping_cart').insert([{ 
-          product_id: id,
-          household_id: auth.householdId 
-      }])
+    if (error) {
+      console.error('Ошибка загрузки списка покупок:', error)
     } else {
-      await supabase.from('shopping_cart').delete()
-          .eq('product_id', id)
-          .eq('household_id', auth.householdId)
+      // Превращаем массив объектов [{product_id: 1}, {product_id: 2}] в Set(1, 2)
+      checkedIds.value = new Set(data.map(item => item.product_id))
     }
+    loading.value = false
   }
 
-  return { list, loading, generateList, toggleItem }
+  // Переключение галочки
+  const toggleProduct = async (productId, newState) => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    // 1. Оптимистичное обновление интерфейса (мгновенно)
+    if (newState) {
+      checkedIds.value.add(productId)
+    } else {
+      checkedIds.value.delete(productId)
+    }
+
+    // 2. Отправка в базу
+    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
+    const { error } = await supabase
+      .from('shopping_cart')
+      .upsert({ 
+        household_id: auth.householdId, 
+        product_id: productId, 
+        is_checked: newState,
+        // user_id желательно тоже добавлять, если есть в таблице, но пока household критичнее
+        updated_at: new Date()
+      }, { onConflict: 'household_id, product_id' }) // Уточняем конфликт, если нужно
+
+    if (error) console.error('Ошибка сохранения галочки:', error)
+  }
+
+  // Проверка: куплен ли продукт?
+  const isChecked = (productId) => {
+    return checkedIds.value.has(productId)
+  }
+
+  // Сброс списка (например, начало новой недели)
+  const clearList = async () => {
+      const auth = useAuthStore()
+      if (!auth.householdId) return
+      
+      // Чистим локально
+      checkedIds.value.clear()
+      
+      // Чистим в базе
+      await supabase
+          .from('shopping_cart')
+          .delete()
+          .eq('household_id', auth.householdId)
+  }
+
+  return { 
+    checkedIds, 
+    loading, 
+    fetchChecklist, 
+    toggleProduct, 
+    isChecked,
+    clearList
+  }
 })

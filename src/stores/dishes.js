@@ -7,78 +7,137 @@ export const useDishStore = defineStore('dishes', () => {
   const dishes = ref([])
   const loading = ref(false)
 
-  // 1. ЗАГРУЗКА (Только моя семья)
   const fetchDishes = async () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
     loading.value = true
-    try {
-      const { data, error } = await supabase
-        .from('dishes')
-        .select(`*, ingredients(id, amount, product_id, products(name, unit))`)
-        .eq('household_id', auth.householdId) // <--- ФИЛЬТР
-        .order('name')
-      
-      if (error) throw error
-      dishes.value = data
-    } catch (e) {
-      console.error(e)
-    } finally {
-      loading.value = false
+    const { data, error } = await supabase
+      .from('dishes')
+      .select(`
+        *,
+        dish_tag_links (
+          dish_tags ( * )
+        ),
+        ingredients (
+          product_id,
+          amount,
+          products ( name, unit )
+        )
+      `)
+      .eq('household_id', auth.householdId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error(error)
+    } else {
+      dishes.value = data.map(dish => ({
+        ...dish,
+        // Собираем теги
+        tags: dish.dish_tag_links 
+          ? dish.dish_tag_links.map(link => link.dish_tags).filter(t => t) 
+          : [],
+        // Собираем ингредиенты
+        ingredients: dish.ingredients 
+          ? dish.ingredients.map(ing => ({
+              product_id: ing.product_id,
+              name: ing.products?.name || 'Неизвестно',
+              amount: ing.amount,
+              unit: ing.products?.unit || ''
+            }))
+          : []
+      }))
     }
+    loading.value = false
   }
 
-  // 2. ДОБАВЛЕНИЕ (Клеим стикер семьи)
-  const addDish = async (dish) => {
+  const addDish = async (dishData) => {
     const auth = useAuthStore()
-    const dishWithHouse = { ...dish, household_id: auth.householdId } 
     
-    const { data, error } = await supabase.from('dishes').insert([dishWithHouse]).select()
-    if (!error && data) {
-      // Добавляем пустой массив ингредиентов, чтобы не было ошибки при отображении
-      dishes.value.push({ ...data[0], ingredients: [] })
+    // 1. Создаем (НОВЫЕ ПОЛЯ dish_type, meal_type)
+    const { data: newDish, error } = await supabase
+      .from('dishes')
+      .insert({
+        name: dishData.name,
+        dish_type: dishData.dish_type, // Основное/Закуска...
+        meal_type: dishData.meal_type, // Обед/Ужин...
+        description: dishData.description || '',
+        kcal: dishData.kcal || 0,
+        protein: dishData.protein || 0,
+        fat: dishData.fat || 0,
+        carbs: dishData.carbs || 0,
+        household_id: auth.householdId
+      })
+      .select()
+      .single()
+
+    if (error) { console.error(error); return }
+
+    // 2. Теги
+    if (dishData.tags && dishData.tags.length > 0) {
+       const links = dishData.tags.map(tag => ({
+           dish_id: newDish.id,
+           tag_id: tag.id
+       }))
+       await supabase.from('dish_tag_links').insert(links)
     }
+
+    // 3. Ингредиенты
+    if (dishData.ingredients && dishData.ingredients.length > 0) {
+        const ingRows = dishData.ingredients.map(ing => ({
+            dish_id: newDish.id,
+            product_id: ing.product_id,
+            amount: parseFloat(ing.amount)
+        }))
+        await supabase.from('ingredients').insert(ingRows)
+    }
+
+    await fetchDishes()
   }
 
-  // 3. ОБНОВЛЕНИЕ
-  const updateDish = async (id, updates) => {
-    const auth = useAuthStore()
+  const updateDish = async (id, dishData) => {
+    // 1. Обновляем (НОВЫЕ ПОЛЯ)
     const { error } = await supabase
       .from('dishes')
-      .update(updates)
+      .update({
+        name: dishData.name,
+        dish_type: dishData.dish_type,
+        meal_type: dishData.meal_type,
+        description: dishData.description,
+        kcal: dishData.kcal,
+        protein: dishData.protein,
+        fat: dishData.fat,
+        carbs: dishData.carbs
+      })
       .eq('id', id)
-      .eq('household_id', auth.householdId)
 
-    if (!error) {
-      const index = dishes.value.findIndex(d => d.id === id)
-      if (index !== -1) dishes.value[index] = { ...dishes.value[index], ...updates }
+    if (error) { console.error(error); return }
+
+    // 2. Теги (удалить старые -> добавить новые)
+    await supabase.from('dish_tag_links').delete().eq('dish_id', id)
+    if (dishData.tags && dishData.tags.length > 0) {
+        const links = dishData.tags.map(tag => ({ dish_id: id, tag_id: tag.id }))
+        await supabase.from('dish_tag_links').insert(links)
     }
+
+    // 3. Ингредиенты (удалить -> добавить)
+    await supabase.from('ingredients').delete().eq('dish_id', id)
+    if (dishData.ingredients && dishData.ingredients.length > 0) {
+        const ingRows = dishData.ingredients.map(ing => ({
+            dish_id: id,
+            product_id: ing.product_id,
+            amount: parseFloat(ing.amount)
+        }))
+        await supabase.from('ingredients').insert(ingRows)
+    }
+
+    await fetchDishes()
   }
 
-  // 4. ИНГРЕДИЕНТЫ (Привязаны к блюду, а блюдо уже в семье)
-  const addIngredient = async (dishId, productId, amount) => {
-    const { data, error } = await supabase
-      .from('ingredients')
-      .insert([{ dish_id: dishId, product_id: productId, amount }])
-      .select('*, products(name, unit)')
-
-    if (!error && data) {
-      const dish = dishes.value.find(d => d.id === dishId)
-      if (dish) {
-        if (!dish.ingredients) dish.ingredients = []
-        dish.ingredients.push(data[0])
-      }
-    }
+  const deleteDish = async (id) => {
+    await supabase.from('dishes').delete().eq('id', id)
+    await fetchDishes()
   }
 
-  const removeIngredient = async (dishId, ingredientId) => {
-    const { error } = await supabase.from('ingredients').delete().eq('id', ingredientId)
-    if (!error) {
-      const dish = dishes.value.find(d => d.id === dishId)
-      if (dish) dish.ingredients = dish.ingredients.filter(i => i.id !== ingredientId)
-    }
-  }
-
-  return { dishes, loading, fetchDishes, addDish, updateDish, addIngredient, removeIngredient }
+  return { dishes, loading, fetchDishes, addDish, updateDish, deleteDish }
 })
