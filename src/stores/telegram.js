@@ -5,7 +5,8 @@ export const useTelegramStore = defineStore('telegram', () => {
   // Получаем доступ к объекту Telegram (если он есть)
   const tg = window.Telegram?.WebApp
   
-  const user = ref(null)
+  const user = ref(null)          // Готовый объект пользователя (для отображения имени, аватарки)
+  const initData = ref(null)      // СЫРАЯ строка данных (нужна для проверки безопасности на сервере)
   const platform = ref('unknown') // ios, android, tdesktop...
   const isReady = ref(false)
 
@@ -25,20 +26,24 @@ export const useTelegramStore = defineStore('telegram', () => {
         tg.expand()
     } catch (e) { console.error('Expand error:', e) }
 
-    // 3. Настраиваем цвета шапки и фона, чтобы они сливались с дизайном
-    // Цвет #F8FAFC взят из твоего style.css
+    // 3. Настраиваем цвета шапки и фона
+    // Цвет #F8FAFC совпадает с твоим фоном в style.css
     const appBgColor = '#F8FAFC' 
     
     try {
-        // Проверяем поддержку методов (для старых версий Telegram)
         if (tg.setHeaderColor) tg.setHeaderColor(appBgColor)
         if (tg.setBackgroundColor) tg.setBackgroundColor(appBgColor)
     } catch (e) {
         console.log('Настройка цветов не поддерживается этой версией Telegram')
     }
 
-    // 4. Сохраняем данные пользователя и платформу
+    // 4. Сохраняем данные
+    // initDataUnsafe — это просто объект, ему верить нельзя (для UI пойдет)
     user.value = tg.initDataUnsafe?.user || null
+    
+    // initData — это строка с подписью. Ей верить можно, если проверить на сервере.
+    initData.value = tg.initData 
+    
     platform.value = tg.platform || 'unknown'
     
     console.log('🦁 Telegram Store initialized on', platform.value)
@@ -66,7 +71,6 @@ export const useTelegramStore = defineStore('telegram', () => {
   }
 
   // --- УПРАВЛЕНИЕ ГЛАВНОЙ КНОПКОЙ (MainButton) ---
-  // Пока просто заглушка, реализуем позже
   const mainButton = {
       show: (text, onClick) => {
           if (!tg?.MainButton) return
@@ -77,13 +81,20 @@ export const useTelegramStore = defineStore('telegram', () => {
       hide: () => {
           if (!tg?.MainButton) return
           tg.MainButton.hide()
-          tg.MainButton.offClick() // Важно отписываться
+          tg.MainButton.offClick()
+      },
+      showProgress: (leaveActive = false) => {
+          if (tg?.MainButton) tg.MainButton.showProgress(leaveActive)
+      },
+      hideProgress: () => {
+          if (tg?.MainButton) tg.MainButton.hideProgress()
       }
   }
 
   return { 
     tg, 
     user, 
+    initData, // <--- Важно: теперь мы возвращаем это поле
     platform, 
     isReady, 
     init,

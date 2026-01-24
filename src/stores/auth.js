@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
+import { useTelegramStore } from './telegram'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -8,25 +9,21 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuth = ref(false)
   const loading = ref(true)
 
-  // Данные для тестового входа (эмуляция TMA)
-  const TEST_CREDENTIALS = {
-    email: 'dev@telegram.mini.app',
-    password: 'dev-password-123'
-  }
-
-  // Инициализация
+  // Инициализация (проверка текущей сессии при перезагрузке)
   const init = async () => {
     loading.value = true
     
-    // Проверяем, есть ли активная сессия
+    // Проверяем, есть ли активная сессия в LocalStorage
     const { data: { session } } = await supabase.auth.getSession()
     
     if (session?.user) {
       await handleUserSession(session.user)
     } else {
-      resetState()
+      // Если сессии нет - пробуем войти через Telegram (если мы внутри ТГ)
+      await loginWithTelegram()
     }
     
+    // Слушаем изменения (вдруг разлогинится)
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         await handleUserSession(session.user)
@@ -39,20 +36,62 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
-  // Логика обработки пользователя
+  // Главная функция входа через Telegram
+  const loginWithTelegram = async () => {
+    const telegramStore = useTelegramStore()
+    
+    // Если мы не в Телеграм (обычный браузер) — выходим, покажем экран-заглушку
+    if (!telegramStore.initData) {
+        console.log('Нет данных Telegram, пропускаем авто-вход')
+        loading.value = false
+        return
+    }
+
+    loading.value = true
+    try {
+        console.log('🚀 Отправляем данные охраннику (Edge Function)...')
+        
+        // 1. Вызываем нашу функцию telegram-auth
+        const { data, error } = await supabase.functions.invoke('telegram-auth', {
+            body: { initData: telegramStore.initData }
+        })
+
+        if (error) throw error
+        if (!data || !data.session) throw new Error('No session returned')
+
+        // 2. Устанавливаем сессию в Supabase (как будто ввели логин/пароль)
+        const { error: sessionError } = await supabase.auth.setSession(data.session)
+        if (sessionError) throw sessionError
+
+        console.log('✅ Успешный вход через Telegram!')
+        // handleUserSession вызовется автоматически через onAuthStateChange
+
+    } catch (e) {
+        console.error('Ошибка входа через Telegram:', e)
+        resetState()
+    } finally {
+        loading.value = false
+    }
+  }
+
+  // Загрузка данных пользователя после входа
   const handleUserSession = async (authUser) => {
     user.value = authUser
     isAuth.value = true
     
-    // Получаем ID семьи
-    const { data } = await supabase
-        .from('profiles')
-        .select('household_id')
-        .eq('id', authUser.id)
-        .single()
-        
-    if (data && data.household_id) {
-        householdId.value = data.household_id
+    try {
+        // Получаем ID семьи из профиля
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('household_id')
+            .eq('id', authUser.id)
+            .single()
+            
+        if (data && data.household_id) {
+            householdId.value = data.household_id
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки профиля:', e)
     }
   }
 
@@ -62,36 +101,31 @@ export const useAuthStore = defineStore('auth', () => {
     isAuth.value = false
   }
 
-  // --- ACTIONS ---
-
-  // Функция для быстрой разработки
-  const loginAsTestUser = async () => {
-    loading.value = true
-    try {
-        // 1. Пробуем войти
-        const { error: signInError } = await supabase.auth.signInWithPassword(TEST_CREDENTIALS)
-        
-        // 2. Если ошибка "Invalid login" (пользователя нет), то регистрируем его
-        if (signInError && signInError.message.includes('Invalid login')) {
-            console.log('Тестовый пользователь не найден, создаем нового...')
-            const { error: signUpError } = await supabase.auth.signUp(TEST_CREDENTIALS)
-            if (signUpError) throw signUpError
-        } else if (signInError) {
-            throw signInError
-        }
-    } catch (e) {
-        console.error('Ошибка тестового входа:', e)
-        throw e
-    } finally {
-        loading.value = false
-    }
-  }
-
   const signOut = async () => {
     await supabase.auth.signOut()
     resetState()
-    // Перезагрузка страницы для очистки состояний
     window.location.reload()
+  }
+
+  // Оставим функцию Dev Login на случай, если ты захочешь проверить что-то в браузере
+  // Но она больше не основная
+  const loginAsTestUser = async () => {
+    loading.value = true
+    try {
+        const { error } = await supabase.auth.signInWithPassword({
+            email: 'dev@telegram.mini.app',
+            password: 'dev-password-123'
+        })
+        if (error) {
+             // Если юзера нет, создаем (старый код)
+             if (error.message.includes('Invalid login')) {
+                await supabase.auth.signUp({
+                    email: 'dev@telegram.mini.app',
+                    password: 'dev-password-123'
+                })
+             } else throw error
+        }
+    } catch(e) { console.error(e) } finally { loading.value = false }
   }
 
   return { 
@@ -100,7 +134,8 @@ export const useAuthStore = defineStore('auth', () => {
     isAuth, 
     loading, 
     init, 
-    loginAsTestUser, // Новая функция
+    loginWithTelegram,
+    loginAsTestUser,
     signOut
   }
 })

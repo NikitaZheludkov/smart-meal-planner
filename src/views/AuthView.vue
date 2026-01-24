@@ -1,66 +1,71 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useTelegramStore } from '../stores/telegram'
 
 const auth = useAuthStore()
-const errorMsg = ref('')
+const telegram = useTelegramStore()
 
-const handleDevLogin = async () => {
-  errorMsg.value = ''
-  try {
-    await auth.loginAsTestUser()
-  } catch (e) {
-    errorMsg.value = 'Ошибка входа: ' + e.message
-  }
-}
+// При открытии страницы пытаемся сразу войти
+onMounted(() => {
+    // Если init() в App.vue еще не сработал или не вошел, 
+    // authStore.init() сам вызовет loginWithTelegram
+})
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-white">
-    <div class="flex-1 flex flex-col items-center justify-center p-8 w-full max-w-md mx-auto text-center">
+  <div class="h-full flex flex-col bg-white relative overflow-hidden">
+    
+    <div class="absolute -top-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-60"></div>
+    <div class="absolute bottom-0 -left-10 w-72 h-72 bg-blue-50 rounded-full blur-3xl opacity-60"></div>
+
+    <div class="flex-1 flex flex-col items-center justify-center p-8 w-full max-w-md mx-auto text-center z-10">
       
-      <div class="w-24 h-24 bg-indigo-50 rounded-[32px] flex items-center justify-center mb-6 border border-indigo-100 shadow-sm animate-bounce-slow">
-        <span class="text-5xl">🥗</span>
+      <div class="w-24 h-24 bg-white rounded-[32px] flex items-center justify-center mb-6 border border-slate-100 shadow-xl shadow-indigo-100/50 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-50 to-white"></div>
+        <span class="text-5xl relative z-10 animate-bounce-slow">🥗</span>
       </div>
 
-      <h1 class="text-3xl font-black text-slate-900 mb-3 tracking-tight">Meal Planner</h1>
-      <p class="text-slate-400 text-sm font-bold mb-12 max-w-[200px] leading-relaxed">
-        Умное планирование меню для всей семьи
-      </p>
+      <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Meal Planner</h1>
+      <p class="text-slate-400 text-sm font-bold mb-8">Загрузка вашего профиля...</p>
 
-      <div class="w-full space-y-4">
+      <div v-if="auth.loading" class="flex flex-col items-center gap-3">
+        <span class="material-icons-round animate-spin text-3xl text-indigo-500">donut_large</span>
+        <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Синхронизация с Telegram</p>
+      </div>
+
+      <div v-else-if="!telegram.initData" class="w-full space-y-4 animate-fade-in">
+        <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-orange-600 text-xs font-bold mb-4">
+            Приложение запущено вне Telegram.<br>Авто-вход невозможен.
+        </div>
+        
         <button 
-          @click="handleDevLogin" 
-          :disabled="auth.loading"
-          class="w-full py-4 bg-[#2AABEE] text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-400/30 tap-effect flex items-center justify-center gap-3 transition-all hover:bg-[#229ED9]"
+          @click="auth.loginAsTestUser()" 
+          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl tap-effect"
         >
-          <span v-if="auth.loading" class="material-icons-round animate-spin text-lg">sync</span>
-          <span v-else class="material-icons-round text-lg">telegram</span>
-          <span>{{ auth.loading ? 'Загрузка...' : 'Запустить (Dev Mode)' }}</span>
+          Войти как Dev User
         </button>
-
-        <p class="text-[10px] text-slate-300 font-bold px-4">
-          Режим тестирования: вход выполняется автоматически под dev-аккаунтом.
-        </p>
       </div>
 
-      <div v-if="errorMsg" class="mt-4 bg-red-50 text-red-500 text-xs font-bold p-3 rounded-xl">
-          {{ errorMsg }}
-      </div>
+       <div v-else class="bg-red-50 p-4 rounded-2xl border border-red-100 text-red-500 text-xs font-bold animate-fade-in">
+            <p class="mb-2">Не удалось войти.</p>
+            <button @click="auth.loginWithTelegram()" class="px-4 py-2 bg-white border border-red-100 rounded-xl shadow-sm">Попробовать снова</button>
+       </div>
+
     </div>
     
-    <div class="p-6 text-center">
-        <p class="text-[10px] text-slate-300 font-bold">v0.3.0 • Telegram Mini App Ready</p>
+    <div class="p-6 text-center z-10">
+        <p class="text-[10px] text-slate-300 font-bold">Secure Telegram Auth • v1.0</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.animate-bounce-slow {
-  animation: bounce 3s infinite;
-}
+.animate-bounce-slow { animation: bounce 3s infinite; }
 @keyframes bounce {
   0%, 100% { transform: translateY(-5%); }
   50% { transform: translateY(5%); }
 }
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
