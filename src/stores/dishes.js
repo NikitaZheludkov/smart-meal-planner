@@ -8,9 +8,6 @@ export const useDishStore = defineStore('dishes', () => {
   const loading = ref(false)
 
   const fetchDishes = async () => {
-    const auth = useAuthStore()
-    if (!auth.user) return
-
     // Если блюда уже загружены, не мигаем спиннером
     if (dishes.value.length === 0) loading.value = true
 
@@ -23,8 +20,8 @@ export const useDishStore = defineStore('dishes', () => {
             dish_types (id, name),
             dish_tag_links ( dish_tags ( * ) ),
             ingredients (
-            product_id, amount,
-            products ( name, unit )
+                product_id, amount,
+                products ( name, unit )
             )
         `)
         .order('created_at', { ascending: false })
@@ -52,7 +49,12 @@ export const useDishStore = defineStore('dishes', () => {
 
   const addDish = async (dishData) => {
     const auth = useAuthStore()
+    if (!auth.householdId) {
+        console.error('Нет householdId')
+        return
+    }
     
+    // 1. Создаем само блюдо
     const { data: newDish, error } = await supabase
       .from('dishes')
       .insert({
@@ -64,18 +66,20 @@ export const useDishStore = defineStore('dishes', () => {
         protein: dishData.protein || 0,
         fat: dishData.fat || 0,
         carbs: dishData.carbs || 0,
-        household_id: auth.householdId
+        household_id: auth.householdId // <-- ВАЖНО: Добавили ID семьи
       })
       .select()
       .single()
 
     if (error) { console.error(error); return }
 
+    // 2. Привязываем теги (если есть)
     if (dishData.tags?.length) {
        const links = dishData.tags.map(tag => ({ dish_id: newDish.id, tag_id: tag.id }))
        await supabase.from('dish_tag_links').insert(links)
     }
 
+    // 3. Привязываем ингредиенты (если есть)
     if (dishData.ingredients?.length) {
         const ingRows = dishData.ingredients.map(ing => ({
             dish_id: newDish.id,
@@ -89,6 +93,7 @@ export const useDishStore = defineStore('dishes', () => {
   }
 
   const updateDish = async (id, dishData) => {
+    // При обновлении household_id не меняем, он уже есть в базе
     const { error } = await supabase
       .from('dishes')
       .update({
@@ -105,6 +110,7 @@ export const useDishStore = defineStore('dishes', () => {
 
     if (error) { console.error(error); return }
 
+    // Обновляем связи (удаляем старые -> пишем новые)
     await supabase.from('dish_tag_links').delete().eq('dish_id', id)
     if (dishData.tags?.length) {
         const links = dishData.tags.map(tag => ({ dish_id: id, tag_id: tag.id }))

@@ -1,32 +1,43 @@
 // supabase/functions/telegram-auth/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
-const botToken = Deno.env.get('BOT_TOKEN')
-const supabaseUrl = Deno.env.get('SUPABASE_URL')
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') // Важный ключ!
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// ИСПРАВЛЕНИЕ: Используем npm-спецификатор для стабильности
+import { createClient } from "npm:@supabase/supabase-js@2"
+
+const botToken = Deno.env.get('BOT_TOKEN')!
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+// CORS заголовки нужны, чтобы браузер не блокировал запросы с фронтенда
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
-  try {
-    // 1. Получаем данные от фронтенда
-    const { initData } = await req.json()
-    if (!initData) throw new Error('No initData provided')
+  // Обработка Preflight запроса (OPTIONS) - стандартная процедура для браузеров
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
-    // 2. Валидация данных Telegram
-    // Нам нужно убедиться, что данные не подделаны
+  try {
+    const { initData } = await req.json()
+    if (!initData) {
+        throw new Error('No initData provided')
+    }
+
+    // --- 1. ВАЛИДАЦИЯ ДАННЫХ TELEGRAM ---
     const urlParams = new URLSearchParams(initData)
     const hash = urlParams.get('hash')
     urlParams.delete('hash')
 
-    // Сортируем параметры по алфавиту (требование Telegram)
+    // Сортировка параметров (a-z)
     const dataCheckString = Array.from(urlParams.entries())
       .map(([key, value]) => `${key}=${value}`)
       .sort()
       .join('\n')
 
-    // Создаем секретный ключ из токена бота
+    // Crypto API доступно в Deno глобально (импортировать не нужно)
     const secretKey = await crypto.subtle.importKey(
       "raw", 
       new TextEncoder().encode("WebAppData"), 
@@ -34,15 +45,13 @@ serve(async (req) => {
       false, 
       ["sign", "verify"]
     )
-    
-    // Подписываем токен бота этим ключом
+
     const secret = await crypto.subtle.sign(
       "HMAC", 
       secretKey, 
       new TextEncoder().encode(botToken)
     )
 
-    // Теперь используем полученный секрет для проверки данных
     const signingKey = await crypto.subtle.importKey(
       "raw", 
       secret, 
@@ -57,80 +66,83 @@ serve(async (req) => {
       new TextEncoder().encode(dataCheckString)
     )
 
-    // Переводим в HEX строку для сравнения
     const hex = Array.from(new Uint8Array(verification))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')
 
-    // Если хеши не совпали — это хакер!
     if (hex !== hash) {
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 })
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // 3. Если мы здесь — данные настоящие. Разбираем их.
+    // --- 2. ЛОГИКА АВТОРИЗАЦИИ (Login / Registration) ---
     const userStr = urlParams.get('user')
     if (!userStr) throw new Error('No user data')
     const tgUser = JSON.parse(userStr)
 
-    // 4. Работаем с базой через Supabase Admin (с правами бога)
+    // Создаем админский клиент Supabase
     const supabaseAdmin = createClient(
-      supabaseUrl ?? '',
-      supabaseServiceRoleKey ?? '',
+      supabaseUrl,
+      supabaseServiceRoleKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Ищем пользователя по telegram_id в нашей таблице profiles
-    // Но так как profiles связана с auth.users, нам проще искать/создавать через email-трюк
-    // Мы будем генерировать фейковый email: telegram_ID@tg.ma
+    // Генерируем "технические" данные для входа
     const email = `${tgUser.id}@tg.ma`
-    const password = `tg_pass_${tgUser.id}_secret` // Пароль не важен, пользователь его не вводит
+    const password = `tg_pass_${tgUser.id}_secret`
 
-    // Пытаемся создать пользователя (если его нет)
-    // Мы кладем данные ТГ в user_metadata, чтобы сработал наш триггер в БД
-    const { data: { user }, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        telegram_id: tgUser.id,
-        first_name: tgUser.first_name,
-        username: tgUser.username,
-        avatar_url: tgUser.photo_url
-      }
-    })
-
-    let targetUserId = user?.id
-
-    // Если ошибка "User already registered", значит юзер старый. Просто находим его ID.
-    if (createError && createError.message.includes('already registered')) {
-        // Получаем ID существующего юзера (через админку нельзя получить ID по email напрямую просто так,
-        // поэтому мы используем listUsers или просто входим)
-        // Но проще всего — просто выполнить SignIn от имени админа без пароля (createSession)
-        // Зная email, мы можем найти его ID через запрос к таблице profiles? Нет, RLS мешает.
-        // Самый простой способ в Edge Functions:
-        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-        // Это не оптимально для миллионов юзеров, но для старта пойдет. 
-        // Лучше использовать getUserByEmail, но он в beta.
-        // Давай сделаем проще: просто входим.
-    }
-
-    // Генерируем сессию (Login)
-    const { data: sessionData, error: loginError } = await supabaseAdmin.auth.signInWithPassword({
+    // Сценарий А: Пробуем сразу войти (если пользователь уже есть)
+    const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email,
       password
     })
 
-    if (loginError) {
-      throw loginError
+    // Если вошли успешно - отдаем сессию
+    if (!signInError && signInData.session) {
+        return new Response(
+            JSON.stringify(signInData),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        )
     }
 
-    // 5. Возвращаем токен фронтенду
+    // Сценарий Б: Если не вошли (пользователя нет) - регистрируем
+    // Данные кладем в meta_data, чтобы сработал наш SQL-триггер handle_new_user
+    const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+            telegram_id: tgUser.id,
+            first_name: tgUser.first_name,
+            username: tgUser.username,
+            avatar_url: tgUser.photo_url
+        }
+    })
+
+    if (signUpError) {
+        throw signUpError
+    }
+
+    // После регистрации нужно сразу войти, чтобы получить токены
+    const { data: finalSession, error: finalLoginError } = await supabaseAdmin.auth.signInWithPassword({
+        email,
+        password
+    })
+
+    if (finalLoginError) throw finalLoginError
+
+    // Отдаем сессию фронтенду
     return new Response(
-      JSON.stringify(sessionData),
-      { headers: { "Content-Type": "application/json" } },
+      JSON.stringify(finalSession),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     )
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 400 })
+    return new Response(JSON.stringify({ error: error.message }), { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })
