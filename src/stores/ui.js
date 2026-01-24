@@ -5,15 +5,16 @@ export const useUIStore = defineStore('ui', () => {
   
   // --- ПЛАН ---
   const plan = ref({
-    activeTab: 'day', // Всегда сбрасываем на "День"
-    selectedDate: new Date(), // Всегда сегодня
-    currentWeekStart: new Date() // Текущая неделя
+    activeTab: 'day',
+    selectedDate: new Date(),
+    currentWeekStart: new Date() 
   })
 
   // --- БЛЮДА ---
   const dishes = ref({
-    activeCategory: 'Все',
-    activeTag: null,
+    activeCategory: 'all', // Тип блюда (Суп, Второе...)
+    activeTag: null,       // Прием пищи (Завтрак, Обед...) - старое название переменной
+    filterTags: [],        // НОВОЕ: Массив ID выбранных тегов (Быстро, ПП...)
     searchQuery: ''
   })
 
@@ -22,9 +23,6 @@ export const useUIStore = defineStore('ui', () => {
     activeTab: 'list',
     filterMode: 'category' 
   })
-
-  // МЫ УБРАЛИ watch() и чтение из localStorage. 
-  // Теперь состояние живет только пока открыта вкладка.
 
   return { plan, dishes, shopping }
 })

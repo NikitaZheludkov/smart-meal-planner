@@ -20,7 +20,7 @@ const uiStore = useUIStore()
 
 // --- ИНИЦИАЛИЗАЦИЯ ДАТ ---
 const getStartOfWeekFromSettings = () => {
-    const day = settingsStore.startDay !== null ? settingsStore.startDay : 1
+    const day = settingsStore.startDay ?? 1
     return startOfWeek(new Date(), { weekStartsOn: day })
 }
 
@@ -30,19 +30,22 @@ const selectedDate = ref(new Date())
 uiStore.plan.currentWeekStart = currentWeekStart.value
 uiStore.plan.selectedDate = selectedDate.value
 
-const showSelector = ref(false)
-const targetSlot = ref(null)
-
-const existingSlotItems = computed(() => {
-    if (!targetSlot.value) return []
-    // Передаем ID слота, а не имя
-    return getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotId)
+// --- НАСТРОЙКИ (ПОРЦИИ) ---
+// Берем значение напрямую из стора настроек
+const defaultPortions = computed(() => {
+    return Number(settingsStore.defaultPortions) || 1
 })
 
-const suggestedItems = ref([]) 
+const showSelector = ref(false)
+const targetSlot = ref({
+    dateObj: null,      
+    dateStr: '',        
+    slotId: null,       
+    yesterdayItems: []  
+})
 
 watch(() => settingsStore.startDay, (newStartDay) => {
-    if (newStartDay !== null) {
+    if (newStartDay !== undefined && newStartDay !== null) {
         currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: newStartDay })
     }
 })
@@ -57,48 +60,54 @@ const getSlotIcon = (slotName) => {
     return '🥘'
 }
 
-// Фильтр и Сортировка: теперь работает по ID слота (meal_type_id)
 const getSlotItems = (date, slotId) => {
+  if (!date) return []
   const dStr = format(date, 'yyyy-MM-dd')
   
-  const items = planStore.plan.filter(p => {
-    // Сравниваем по дате и ID слота
-    return p.date === dStr && p.slot_id === slotId
+  return planStore.plan.filter(p => {
+    return p.date === dStr && p.meal_type_id === slotId
   })
-
-  return items
 }
 
 const openSelector = (date, slot) => {
-  // slot теперь объект {id, name}
-  targetSlot.value = { 
-    date: format(date, 'yyyy-MM-dd'), 
-    slotName: slot.name, 
-    slotId: slot.id 
-  }
-  
   const prevDate = subDays(date, 1)
-  suggestedItems.value = getSlotItems(prevDate, slot.id)
+  const prevItems = getSlotItems(prevDate, slot.id)
+
+  targetSlot.value = { 
+    dateObj: date, 
+    dateStr: format(date, 'yyyy-MM-dd'), 
+    slotId: slot.id,
+    yesterdayItems: prevItems 
+  }
   
   showSelector.value = true
 }
 
-const onDishSelected = async (payload) => {
-  if (!targetSlot.value || !payload) return
+// --- ОБРАБОТКА ВЫБОРА ---
+const onDishSelected = async ({ item, type }) => {
+  if (!targetSlot.value.dateObj || !targetSlot.value.slotId) return
 
-  const currentItems = getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotId)
+  const currentItems = getSlotItems(targetSlot.value.dateObj, targetSlot.value.slotId)
 
-  const isDuplicate = currentItems.some(item => {
-      if (payload.type === 'dish') return item.dish_id === payload.id
-      else return item.product_id === payload.id
+  // Проверка на дубликаты
+  const isDuplicate = currentItems.some(existing => {
+      if (type === 'dish') return existing.dish_id === item.id
+      else return existing.product_id === item.id
   })
 
-  if (isDuplicate) {
-      alert('Такое блюдо уже выбрано!')
-      return
+  if (isDuplicate) return 
+
+  // Берем значение из настроек
+  const portionsToAdd = defaultPortions.value
+
+  // Формируем данные для отправки в planStore
+  const payload = { 
+      ...item, 
+      type,
+      portions: portionsToAdd 
   }
-  // Передаем slotId (UUID)
-  await planStore.addToPlan(targetSlot.value.date, targetSlot.value.slotId, payload)
+  
+  await planStore.addToPlan(targetSlot.value.dateStr, targetSlot.value.slotId, payload)
 }
 
 const showDishModal = ref(false)
@@ -113,12 +122,15 @@ const openDishDetails = async (item) => {
   }
 }
 
-// Слоты берем из загруженного справочника
 const mealSlots = computed(() => dictionaries.mealTypes)
 
 const loadData = async () => {
-  await planStore.fetchPlan()
-  await dictionaries.fetchDictionaries() // Важно!
+  await Promise.all([
+      planStore.fetchPlan(),
+      dictionaries.fetchDictionaries(),
+      settingsStore.fetchSettings() 
+  ])
+  
   if (dishStore.dishes.length === 0) dishStore.fetchDishes()
 }
 
@@ -128,7 +140,6 @@ const weekDays = computed(() => {
 })
 
 const currentDayData = computed(() => {
-  // Строим группы на основе справочника
   return mealSlots.value.map(slot => {
     const items = getSlotItems(selectedDate.value, slot.id)
     return { slot, items, hasItems: items.length > 0 }
@@ -164,14 +175,14 @@ const displayDateLabel = computed(() => {
 
 const showTodayBtn = computed(() => {
   if (uiStore.plan.activeTab === 'day') return !isToday(selectedDate.value)
-  const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+  const userStartDay = settingsStore.startDay ?? 1
   const realCurrentWeekStart = startOfWeek(new Date(), { weekStartsOn: userStartDay })
   return !isSameDay(currentWeekStart.value, realCurrentWeekStart)
 })
 
 const goToToday = () => {
   const today = new Date()
-  const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+  const userStartDay = settingsStore.startDay ?? 1
   currentWeekStart.value = startOfWeek(today, { weekStartsOn: userStartDay })
   selectedDate.value = today
 }
@@ -349,9 +360,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
     <transition name="fade">
         <DishSelector 
             v-if="showSelector" 
-            :preferred-category="targetSlot?.slotName" 
-            :suggested-items="suggestedItems"
-            :existing-items="existingSlotItems" 
+            :is-open="showSelector"
+            :selected-date="targetSlot.dateObj"
+            :slot-id="targetSlot.slotId"
+            :existing-items="targetSlot.dateObj ? getSlotItems(targetSlot.dateObj, targetSlot.slotId) : []"
+            :yesterday-items="targetSlot.yesterdayItems"
             @close="showSelector = false" 
             @select="onDishSelected" 
         />

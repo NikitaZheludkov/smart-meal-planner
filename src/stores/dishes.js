@@ -8,49 +8,51 @@ export const useDishStore = defineStore('dishes', () => {
   const loading = ref(false)
 
   const fetchDishes = async () => {
-    // RLS сам отфильтрует данные, householdId в запросе не обязателен, но Auth нужен
     const auth = useAuthStore()
     if (!auth.user) return
 
-    loading.value = true
-    const { data, error } = await supabase
-      .from('dishes')
-      .select(`
-        *,
-        meal_types (id, name),
-        dish_types (id, name),
-        dish_tag_links ( dish_tags ( * ) ),
-        ingredients (
-          product_id, amount,
-          products ( name, unit )
-        )
-      `)
-      .order('created_at', { ascending: false })
+    // Если блюда уже загружены, не мигаем спиннером
+    if (dishes.value.length === 0) loading.value = true
 
-    if (error) {
-      console.error(error)
-    } else {
-      dishes.value = data.map(dish => ({
-        ...dish,
-        // Маппинг для удобства UI
-        meal_type_name: dish.meal_types?.name,
-        dish_type_name: dish.dish_types?.name,
-        tags: dish.dish_tag_links?.map(link => link.dish_tags).filter(t => t) || [],
-        ingredients: dish.ingredients?.map(ing => ({
-              product_id: ing.product_id,
-              name: ing.products?.name || 'Неизвестно',
-              amount: ing.amount,
-              unit: ing.products?.unit || ''
-            })) || []
-      }))
+    try {
+        const { data, error } = await supabase
+        .from('dishes')
+        .select(`
+            *,
+            meal_types (id, name),
+            dish_types (id, name),
+            dish_tag_links ( dish_tags ( * ) ),
+            ingredients (
+            product_id, amount,
+            products ( name, unit )
+            )
+        `)
+        .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        dishes.value = data.map(dish => ({
+            ...dish,
+            meal_type_name: dish.meal_types?.name,
+            dish_type_name: dish.dish_types?.name,
+            tags: dish.dish_tag_links?.map(link => link.dish_tags).filter(t => t) || [],
+            ingredients: dish.ingredients?.map(ing => ({
+                product_id: ing.product_id,
+                name: ing.products?.name || 'Неизвестно',
+                amount: ing.amount,
+                unit: ing.products?.unit || ''
+                })) || []
+        }))
+    } catch (e) {
+        console.error('Ошибка загрузки блюд:', e)
+    } finally {
+        loading.value = false
     }
-    loading.value = false
   }
 
   const addDish = async (dishData) => {
     const auth = useAuthStore()
     
-    // Используем ID из формы
     const { data: newDish, error } = await supabase
       .from('dishes')
       .insert({
@@ -62,14 +64,13 @@ export const useDishStore = defineStore('dishes', () => {
         protein: dishData.protein || 0,
         fat: dishData.fat || 0,
         carbs: dishData.carbs || 0,
-        household_id: auth.householdId // Нужно для INSERT, RLS проверит на соответствие
+        household_id: auth.householdId
       })
       .select()
       .single()
 
     if (error) { console.error(error); return }
 
-    // Сохранение тегов и ингредиентов (логика не меняется)
     if (dishData.tags?.length) {
        const links = dishData.tags.map(tag => ({ dish_id: newDish.id, tag_id: tag.id }))
        await supabase.from('dish_tag_links').insert(links)
@@ -87,7 +88,6 @@ export const useDishStore = defineStore('dishes', () => {
     await fetchDishes()
   }
 
-  // Обновление
   const updateDish = async (id, dishData) => {
     const { error } = await supabase
       .from('dishes')
@@ -105,7 +105,6 @@ export const useDishStore = defineStore('dishes', () => {
 
     if (error) { console.error(error); return }
 
-    // Перезапись связей (тегов и ингредиентов)
     await supabase.from('dish_tag_links').delete().eq('dish_id', id)
     if (dishData.tags?.length) {
         const links = dishData.tags.map(tag => ({ dish_id: id, tag_id: tag.id }))

@@ -11,10 +11,12 @@ export const usePlanStore = defineStore('plan', () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
-    loading.value = true
+    // ТИХАЯ ЗАГРУЗКА: Если данные уже есть, не включаем главный спиннер,
+    // просто обновляем данные в фоне.
+    const isFirstLoad = plan.value.length === 0
+    if (isFirstLoad) loading.value = true
     
     try {
-        // Добавляем meal_types в запрос
         const { data, error } = await supabase
         .from('plan')
         .select(`
@@ -33,41 +35,45 @@ export const usePlanStore = defineStore('plan', () => {
         
         if (error) throw error
         
-        // Маппим данные для удобства UI
         plan.value = data.map(item => ({
             ...item,
-            slot: item.meal_types?.name || 'Неизвестно', // Для совместимости отображения
+            slot: item.meal_types?.name || 'Неизвестно',
             slot_id: item.meal_type_id
         })) || []
 
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
     } finally {
+        // ГАРАНТИЯ: Выключаем спиннер в любом случае
         loading.value = false
     }
   }
 
-  // Обновленный метод добавления
   const addToPlan = async (date, slotId, item) => {
     const auth = useAuthStore()
     
+    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+    // Сначала смотрим, передали ли нам порции явно (item.portions из настроек)
+    // Если нет, ищем amount (если это ингредиент)
+    // Если ничего нет — ставим 1
+    const finalPortions = item.portions || item.amount || 1
+
     const payload = {
       date,
-      meal_type_id: slotId, // ТЕПЕРЬ ИСПОЛЬЗУЕМ ID
-      slot: 'legacy', // Заглушка для старого поля, если оно required, но лучше использовать meal_type_id
+      meal_type_id: slotId,
+      slot: 'legacy', 
       household_id: auth.householdId,
-      ignore_shopping: item.ignore_shopping || false 
+      ignore_shopping: item.ignore_shopping || false,
+      portions: finalPortions // Используем правильное число
     }
 
     if (item.type === 'dish') {
       payload.dish_id = item.id
-      payload.portions = item.amount || 1
     } else {
       payload.product_id = item.id
-      payload.portions = item.amount || 1
     }
+    // -------------------------
 
-    // Оптимистик UI (добавляем временно)
     const tempItem = { ...payload, id: 'temp_' + Date.now() }
     if (item.type === 'dish') tempItem.dishes = item
     else tempItem.products = item

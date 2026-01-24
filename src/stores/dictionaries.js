@@ -4,11 +4,12 @@ import { supabase } from '../lib/supabase'
 
 export const useDictionariesStore = defineStore('dictionaries', () => {
   
-  // Справочники теперь храним как объекты: [{ id: '...', name: '...' }]
+  // Данные из базы
   const mealTypes = ref([]) 
   const dishTypes = ref([])
+  const availableTags = ref([]) 
   
-  // Категории продуктов оставляем локально, если для них нет таблицы в БД
+  // Локальные данные (категории продуктов для списка покупок)
   const productCategories = ref([
     { id: 'pcat_1', name: 'Овощи и фрукты' },
     { id: 'pcat_2', name: 'Молочные продукты' },
@@ -20,49 +21,51 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
     { id: 'pcat_8', name: 'Разное' }
   ])
 
-  const availableTags = ref([]) 
   const loading = ref(false)
 
   const fetchDictionaries = async () => {
     loading.value = true
     try {
-      // 1. Грузим типы приемов пищи
+      // 1. Приемы пищи (Завтрак, Обед...) - сортировка по порядку
       const { data: meals } = await supabase
         .from('meal_types')
         .select('*')
         .order('sort_order')
+      
       if (meals) mealTypes.value = meals
 
-      // 2. Грузим типы блюд
+      // 2. Типы блюд (Основные, Салаты...) - сортировка по важности (sort_order)
       const { data: dishes } = await supabase
         .from('dish_types')
         .select('*')
-        .order('name')
+        .order('sort_order')
+      
       if (dishes) dishTypes.value = dishes
 
-      // 3. Грузим теги (безопасно через RLS, household_id не нужен в фильтре)
+      // 3. Теги (Быстро, ПП...) - сортировка по группам и порядку
       const { data: tags } = await supabase
           .from('dish_tags')
           .select('*')
-          .order('name')
+          .order('sort_order')
+      
       if (tags) availableTags.value = tags
 
     } catch (e) {
-      console.error('Ошибка справочников:', e)
+      console.error('Ошибка загрузки справочников:', e)
     } finally {
       loading.value = false
     }
   }
 
-  // Хелпер: найти объект по ID
+  // Хелперы для получения объектов по ID (чтобы не искать вручную в компонентах)
   const getMealTypeById = (id) => mealTypes.value.find(m => m.id === id)
   const getDishTypeById = (id) => dishTypes.value.find(d => d.id === id)
 
   return { 
     mealTypes,
     dishTypes,
+    availableTags,
     productCategories, 
-    availableTags, 
     loading, 
     fetchDictionaries,
     getMealTypeById,
