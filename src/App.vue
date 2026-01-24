@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
-import { useTelegramStore } from './stores/telegram' // <-- Импорт нового стора
+import { useTelegramStore } from './stores/telegram' 
 
 // Импортируем компоненты
 import PlanView from './views/PlanView.vue'
@@ -16,7 +16,7 @@ import AuthView from './views/AuthView.vue'
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
 const settings = useSettingsStore()
-const telegram = useTelegramStore() // <-- Инициализация стора
+const telegram = useTelegramStore() 
 const currentTab = ref('plan')
 
 // Глобальный флаг загрузки
@@ -36,6 +36,15 @@ const activeComponent = computed(() => {
   return tab ? tab.component : PlanView
 })
 
+// Логика переключения вкладок с вибрацией
+const switchTab = (tabId) => {
+    if (currentTab.value === tabId) return
+    
+    // Легкий удар, как в нативных приложениях iOS
+    telegram.haptic.impact('light') 
+    currentTab.value = tabId
+}
+
 // Единая функция загрузки данных пользователя
 const loadUserData = async () => {
     isAppInitializing.value = true 
@@ -43,7 +52,6 @@ const loadUserData = async () => {
     
     try {
         if (auth.isAuth) {
-            // Грузим настройки и справочники
             await Promise.all([
                 settings.fetchSettings(),
                 dictionaries.fetchDictionaries()
@@ -56,18 +64,13 @@ const loadUserData = async () => {
     }
 }
 
-// Следим за входом в систему
 watch(() => auth.isAuth, (newVal) => {
   if (newVal) loadUserData()
 })
 
-// Инициализация при первом открытии
 onMounted(async () => {
     try {
-        // 1. Инициализируем Telegram (цвета, расширение экрана)
         telegram.init() 
-
-        // 2. Инициализируем Auth
         await auth.init() 
         
         if (auth.isAuth) {
@@ -111,7 +114,7 @@ onMounted(async () => {
 
       <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
         <div class="h-[76px] grid grid-cols-5 items-center">
-          <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'">
+          <button v-for="tab in tabs" :key="tab.id" @click="switchTab(tab.id)" class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'">
             <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
             <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
           </button>

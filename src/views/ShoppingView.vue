@@ -2,13 +2,15 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
+import { useTelegramStore } from '../stores/telegram' // <-- Импорт
 import { startOfWeek, addDays, format, isWithinInterval, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 const planStore = usePlanStore()
 const settingsStore = useSettingsStore()
+const telegram = useTelegramStore() // <-- Инит
 
-const activeTab = ref('list') // list | departments
+const activeTab = ref('list') 
 
 // --- 1. УПРАВЛЕНИЕ ПЕРИОДОМ ---
 const currentWeekStart = ref(new Date())
@@ -21,10 +23,11 @@ const periodLabel = computed(() => {
 })
 
 const changePeriod = (dir) => {
+    telegram.haptic.selection() // <-- Вибрация "барабан" при смене дат
     currentWeekStart.value = addDays(currentWeekStart.value, dir * periodLength.value)
 }
 
-// --- 2. ЛОГИКА ГАЛОЧЕК (CHECKBOXES) ---
+// --- 2. ЛОГИКА ГАЛОЧЕК ---
 const checkedIds = ref(new Set())
 
 onMounted(() => {
@@ -46,6 +49,9 @@ watch(checkedIds, (newVal) => {
 }, { deep: true })
 
 const toggleCheck = (id) => {
+    // Средний удар - как щелчок выключателя
+    telegram.haptic.impact('medium')
+    
     if (checkedIds.value.has(id)) checkedIds.value.delete(id)
     else checkedIds.value.add(id)
 }
@@ -102,21 +108,17 @@ const addToAggregatedList = (list, product, amount) => {
     list[product.id].amount += amount
 }
 
-// СТАТИСТИКА ПО БЛЮДАМ (ДЛЯ КАРУСЕЛИ)
-// ИСПРАВЛЕНО: Группировка одинаковых блюд и расчет по уникальным ингредиентам
 const dishStats = computed(() => {
     const dishesMap = new Map()
     
     activePlanItems.value.forEach(item => {
-        if (!item.dish_id) return // Пропускаем отдельные продукты
+        if (!item.dish_id) return 
         
         const dishId = item.dishes.id
         
-        // Если такое блюдо уже есть в списке, просто увеличиваем счетчик
         if (dishesMap.has(dishId)) {
             dishesMap.get(dishId).count++
         } else {
-            // Если нет - создаем запись и считаем прогресс по ингредиентам
             const ingredients = item.dishes.ingredients || []
             let totalIngs = 0
             let foundIngs = 0
@@ -124,7 +126,6 @@ const dishStats = computed(() => {
             ingredients.forEach(ing => {
                 if (!ing.products) return
                 totalIngs++
-                // Проверяем, есть ли этот продукт в списке купленных
                 if (checkedIds.value.has(ing.product_id)) {
                     foundIngs++
                 }
@@ -135,7 +136,7 @@ const dishStats = computed(() => {
             dishesMap.set(dishId, {
                 id: dishId,
                 name: item.dishes.name,
-                count: 1, // Начальный счетчик
+                count: 1, 
                 percent: percent
             })
         }
@@ -161,6 +162,13 @@ const groupedList = computed(() => {
 
 const totalItems = computed(() => shoppingList.value.length)
 const countChecked = computed(() => shoppingList.value.filter(i => checkedIds.value.has(i.id)).length)
+
+const switchViewTab = (mode) => {
+    if(activeTab.value !== mode) {
+        telegram.haptic.selection()
+        activeTab.value = mode
+    }
+}
 </script>
 
 <template>
@@ -172,14 +180,14 @@ const countChecked = computed(() => shoppingList.value.filter(i => checkedIds.va
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Купить</h1>
         
         <div class="flex gap-2">
-            <button @click="planStore.fetchPlan()" class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 tap-effect">
+            <button @click="planStore.fetchPlan(); telegram.haptic.impact('light')" class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 tap-effect">
                 <span class="material-icons-round" :class="planStore.loading ? 'animate-spin' : ''">refresh</span>
             </button>
             <div class="bg-slate-50 p-1 rounded-xl flex">
-                <button @click="activeTab = 'list'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('list')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">format_list_bulleted</span>
                 </button>
-                <button @click="activeTab = 'departments'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('departments')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">grid_view</span>
                 </button>
             </div>

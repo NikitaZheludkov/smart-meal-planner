@@ -4,6 +4,7 @@ import { useDishStore } from '../stores/dishes'
 import { usePlanStore } from '../stores/plan'
 import { useProductStore } from '../stores/products'
 import { useSettingsStore } from '../stores/settings'
+import { useTelegramStore } from '../stores/telegram' // <-- Импорт
 
 const props = defineProps({
   preferredCategory: String, 
@@ -16,13 +17,17 @@ const dishStore = useDishStore()
 const planStore = usePlanStore()
 const productStore = useProductStore()
 const settingsStore = useSettingsStore()
+const telegram = useTelegramStore() // <-- Инит
 
 const searchQuery = ref('')
 const activeTab = ref('dishes') 
 
 // --- ЛОГИКА ---
+// ВАЖНО: У нас теперь preferredCategory - это Имя, а в блюдах хранятся ID. 
+// Но логика "рек" пока останется простой, чтобы не усложнять.
 const isContextMatch = (dish) => {
-    return dish.meal_type === props.preferredCategory
+    // В будущем можно доработать, пока просто возвращаем false или упрощенную проверку
+    return false 
 }
 
 const sortedDishes = computed(() => {
@@ -32,17 +37,6 @@ const sortedDishes = computed(() => {
   if (q) {
     list = list.filter(d => d.name.toLowerCase().includes(q))
   }
-
-  if (props.preferredCategory) {
-      list.sort((a, b) => {
-          const aMatch = isContextMatch(a)
-          const bMatch = isContextMatch(b)
-          if (aMatch && !bMatch) return -1
-          if (!aMatch && bMatch) return 1
-          return 0
-      })
-  }
-  
   return list
 })
 
@@ -54,6 +48,9 @@ const filteredProducts = computed(() => {
 
 // --- ДЕЙСТВИЯ ---
 const handleAdd = (item, type = 'dish') => {
+    // Успешная вибрация!
+    telegram.haptic.notification('success')
+    
     const defaultPortions = settingsStore.defaultPortions || 1
     emit('select', { 
         ...item, 
@@ -64,15 +61,18 @@ const handleAdd = (item, type = 'dish') => {
 }
 
 const updatePortions = (item, delta) => {
+    telegram.haptic.selection() // Легкий щелчок
     const newAmount = Math.max(1, (item.portions || 1) + delta)
     planStore.updatePlanItem(item.id, { portions: newAmount })
 }
 
 const toggleShopping = (item) => {
+    telegram.haptic.impact('medium')
     planStore.updatePlanItem(item.id, { ignore_shopping: !item.ignore_shopping })
 }
 
 const removeItem = (item) => {
+    telegram.haptic.notification('warning') // Предупреждающая вибрация при удалении
     planStore.removeFromPlan(item.id)
 }
 
@@ -222,7 +222,7 @@ const isValidItem = (item) => {
                            <div class="text-[10px] font-bold text-slate-400 mt-0.5 flex gap-2">
                                <span>{{ dish.kcal }} ккал</span>
                                <span class="text-slate-300">•</span>
-                               <span>{{ dish.dish_type }}</span>
+                               <span>{{ dish.dish_type_name }}</span>
                            </div>
                        </div>
                        <div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors" :class="isContextMatch(dish) ? 'bg-indigo-500 text-white shadow-md' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-500 group-hover:text-white'">
