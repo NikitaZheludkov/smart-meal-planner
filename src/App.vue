@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
+import { useTelegramStore } from './stores/telegram' // <-- Импорт нового стора
 
 // Импортируем компоненты
 import PlanView from './views/PlanView.vue'
@@ -15,10 +16,12 @@ import AuthView from './views/AuthView.vue'
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
 const settings = useSettingsStore()
+const telegram = useTelegramStore() // <-- Инициализация стора
 const currentTab = ref('plan')
 
 // Глобальный флаг загрузки
 const isAppInitializing = ref(true)
+const initError = ref(null)
 
 const tabs = [
   { id: 'plan', label: 'План', icon: 'calendar_today', component: PlanView },
@@ -35,47 +38,47 @@ const activeComponent = computed(() => {
 
 // Единая функция загрузки данных пользователя
 const loadUserData = async () => {
-    isAppInitializing.value = true // 1. Включаем экран загрузки
+    isAppInitializing.value = true 
+    initError.value = null
     
     try {
         if (auth.isAuth) {
-            // 2. Ждем настройки (КРИТИЧНО для интерфейса)
-            await settings.fetchSettings()
-            // 3. Справочники грузим параллельно (не блокируем, если не критично)
-            dictionaries.fetchDictionaries()
+            // Грузим настройки и справочники
+            await Promise.all([
+                settings.fetchSettings(),
+                dictionaries.fetchDictionaries()
+            ])
         }
     } catch (e) {
         console.error('Ошибка загрузки данных:', e)
     } finally {
-        // 4. Выключаем экран загрузки (Интерфейс рисуется только сейчас)
         isAppInitializing.value = false
     }
 }
 
 // Следим за входом в систему
 watch(() => auth.isAuth, (newVal) => {
-  if (newVal) {
-      // Если пользователь только что вошел - запускаем загрузку
-      loadUserData()
-  }
+  if (newVal) loadUserData()
 })
 
-// Инициализация при первом открытии (F5)
+// Инициализация при первом открытии
 onMounted(async () => {
-    await auth.init() // Ждем проверки сессии
-    
-    if (auth.isAuth) {
-        await loadUserData() // Если сессия есть - грузим данные
-    } else {
-        isAppInitializing.value = false // Если нет - просто показываем AuthView
-    }
+    try {
+        // 1. Инициализируем Telegram (цвета, расширение экрана)
+        telegram.init() 
 
-    // Telegram Cosmetics
-    if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.expand()
-        window.Telegram.WebApp.ready()
-        window.Telegram.WebApp.setHeaderColor('#F8FAFC') 
-        window.Telegram.WebApp.setBackgroundColor('#F8FAFC')
+        // 2. Инициализируем Auth
+        await auth.init() 
+        
+        if (auth.isAuth) {
+            await loadUserData() 
+        } else {
+            isAppInitializing.value = false 
+        }
+    } catch (e) {
+        console.error('Критическая ошибка старта:', e)
+        initError.value = 'Ошибка запуска приложения. Обновите страницу.'
+        isAppInitializing.value = false
     }
 })
 </script>
@@ -87,6 +90,12 @@ onMounted(async () => {
       <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>
       <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
       <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
+    </div>
+
+    <div v-else-if="initError" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <span class="material-icons-round text-4xl text-red-400 mb-2">error_outline</span>
+        <p class="text-sm font-bold text-slate-600">{{ initError }}</p>
+        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">Обновить</button>
     </div>
 
     <div v-else-if="!auth.isAuth" class="flex-1 bg-white">

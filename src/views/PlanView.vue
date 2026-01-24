@@ -19,19 +19,14 @@ const dishStore = useDishStore()
 const uiStore = useUIStore()
 
 // --- ИНИЦИАЛИЗАЦИЯ ДАТ ---
-
-// Хелпер: Рассчитываем старт недели СРАЗУ, используя загруженные настройки
 const getStartOfWeekFromSettings = () => {
-    // settingsStore.startDay уже загружен в App.vue, берем его
     const day = settingsStore.startDay !== null ? settingsStore.startDay : 1
     return startOfWeek(new Date(), { weekStartsOn: day })
 }
 
-// Инициализируем ref правильным значением
 const currentWeekStart = ref(getStartOfWeekFromSettings())
 const selectedDate = ref(new Date())
 
-// Синхронизируем со стором UI (если вдруг понадобится, но стартуем с чистого листа)
 uiStore.plan.currentWeekStart = currentWeekStart.value
 uiStore.plan.selectedDate = selectedDate.value
 
@@ -40,12 +35,12 @@ const targetSlot = ref(null)
 
 const existingSlotItems = computed(() => {
     if (!targetSlot.value) return []
-    return getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotName)
+    // Передаем ID слота, а не имя
+    return getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotId)
 })
 
 const suggestedItems = ref([]) 
 
-// Если настройки поменяются на лету (в другой вкладке), пересчитываем неделю
 watch(() => settingsStore.startDay, (newStartDay) => {
     if (newStartDay !== null) {
         currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: newStartDay })
@@ -62,38 +57,20 @@ const getSlotIcon = (slotName) => {
     return '🥘'
 }
 
-const categoryPriorities = computed(() => {
-  const map = {}
-  if (dictionaries.dishTypes) {
-      dictionaries.dishTypes.forEach((type, index) => { 
-          map[type] = index + 1 
-      })
-  }
-  return map
-})
-
-// Фильтр и Сортировка
-const getSlotItems = (date, slotName) => {
+// Фильтр и Сортировка: теперь работает по ID слота (meal_type_id)
+const getSlotItems = (date, slotId) => {
   const dStr = format(date, 'yyyy-MM-dd')
   
   const items = planStore.plan.filter(p => {
-    if (p.date !== dStr || p.slot !== slotName) return false
-    const isValidDish = p.dish_id && p.dishes;
-    const isValidProduct = p.product_id && p.products;
-    return isValidDish || isValidProduct;
+    // Сравниваем по дате и ID слота
+    return p.date === dStr && p.slot_id === slotId
   })
 
-  return items.sort((a, b) => {
-    const getPrio = (item) => {
-      if (item.product_id) return 999 
-      const typeName = item.dishes?.dish_type
-      return categoryPriorities.value[typeName] || 500
-    }
-    return getPrio(a) - getPrio(b)
-  })
+  return items
 }
 
 const openSelector = (date, slot) => {
+  // slot теперь объект {id, name}
   targetSlot.value = { 
     date: format(date, 'yyyy-MM-dd'), 
     slotName: slot.name, 
@@ -101,7 +78,7 @@ const openSelector = (date, slot) => {
   }
   
   const prevDate = subDays(date, 1)
-  suggestedItems.value = getSlotItems(prevDate, slot.name)
+  suggestedItems.value = getSlotItems(prevDate, slot.id)
   
   showSelector.value = true
 }
@@ -109,22 +86,19 @@ const openSelector = (date, slot) => {
 const onDishSelected = async (payload) => {
   if (!targetSlot.value || !payload) return
 
-  const currentItems = getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotName)
+  const currentItems = getSlotItems(new Date(targetSlot.value.date), targetSlot.value.slotId)
 
   const isDuplicate = currentItems.some(item => {
-      if (payload.type === 'dish') {
-          return item.dish_id === payload.id
-      } else {
-          return item.product_id === payload.id
-      }
+      if (payload.type === 'dish') return item.dish_id === payload.id
+      else return item.product_id === payload.id
   })
 
   if (isDuplicate) {
       alert('Такое блюдо уже выбрано!')
       return
   }
-
-  await planStore.addToPlan(targetSlot.value.date, targetSlot.value.slotName, targetSlot.value.slotId, payload)
+  // Передаем slotId (UUID)
+  await planStore.addToPlan(targetSlot.value.date, targetSlot.value.slotId, payload)
 }
 
 const showDishModal = ref(false)
@@ -139,11 +113,12 @@ const openDishDetails = async (item) => {
   }
 }
 
-const mealSlots = computed(() => dictionaries.mealSlots)
+// Слоты берем из загруженного справочника
+const mealSlots = computed(() => dictionaries.mealTypes)
 
 const loadData = async () => {
-  // Настройки уже загружены в App.vue, здесь просто грузим контент
   await planStore.fetchPlan()
+  await dictionaries.fetchDictionaries() // Важно!
   if (dishStore.dishes.length === 0) dishStore.fetchDishes()
 }
 
@@ -153,8 +128,9 @@ const weekDays = computed(() => {
 })
 
 const currentDayData = computed(() => {
+  // Строим группы на основе справочника
   return mealSlots.value.map(slot => {
-    const items = getSlotItems(selectedDate.value, slot.name)
+    const items = getSlotItems(selectedDate.value, slot.id)
     return { slot, items, hasItems: items.length > 0 }
   })
 })
@@ -311,36 +287,35 @@ onMounted(() => { if (auth.isAuth) loadData() })
             :key="slot.id" 
             @click="openSelector(day, slot)" 
             class="w-full h-28 rounded-2xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-all bg-white shadow-sm border-slate-100" 
-            :class="getSlotItems(day, slot.name).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
+            :class="getSlotItems(day, slot.id).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
           >
-            
-            <span v-if="getSlotItems(day, slot.name).length === 0" class="text-[7px] font-bold text-slate-300 uppercase text-center break-all px-1">
+            <span v-if="getSlotItems(day, slot.id).length === 0" class="text-[7px] font-bold text-slate-300 uppercase text-center break-all px-1">
                 {{ slot.name.substring(0, 3) }}
             </span>
 
-            <template v-else-if="getSlotItems(day, slot.name).length === 1">
-               <template v-if="getSlotItems(day, slot.name)[0].dish_id && getSlotItems(day, slot.name)[0].dishes?.image_url">
-                    <img :src="getSlotItems(day, slot.name)[0].dishes.image_url" class="absolute inset-0 w-full h-full object-cover">
-                    <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'bg-red-500/30' : ''"></div>
+            <template v-else-if="getSlotItems(day, slot.id).length === 1">
+               <template v-if="getSlotItems(day, slot.id)[0].dish_id && getSlotItems(day, slot.id)[0].dishes?.image_url">
+                    <img :src="getSlotItems(day, slot.id)[0].dishes.image_url" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-500/30' : ''"></div>
                     <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent"></div>
                     <div class="absolute bottom-1.5 left-1.5 right-1.5 z-10 text-left">
                         <div class="text-[9px] font-bold text-white leading-tight line-clamp-2 shadow-sm">
-                             <span v-if="getSlotItems(day, slot.name)[0].ignore_shopping" class="text-[8px] mr-1">🚫</span>
-                            {{ getSlotItems(day, slot.name)[0].dishes?.name }}
-                            <span v-if="getSlotItems(day, slot.name)[0].portions > 1" class="text-yellow-300 ml-0.5">x{{ getSlotItems(day, slot.name)[0].portions }}</span>
+                             <span v-if="getSlotItems(day, slot.id)[0].ignore_shopping" class="text-[8px] mr-1">🚫</span>
+                            {{ getSlotItems(day, slot.id)[0].dishes?.name }}
+                            <span v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-yellow-300 ml-0.5">x{{ getSlotItems(day, slot.id)[0].portions }}</span>
                          </div>
                     </div>
                 </template>
                 <template v-else>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'bg-red-50' : 'bg-white'">
+                    <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-50' : 'bg-white'">
                         <div class="text-xl mb-1">
-                            {{ getSlotItems(day, slot.name)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
+                            {{ getSlotItems(day, slot.id)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
                         </div>
-                        <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.name)[0].ignore_shopping ? 'text-red-500 line-through' : 'text-slate-800'">
-                            {{ getSlotItems(day, slot.name)[0].dish_id ? getSlotItems(day, slot.name)[0].dishes?.name : getSlotItems(day, slot.name)[0].products?.name }}
+                        <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'text-red-500 line-through' : 'text-slate-800'">
+                            {{ getSlotItems(day, slot.id)[0].dish_id ? getSlotItems(day, slot.id)[0].dishes?.name : getSlotItems(day, slot.id)[0].products?.name }}
                         </div>
-                        <div v-if="getSlotItems(day, slot.name)[0].portions > 1" class="text-[8px] font-black text-indigo-500">
-                              x{{ getSlotItems(day, slot.name)[0].portions }}
+                        <div v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-[8px] font-black text-indigo-500">
+                              x{{ getSlotItems(day, slot.id)[0].portions }}
                         </div>
                     </div>
                 </template>
@@ -349,7 +324,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
             <template v-else>
                <div class="flex flex-col w-full h-full p-1 gap-1">
                    <div 
-                      v-for="(item, idx) in getSlotItems(day, slot.name).slice(0, 3)" 
+                      v-for="(item, idx) in getSlotItems(day, slot.id).slice(0, 3)" 
                       :key="item.id" 
                       class="flex-1 w-full rounded-lg border flex items-center justify-center px-1 overflow-hidden"
                       :class="item.ignore_shopping ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'"
@@ -360,7 +335,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                       </span>
                     </div>
                    
-                   <div v-if="getSlotItems(day, slot.name).length > 3" class="h-2 w-full bg-slate-100 rounded-sm flex items-center justify-center">
+                   <div v-if="getSlotItems(day, slot.id).length > 3" class="h-2 w-full bg-slate-100 rounded-sm flex items-center justify-center">
                        <span class="text-[6px] font-bold text-slate-400">...</span>
                     </div>
                </div>

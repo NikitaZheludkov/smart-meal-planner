@@ -11,14 +11,13 @@ const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 
-// Используем новые списки из словаря
+// Категории берем из справочника
 const filterCategories = computed(() => {
-  return ['Все', ...dictionaries.dishTypes]
+  return dictionaries.dishTypes // Это массив объектов {id, name}
 })
 
 const mealTypes = computed(() => dictionaries.mealTypes)
 
-// --- МОДАЛКА ---
 const showDetailModal = ref(false)
 const viewingDish = ref(null)
 
@@ -28,15 +27,13 @@ const openDish = (dish) => {
 }
 
 const openCreateDish = () => {
-  const defaultCat = uiStore.dishes.activeCategory !== 'Все' 
-    ? uiStore.dishes.activeCategory 
-    : (dictionaries.dishTypes[0] || '')
-    
+  // Логика создания
   viewingDish.value = {
       id: null, 
       name: '',
-      dish_type: defaultCat, // Используем dish_type
-      meal_type: dictionaries.mealTypes[1], // Обед по умолчанию
+      // Используем первый попавшийся ID по умолчанию
+      dish_type_id: uiStore.dishes.activeCategory || dictionaries.dishTypes[0]?.id, 
+      meal_type_id: dictionaries.mealTypes[1]?.id, 
       kcal: null, protein: null, fat: null, carbs: null,
       tags: [],
       ingredients: []
@@ -47,22 +44,21 @@ const openCreateDish = () => {
 onMounted(async () => {
   if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
   if (productStore.products.length === 0) await productStore.fetchProducts()
-  dictionaries.fetchDictionaries()
+  // Справочники теперь критичны, грузим их
+  await dictionaries.fetchDictionaries()
 })
 
-// Фильтрация
 const filteredDishes = computed(() => {
   let result = dishStore.dishes
   
-  // 1. Фильтр по Типу Блюда (вместо старых категорий)
-  if (uiStore.dishes.activeCategory !== 'Все') {
-    result = result.filter(d => d.dish_type === uiStore.dishes.activeCategory)
+  // 1. Фильтр по Типу Блюда (сравниваем ID)
+  if (uiStore.dishes.activeCategory !== 'all') {
+    result = result.filter(d => d.dish_type_id === uiStore.dishes.activeCategory)
   }
 
-  // 2. Фильтр по Приему Пищи (вместо тегов)
+  // 2. Фильтр по Приему Пищи (сравниваем ID)
   if (uiStore.dishes.activeTag) {
-     // activeTag у нас теперь хранит имя приема пищи (Завтрак, Обед...)
-    result = result.filter(d => d.meal_type === uiStore.dishes.activeTag)
+    result = result.filter(d => d.meal_type_id === uiStore.dishes.activeTag)
   }
   
   // 3. Поиск
@@ -73,6 +69,9 @@ const filteredDishes = computed(() => {
   
   return result
 })
+
+// Инициализируем UI Store правильными значениями, если они пустые
+if (!uiStore.dishes.activeCategory) uiStore.dishes.activeCategory = 'all'
 </script>
 
 <template>
@@ -102,24 +101,32 @@ const filteredDishes = computed(() => {
 
         <button 
           v-for="type in mealTypes" 
-          :key="type" 
-          @click="uiStore.dishes.activeTag = type" 
+          :key="type.id" 
+          @click="uiStore.dishes.activeTag = type.id" 
           class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black uppercase transition-all tap-effect border" 
-          :class="uiStore.dishes.activeTag === type ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
+          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
         >
-            {{ type }}
+            {{ type.name }}
         </button>
       </div>
 
       <div class="flex overflow-x-auto gap-2 no-scrollbar pb-2">
         <button 
-          v-for="cat in filterCategories" 
-          :key="cat" 
-          @click="uiStore.dishes.activeCategory = cat" 
+          @click="uiStore.dishes.activeCategory = 'all'" 
           class="whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all tap-effect border" 
-          :class="uiStore.dishes.activeCategory === cat ? 'bg-white text-slate-900 border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+          :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
         >
-            {{ cat }}
+            Все
+        </button>
+
+        <button 
+          v-for="cat in filterCategories" 
+          :key="cat.id" 
+          @click="uiStore.dishes.activeCategory = cat.id" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all tap-effect border" 
+          :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+        >
+            {{ cat.name }}
         </button>
       </div>
     </div>
@@ -129,9 +136,6 @@ const filteredDishes = computed(() => {
       <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
         <div class="text-5xl mb-2">🍳</div>
         <p class="font-bold text-slate-400">Нет блюд</p>
-        <p v-if="uiStore.dishes.activeTag || uiStore.dishes.activeCategory !== 'Все'" class="text-xs text-slate-300 mt-1">
-            Попробуйте изменить фильтры
-        </p>
       </div>
 
       <div 
@@ -143,13 +147,13 @@ const filteredDishes = computed(() => {
         <div class="flex justify-between items-start">
           <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
           <span class="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0">
-              {{ dish.dish_type }}
+              {{ dish.dish_type_name }}
           </span>
         </div>
         
         <div class="flex flex-wrap gap-1 mt-1">
             <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
-               {{ dish.meal_type }}
+               {{ dish.meal_type_name }}
             </span>
             <span 
                 v-for="tag in dish.tags" 

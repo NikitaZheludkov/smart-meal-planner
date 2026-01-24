@@ -3,7 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
-import { usePlanStore } from '../stores/plan' // <--- Добавили импорт
+import { usePlanStore } from '../stores/plan'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -14,14 +14,14 @@ const emit = defineEmits(['close'])
 const dishStore = useDishStore()
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
-const planStore = usePlanStore() // <--- Инициализировали стор плана
+const planStore = usePlanStore()
 
 const isEditing = ref(false)
 const formData = ref({
     id: null,
     name: '',
-    dish_type: '', 
-    meal_type: '', 
+    dish_type_id: '', // ID вместо строки
+    meal_type_id: '', // ID вместо строки
     description: '',
     kcal: null, protein: null, fat: null, carbs: null,
     tags: [],
@@ -81,14 +81,20 @@ const removeIngredient = (index) => {
 // --- ИНИЦИАЛИЗАЦИЯ ---
 watch(() => props.dish, (newVal) => {
   if (newVal) {
+    // Копируем данные
     formData.value = JSON.parse(JSON.stringify(newVal))
     if (!formData.value.ingredients) formData.value.ingredients = []
     if (!formData.value.tags) formData.value.tags = []
     
     // Режим создания или просмотра
     if (!formData.value.id) {
-        if (!formData.value.dish_type) formData.value.dish_type = dictionaries.dishTypes[0]
-        if (!formData.value.meal_type) formData.value.meal_type = dictionaries.mealTypes[1] 
+        // Ставим первые значения из справочников по умолчанию (ID)
+        if (!formData.value.dish_type_id && dictionaries.dishTypes.length) {
+            formData.value.dish_type_id = dictionaries.dishTypes[0].id
+        }
+        if (!formData.value.meal_type_id && dictionaries.mealTypes.length) {
+            formData.value.meal_type_id = dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0].id
+        }
         isEditing.value = true
     } else {
         isEditing.value = false
@@ -103,7 +109,6 @@ const handleSave = async () => {
   if (!formData.value.name) return
   if (formData.value.id) {
     await dishStore.updateDish(formData.value.id, formData.value)
-    // Если мы поменяли название или КБЖУ, план тоже стоит обновить, чтобы цифры пересчитались
     await planStore.fetchPlan() 
   } else {
     await dishStore.addDish(formData.value)
@@ -113,12 +118,9 @@ const handleSave = async () => {
 }
 
 const handleDelete = async () => {
-    if(confirm('Вы уверены, что хотите удалить это блюдо? Это удалит его из всех дней плана!')) {
+    if(confirm('Удалить блюдо?')) {
         await dishStore.deleteDish(formData.value.id)
-        
-        // ВАЖНО: Обновляем план, чтобы убрать удаленное блюдо из сетки
         await planStore.fetchPlan()
-        
         emit('close')
     }
 }
@@ -130,6 +132,14 @@ const handleCancel = () => {
         formData.value = JSON.parse(JSON.stringify(props.dish))
     }
 }
+
+// Хелперы для отображения названий в режиме просмотра
+const getDishTypeName = computed(() => {
+    return dictionaries.getDishTypeById(formData.value.dish_type_id)?.name || '...'
+})
+const getMealTypeName = computed(() => {
+    return dictionaries.getMealTypeById(formData.value.meal_type_id)?.name || '...'
+})
 </script>
 
 <template>
@@ -164,17 +174,17 @@ const handleCancel = () => {
               <h2 class="text-2xl font-black text-slate-900 leading-tight mb-2">{{ formData.name }}</h2>
               <div class="flex flex-wrap justify-center gap-1.5">
                   <span class="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                      {{ formData.meal_type }}
+                      {{ getMealTypeName }}
                   </span>
                   <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-slate-200">
-                      {{ formData.dish_type }}
+                      {{ getDishTypeName }}
                   </span>
                   <span v-for="tag in formData.tags" :key="tag.id" class="px-2 py-1 bg-indigo-50 text-indigo-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
                       #{{ tag.name }}
                   </span>
               </div>
            </div>
-
+           
            <div class="grid grid-cols-4 gap-2">
               <div class="bg-orange-50 p-2 rounded-2xl border border-orange-100 flex flex-col items-center">
                   <span class="text-lg font-black text-orange-500">{{ formData.kcal || 0 }}</span>
@@ -212,7 +222,6 @@ const handleCancel = () => {
            </div>
         </div>
 
-
         <div v-else class="space-y-6 pb-20">
             
             <div class="space-y-1">
@@ -224,8 +233,8 @@ const handleCancel = () => {
                 <div class="space-y-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Тип блюда</label>
                     <div class="relative">
-                        <select v-model="formData.dish_type" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
-                            <option v-for="t in dictionaries.dishTypes" :key="t" :value="t">{{ t }}</option>
+                        <select v-model="formData.dish_type_id" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
+                            <option v-for="t in dictionaries.dishTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
                         <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>
                     </div>
@@ -234,8 +243,8 @@ const handleCancel = () => {
                 <div class="space-y-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Прием пищи</label>
                     <div class="relative">
-                        <select v-model="formData.meal_type" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
-                            <option v-for="t in dictionaries.mealTypes" :key="t" :value="t">{{ t }}</option>
+                        <select v-model="formData.meal_type_id" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
+                            <option v-for="t in dictionaries.mealTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
                         <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>
                     </div>
@@ -245,9 +254,6 @@ const handleCancel = () => {
             <div class="space-y-1">
                 <div class="flex justify-between items-center px-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Теги свойств</label>
-                    <button class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors">
-                        Настроить
-                    </button>
                 </div>
                 <div v-if="dictionaries.availableTags.length > 0" class="flex flex-wrap gap-2">
                     <button 
@@ -261,7 +267,7 @@ const handleCancel = () => {
                     </button>
                 </div>
                 <div v-else class="text-xs text-slate-400 italic pl-1">
-                    Тегов пока нет. Добавьте их в настройках.
+                    Тегов пока нет.
                 </div>
             </div>
 

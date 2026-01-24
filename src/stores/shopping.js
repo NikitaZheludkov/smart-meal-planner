@@ -4,78 +4,60 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 
 export const useShoppingStore = defineStore('shopping', () => {
-  // Храним ID купленных продуктов в Set для мгновенного доступа O(1)
   const checkedIds = ref(new Set())
   const loading = ref(false)
+  
+  // Кэшированный список, чтобы не тормозить UI
+  const shoppingListCache = ref([]) 
 
-  // Загрузка состояния из базы
   const fetchChecklist = async () => {
+    // RLS защищает данные, householdId не обязателен в фильтре, но нужен контекст
     const auth = useAuthStore()
-    if (!auth.householdId) return
+    if (!auth.user) return
 
     loading.value = true
-    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
     const { data, error } = await supabase
       .from('shopping_cart')
       .select('product_id')
-      .eq('household_id', auth.householdId)
       .eq('is_checked', true)
 
     if (error) {
-      console.error('Ошибка загрузки списка покупок:', error)
+      console.error('Ошибка списка покупок:', error)
     } else {
-      // Превращаем массив объектов [{product_id: 1}, {product_id: 2}] в Set(1, 2)
       checkedIds.value = new Set(data.map(item => item.product_id))
     }
     loading.value = false
   }
 
-  // Переключение галочки
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
-    if (!auth.householdId) return
+    
+    // Оптимистик UI
+    if (newState) checkedIds.value.add(productId)
+    else checkedIds.value.delete(productId)
 
-    // 1. Оптимистичное обновление интерфейса (мгновенно)
-    if (newState) {
-      checkedIds.value.add(productId)
-    } else {
-      checkedIds.value.delete(productId)
-    }
-
-    // 2. Отправка в базу
-    // ИСПРАВЛЕНО: используем shopping_cart согласно структуре БД
+    // Запись в базу
     const { error } = await supabase
       .from('shopping_cart')
       .upsert({ 
         household_id: auth.householdId, 
         product_id: productId, 
         is_checked: newState,
-        // user_id желательно тоже добавлять, если есть в таблице, но пока household критичнее
         updated_at: new Date()
-      }, { onConflict: 'household_id, product_id' }) // Уточняем конфликт, если нужно
+      }, { onConflict: 'household_id, product_id' })
 
-    if (error) console.error('Ошибка сохранения галочки:', error)
+    if (error) console.error('Ошибка сохранения:', error)
   }
 
-  // Проверка: куплен ли продукт?
-  const isChecked = (productId) => {
-    return checkedIds.value.has(productId)
-  }
-
-  // Сброс списка (например, начало новой недели)
   const clearList = async () => {
       const auth = useAuthStore()
-      if (!auth.householdId) return
-      
-      // Чистим локально
       checkedIds.value.clear()
-      
-      // Чистим в базе
-      await supabase
-          .from('shopping_cart')
-          .delete()
-          .eq('household_id', auth.householdId)
+      await supabase.from('shopping_cart').delete().neq('id', '00000000-0000-0000-0000-000000000000') 
+      // Примечание: RLS удалит только строки текущей семьи. 
+      // neq - это хак, чтобы Supabase не ругался на отсутствие WHERE, если `delete()` пустой.
   }
+  
+  const isChecked = (id) => checkedIds.value.has(id)
 
   return { 
     checkedIds, 
