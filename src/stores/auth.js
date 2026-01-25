@@ -40,17 +40,14 @@ export const useAuthStore = defineStore('auth', () => {
   const loginWithTelegram = async () => {
     const telegramStore = useTelegramStore()
     
-    // Если мы не в Телеграм (обычный браузер) — выходим, покажем экран-заглушку
+    // Если мы не в Телеграм (обычный браузер) — выходим
     if (!telegramStore.initData) {
-        console.log('Нет данных Telegram, пропускаем авто-вход')
         loading.value = false
         return
     }
 
     loading.value = true
     try {
-        console.log('🚀 Отправляем данные охраннику (Edge Function)...')
-        
         // 1. Вызываем нашу функцию telegram-auth
         const { data, error } = await supabase.functions.invoke('telegram-auth', {
             body: { initData: telegramStore.initData }
@@ -59,12 +56,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (error) throw error
         if (!data || !data.session) throw new Error('No session returned')
 
-        // 2. Устанавливаем сессию в Supabase (как будто ввели логин/пароль)
+        // 2. Устанавливаем сессию
         const { error: sessionError } = await supabase.auth.setSession(data.session)
         if (sessionError) throw sessionError
-
-        console.log('✅ Успешный вход через Telegram!')
-        // handleUserSession вызовется автоматически через onAuthStateChange
 
     } catch (e) {
         console.error('Ошибка входа через Telegram:', e)
@@ -76,22 +70,31 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Загрузка данных пользователя после входа
   const handleUserSession = async (authUser) => {
-    user.value = authUser
-    isAuth.value = true
-    
     try {
-        // Получаем ID семьи из профиля
+        // Пробуем получить профиль
         const { data, error } = await supabase
             .from('profiles')
             .select('household_id')
             .eq('id', authUser.id)
             .single()
             
-        if (data && data.household_id) {
-            householdId.value = data.household_id
+        // ВАЖНОЕ ИЗМЕНЕНИЕ:
+        // Если профиля нет (error) — значит база была сброшена, а юзер остался.
+        // Нужно принудительно разлогинить его, чтобы он зарегистрировался заново.
+        if (error || !data) {
+            console.warn('Профиль пользователя не найден (возможно, база была очищена). Выход...')
+            await signOut()
+            return
         }
+
+        // Если все ок — сохраняем данные
+        user.value = authUser
+        householdId.value = data.household_id
+        isAuth.value = true
+        
     } catch (e) {
-        console.error('Ошибка загрузки профиля:', e)
+        console.error('Критическая ошибка сессии:', e)
+        await signOut() 
     }
   }
 
@@ -104,28 +107,40 @@ export const useAuthStore = defineStore('auth', () => {
   const signOut = async () => {
     await supabase.auth.signOut()
     resetState()
-    window.location.reload()
+    // Не делаем reload, чтобы не зациклить, если что-то пойдет не так
   }
 
-  // Оставим функцию Dev Login на случай, если ты захочешь проверить что-то в браузере
-  // Но она больше не основная
   const loginAsTestUser = async () => {
     loading.value = true
     try {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email: 'dev@telegram.mini.app',
             password: 'dev-password-123'
         })
+        
         if (error) {
-             // Если юзера нет, создаем (старый код)
+             // Если юзера нет, создаем
              if (error.message.includes('Invalid login')) {
-                await supabase.auth.signUp({
+                // Создаем юзера. Благодаря триггеру в БД профиль создастся сам.
+                const { error: signUpError } = await supabase.auth.signUp({
                     email: 'dev@telegram.mini.app',
-                    password: 'dev-password-123'
+                    password: 'dev-password-123',
+                    options: {
+                        data: {
+                            first_name: 'Dev User',
+                            username: 'developer'
+                        }
+                    }
                 })
+                if (signUpError) throw signUpError
              } else throw error
         }
-    } catch(e) { console.error(e) } finally { loading.value = false }
+    } catch(e) { 
+        console.error(e)
+        alert('Ошибка входа: ' + e.message)
+    } finally { 
+        loading.value = false 
+    }
   }
 
   return { 
