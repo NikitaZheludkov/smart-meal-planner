@@ -13,7 +13,8 @@ const selectedPeriod = ref(7)
 const selectedPortions = ref(1)
 
 // Инициализация при открытии
-onMounted(() => {
+onMounted(async () => {
+    await settingsStore.fetchSettings()
     selectedStartDay.value = settingsStore.startDay
     selectedPeriod.value = settingsStore.periodLength
     selectedPortions.value = settingsStore.defaultPortions
@@ -23,36 +24,57 @@ onMounted(() => {
 const showJoinModal = ref(false)
 const joinCodeInput = ref('')
 const isGenerating = ref(false)
+const isJoining = ref(false)
 
+// ВАЖНО: Правильное вычисление владельца
 const isOwner = computed(() => {
-    return settingsStore.household?.owner_id === authStore.user?.id
+    if (!settingsStore.household || !authStore.user) return false
+    return settingsStore.household.owner_id === authStore.user.id
 })
 
 // Генерация кода
 const handleGenerateCode = async () => {
+    if (isGenerating.value) return
     isGenerating.value = true
     telegram.haptic.impact('medium')
-    await settingsStore.generateInviteCode()
-    isGenerating.value = false
+    try {
+        await settingsStore.generateInviteCode()
+    } catch (e) {
+        alert(e.message)
+    } finally {
+        isGenerating.value = false
+    }
 }
 
 // Вход по коду
 const handleJoin = async () => {
-    if (joinCodeInput.value.length < 6) return
+    if (!joinCodeInput.value) {
+        alert('Введите код')
+        return
+    }
+    
+    isJoining.value = true
+    telegram.haptic.notification('success')
+    
     try {
-        telegram.haptic.notification('success')
         await settingsStore.joinHousehold(joinCodeInput.value)
+        // После успеха страница перезагрузится сама
     } catch (e) {
         telegram.haptic.notification('error')
-        alert(e.message)
+        alert('Ошибка: ' + e.message)
+        isJoining.value = false
     }
 }
 
 // Выход из семьи
 const handleLeave = async () => {
-    if(confirm('Вы точно хотите покинуть эту семью и создать новую пустую?')) {
+    if(confirm('Вернуться в свою личную семью?')) {
         telegram.haptic.impact('heavy')
-        await settingsStore.leaveHousehold()
+        try {
+            await settingsStore.leaveHousehold()
+        } catch (e) {
+            alert(e.message)
+        }
     }
 }
 
@@ -70,6 +92,7 @@ const handleSave = async () => {
       setTimeout(() => { saveButtonText.value = 'Сохранить изменения' }, 2000)
   } catch (e) {
       saveButtonText.value = 'Ошибка'
+      alert(e.message)
   } finally {
       isSaving.value = false
   }
@@ -79,6 +102,7 @@ const handleLogout = async () => {
     telegram.haptic.impact('medium')
     if (confirm('Выйти из аккаунта?')) {
         await authStore.signOut()
+        window.location.reload()
     }
 }
 
@@ -112,11 +136,15 @@ const periods = [
       <div>
         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Совместный доступ</h3>
         
-        <div class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
+        <div v-if="settingsStore.loading" class="text-center py-4">
+            <span class="material-icons-round animate-spin text-slate-300">sync</span>
+        </div>
+
+        <div v-else class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
             
             <div>
                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-2">Участники</div>
-                <div class="flex -space-x-2 overflow-hidden py-1">
+                <div class="flex -space-x-2 overflow-hidden py-1 pl-2">
                     <div 
                         v-for="member in settingsStore.familyMembers" 
                         :key="member.id"
@@ -126,6 +154,9 @@ const periods = [
                         <span v-else>👤</span>
                     </div>
                 </div>
+                <div v-if="settingsStore.household" class="mt-2 text-xs text-slate-500 font-bold">
+                    {{ settingsStore.household.name }}
+                </div>
             </div>
 
             <div class="h-[1px] bg-slate-50 w-full"></div>
@@ -133,10 +164,10 @@ const periods = [
             <div v-if="isOwner">
                 <div v-if="settingsStore.household?.invite_code">
                     <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код приглашения</div>
-                    <div class="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 text-center relative overflow-hidden group" @click="telegram.haptic.selection()">
+                    <div class="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 text-center relative overflow-hidden group active:scale-95 transition-transform" @click="telegram.haptic.selection()">
                         <div class="text-3xl font-black text-indigo-600 tracking-[0.2em]">{{ settingsStore.household.invite_code }}</div>
                     </div>
-                    <button @click="handleGenerateCode" class="w-full mt-2 text-xs font-bold text-slate-400 py-2">
+                    <button @click="handleGenerateCode" class="w-full mt-2 text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
                         {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
                     </button>
                 </div>
@@ -144,9 +175,9 @@ const periods = [
                 <button 
                     v-else 
                     @click="handleGenerateCode"
-                    class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs tap-effect"
+                    class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs tap-effect shadow-lg shadow-slate-900/20"
                 >
-                    Получить код приглашения
+                    {{ isGenerating ? 'Создаем...' : 'Получить код приглашения' }}
                 </button>
             </div>
 
@@ -160,9 +191,9 @@ const periods = [
             </div>
 
             <button 
-                v-if="isOwner && settingsStore.familyMembers.length === 1" 
+                v-if="isOwner" 
                 @click="showJoinModal = true"
-                class="w-full py-3 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs tap-effect"
+                class="w-full py-3 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs tap-effect hover:bg-slate-50 transition-colors"
             >
                 Ввести код другой семьи
             </button>
@@ -235,11 +266,19 @@ const periods = [
             <input 
                 v-model="joinCodeInput" 
                 placeholder="Например: 123456" 
-                class="w-full text-center text-2xl tracking-widest font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4"
+                type="tel"
+                class="w-full text-center text-2xl tracking-widest font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4 text-slate-900"
                 maxlength="6"
             >
-            <button @click="handleJoin" class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2">Присоединиться</button>
-            <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs">Отмена</button>
+            <button 
+                @click="handleJoin" 
+                :disabled="isJoining"
+                class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2 disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+                <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
+                {{ isJoining ? 'Входим...' : 'Присоединиться' }}
+            </button>
+            <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs tap-effect">Отмена</button>
         </div>
     </div>
 
