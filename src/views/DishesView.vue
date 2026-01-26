@@ -6,7 +6,7 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import { useTelegramStore } from '../stores/telegram'
 import DishDetailModal from '../components/DishDetailModal.vue'
-import DishFilterModal from '../components/DishFilterModal.vue' // <-- Импорт
+import DishFilterModal from '../components/DishFilterModal.vue'
 
 const dishStore = useDishStore()
 const productStore = useProductStore()
@@ -74,12 +74,10 @@ const filteredDishes = computed(() => {
     result = result.filter(d => d.dish_type_id === uiStore.dishes.activeCategory)
   }
 
-  // 4. ТЕГИ (Множественный выбор, логика AND - должны совпасть ВСЕ выбранные)
+  // 4. ТЕГИ (Множественный выбор, логика AND)
   if (uiStore.dishes.filterTags.length > 0) {
       result = result.filter(dish => {
-          // Получаем ID тегов этого блюда
           const dishTagIds = dish.tags.map(t => t.id)
-          // Проверяем, содержит ли блюдо ВСЕ выбранные фильтры
           return uiStore.dishes.filterTags.every(tagId => dishTagIds.includes(tagId))
       })
   }
@@ -87,7 +85,6 @@ const filteredDishes = computed(() => {
   return result
 })
 
-// Переключатели с вибрацией
 const setCategory = (id) => {
     if(uiStore.dishes.activeCategory !== id) {
         telegram.haptic.selection()
@@ -214,7 +211,7 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="fixed bottom-24 right-5 z-30">
+    <div class="fixed bottom-32 right-5 z-[60]">
       <button 
         @click="openCreateDish" 
         class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"
