@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 
 export const useSettingsStore = defineStore('settings', () => {
+  // Настройки теперь общие для семьи
   const startDay = ref(1) 
   const periodLength = ref(7)
   const defaultPortions = ref(1)
@@ -18,24 +19,18 @@ export const useSettingsStore = defineStore('settings', () => {
 
     loading.value = true
     try {
-      // 1. Грузим настройки профиля
-      const { data: profile, error } = await supabase
+      // 1. Узнаем ID семьи пользователя из профиля
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('start_day, period_length, default_portions, household_id')
+        .select('household_id')
         .eq('id', auth.user.id)
         .single()
 
-      if (error) throw error
+      if (profileError) throw profileError
 
-      if (profile) {
-        startDay.value = profile.start_day ?? 1
-        periodLength.value = profile.period_length ?? 7
-        defaultPortions.value = profile.default_portions ?? 1
-        
-        // 2. ОБЯЗАТЕЛЬНО грузим семью, если она есть
-        if (profile.household_id) {
-            await fetchHouseholdDetails(profile.household_id)
-        }
+      if (profile?.household_id) {
+          // 2. Загружаем данные СЕМЬИ (включая настройки)
+          await fetchHouseholdDetails(profile.household_id)
       }
     } catch (e) { 
         console.error('Ошибка загрузки настроек:', e) 
@@ -45,7 +40,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
   
   const fetchHouseholdDetails = async (householdId) => {
-      // Данные семьи
+      // Данные семьи + НАСТРОЙКИ
       const { data: hhData, error: hhError } = await supabase
           .from('households')
           .select('*')
@@ -54,9 +49,13 @@ export const useSettingsStore = defineStore('settings', () => {
       
       if (!hhError && hhData) {
           household.value = hhData
+          // Применяем настройки из базы в приложение
+          startDay.value = hhData.start_day ?? 1
+          periodLength.value = hhData.period_length ?? 7
+          defaultPortions.value = hhData.default_portions ?? 1
       }
       
-      // Участники
+      // Участники семьи
       const { data: members } = await supabase
           .from('profiles')
           .select('id, first_name, username, avatar_url, telegram_id')
@@ -65,17 +64,26 @@ export const useSettingsStore = defineStore('settings', () => {
       familyMembers.value = members || []
   }
 
+  // Сохранение настроек (ОБНОВЛЕНО: пишет в households)
   const saveSettings = async (day, period, portions) => {
-    const auth = useAuthStore()
+    // 1. Мгновенно обновляем локальный стейт (Optimistic UI)
     startDay.value = day
     periodLength.value = period
     defaultPortions.value = portions
     
-    await supabase.from('profiles').update({ 
-        start_day: day, 
-        period_length: period, 
-        default_portions: portions 
-    }).eq('id', auth.user.id)
+    // 2. Если есть семья, сохраняем в базу
+    if (household.value?.id) {
+        const { error } = await supabase
+            .from('households')
+            .update({ 
+                start_day: day, 
+                period_length: period, 
+                default_portions: portions 
+            })
+            .eq('id', household.value.id)
+
+        if (error) console.error('Ошибка сохранения настроек:', error)
+    }
   }
 
   // --- ЛОГИКА СОВМЕСТНОГО ДОСТУПА ---
@@ -83,7 +91,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const generateInviteCode = async () => {
       if (!household.value) throw new Error('Семья не найдена')
 
-      // Генерируем код
       const code = Math.floor(100000 + Math.random() * 900000).toString()
       
       const { data, error } = await supabase
@@ -94,7 +101,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .single()
           
       if (error) throw error
-      if (data) household.value = data
+      if (data) household.value = data // Обновляем локально, чтобы отобразить код
   }
 
   const joinHousehold = async (code) => {
@@ -109,9 +116,9 @@ export const useSettingsStore = defineStore('settings', () => {
           .eq('invite_code', code)
           .single()
           
-      if (error || !targetHousehold) throw new Error('Неверный код приглашения или семья не найдена')
+      if (error || !targetHousehold) throw new Error('Неверный код или семья не найдена')
 
-      // 2. Меняем ID в профиле
+      // 2. Меняем ID в профиле пользователя
       const { error: updateError } = await supabase
           .from('profiles')
           .update({ household_id: targetHousehold.id })
@@ -119,14 +126,14 @@ export const useSettingsStore = defineStore('settings', () => {
           
       if (updateError) throw updateError
       
-      // 3. Перезагрузка страницы
+      // 3. Перезагрузка для применения изменений
       window.location.reload()
   }
 
   const leaveHousehold = async () => {
       const auth = useAuthStore()
       
-      // 1. Ищем родную семью (где user = owner)
+      // 1. Ищем "родную" семью (где пользователь владелец)
       const { data: myOwnHousehold } = await supabase
           .from('households')
           .select('id')
@@ -134,7 +141,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .single()
           
       if (!myOwnHousehold) {
-          // Если родной семьи нет (редкий случай), создаем её
+          // Если своей семьи нет, создаем новую
           const { data: newHousehold } = await supabase
               .from('households')
               .insert({ name: 'Моя семья', owner_id: auth.user.id })
@@ -146,10 +153,10 @@ export const useSettingsStore = defineStore('settings', () => {
                 window.location.reload()
                 return
            }
-           throw new Error('Не удалось покинуть семью')
+           throw new Error('Не удалось создать новую семью')
       }
 
-      // 2. Переключаемся
+      // 2. Переключаемся на родную семью
       await supabase
           .from('profiles')
           .update({ household_id: myOwnHousehold.id })

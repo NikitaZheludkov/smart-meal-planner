@@ -1899,164 +1899,6 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
 })
 </file>
 
-<file path="src/stores/settings.js">
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from './auth'
-
-export const useSettingsStore = defineStore('settings', () => {
-  // Настройки отображения
-  const startDay = ref(1) 
-  const periodLength = ref(7)
-  const defaultPortions = ref(1)
-  
-  // Данные семьи
-  const household = ref(null)      // Информация о семье (id, invite_code)
-  const familyMembers = ref([])    // Список участников
-  
-  // --- ЗАГРУЗКА ---
-  const fetchSettings = async () => {
-    const auth = useAuthStore()
-    if (!auth.user) return
-
-    try {
-      // 1. Грузим настройки профиля
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('start_day, period_length, default_portions, household_id')
-        .eq('id', auth.user.id)
-        .single()
-
-      if (error) throw error
-
-      if (profile) {
-        if (profile.start_day !== null) startDay.value = profile.start_day
-        if (profile.period_length !== null) periodLength.value = profile.period_length
-        if (profile.default_portions !== null) defaultPortions.value = profile.default_portions
-        
-        // 2. Если есть семья - грузим её данные
-        if (profile.household_id) {
-            await fetchHouseholdDetails(profile.household_id)
-        }
-      }
-    } catch (e) {
-      console.error('Ошибка настроек:', e)
-    }
-  }
-  
-  // Загрузка деталей семьи и участников
-  const fetchHouseholdDetails = async (householdId) => {
-      // Инфо о семье (код приглашения)
-      const { data: hhData } = await supabase
-          .from('households')
-          .select('*')
-          .eq('id', householdId)
-          .single()
-      
-      household.value = hhData
-      
-      // Участники
-      const { data: members } = await supabase
-          .from('profiles')
-          .select('id, first_name, username, avatar_url, telegram_id')
-          .eq('household_id', householdId)
-      
-      familyMembers.value = members || []
-  }
-
-  // --- СОХРАНЕНИЕ НАСТРОЕК ---
-  const saveSettings = async (day, period, portions) => {
-    const auth = useAuthStore()
-    if (!auth.user) return
-
-    const updates = { start_day: day, period_length: period, default_portions: portions }
-    
-    // Оптимистичное обновление
-    startDay.value = day
-    periodLength.value = period
-    defaultPortions.value = portions
-
-    await supabase.from('profiles').update(updates).eq('id', auth.user.id)
-  }
-
-  // --- УПРАВЛЕНИЕ СЕМЬЕЙ ---
-
-  // 1. Сгенерировать код приглашения (Только владелец)
-  const generateInviteCode = async () => {
-      // Генерируем 6 цифр
-      const code = Math.floor(100000 + Math.random() * 900000).toString()
-      
-      const { data, error } = await supabase
-          .from('households')
-          .update({ invite_code: code })
-          .eq('id', household.value.id)
-          .select()
-          .single()
-          
-      if (data) household.value = data
-      return error
-  }
-
-  // 2. Войти в семью по коду
-  const joinHousehold = async (code) => {
-      const auth = useAuthStore()
-      
-      // Ищем семью с таким кодом
-      const { data: targetHousehold, error: findError } = await supabase
-          .from('households')
-          .select('id')
-          .eq('invite_code', code)
-          .single()
-          
-      if (findError || !targetHousehold) throw new Error('Неверный код')
-
-      // Обновляем профиль пользователя
-      const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ household_id: targetHousehold.id })
-          .eq('id', auth.user.id)
-          
-      if (updateError) throw updateError
-      
-      // Перезагружаем страницу, чтобы подтянулись новые данные (план, продукты)
-      window.location.reload()
-  }
-
-  // 3. Покинуть семью (вернуться в личную)
-  const leaveHousehold = async () => {
-      const auth = useAuthStore()
-      
-      // Мы просто создаем новую семью через тот же механизм, что при регистрации
-      // Но так как у нас нет готовой функции "reset household", 
-      // мы сделаем хитро: вызовем Edge Function или просто создадим новую запись
-      
-      // Простой вариант: Создаем новую семью и переезжаем в нее
-      const { data: newHousehold } = await supabase
-          .from('households')
-          .insert({ name: 'Моя семья', owner_id: auth.user.id })
-          .select()
-          .single()
-          
-      if (newHousehold) {
-          await supabase
-              .from('profiles')
-              .update({ household_id: newHousehold.id })
-              .eq('id', auth.user.id)
-          
-          window.location.reload()
-      }
-  }
-
-  return { 
-      startDay, periodLength, defaultPortions, 
-      household, familyMembers,
-      fetchSettings, saveSettings,
-      generateInviteCode, joinHousehold, leaveHousehold
-  }
-})
-</file>
-
 <file path="src/stores/shopping.js">
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -2256,256 +2098,6 @@ onMounted(async () => {
         @close="showProductModal = false" 
     />
     
-  </div>
-</template>
-</file>
-
-<file path="src/views/SettingsView.vue">
-<script setup>
-import { onMounted, ref, computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useSettingsStore } from '../stores/settings'
-import { useTelegramStore } from '../stores/telegram'
-
-const authStore = useAuthStore()
-const settingsStore = useSettingsStore()
-const telegram = useTelegramStore()
-
-const selectedStartDay = ref(1)
-const selectedPeriod = ref(7)
-const selectedPortions = ref(1)
-
-// Инициализация при открытии
-onMounted(() => {
-    selectedStartDay.value = settingsStore.startDay
-    selectedPeriod.value = settingsStore.periodLength
-    selectedPortions.value = settingsStore.defaultPortions
-})
-
-// --- ЛОГИКА СЕМЬИ ---
-const showJoinModal = ref(false)
-const joinCodeInput = ref('')
-const isGenerating = ref(false)
-
-const isOwner = computed(() => {
-    return settingsStore.household?.owner_id === authStore.user?.id
-})
-
-// Генерация кода
-const handleGenerateCode = async () => {
-    isGenerating.value = true
-    telegram.haptic.impact('medium')
-    await settingsStore.generateInviteCode()
-    isGenerating.value = false
-}
-
-// Вход по коду
-const handleJoin = async () => {
-    if (joinCodeInput.value.length < 6) return
-    try {
-        telegram.haptic.notification('success')
-        await settingsStore.joinHousehold(joinCodeInput.value)
-    } catch (e) {
-        telegram.haptic.notification('error')
-        alert(e.message)
-    }
-}
-
-// Выход из семьи
-const handleLeave = async () => {
-    if(confirm('Вы точно хотите покинуть эту семью и создать новую пустую?')) {
-        telegram.haptic.impact('heavy')
-        await settingsStore.leaveHousehold()
-    }
-}
-
-// Сохранение настроек
-const isSaving = ref(false)
-const saveButtonText = ref('Сохранить изменения')
-
-const handleSave = async () => {
-  isSaving.value = true
-  saveButtonText.value = 'Сохраняем...'
-  try {
-      await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
-      saveButtonText.value = 'Успешно!'
-      telegram.haptic.notification('success')
-      setTimeout(() => { saveButtonText.value = 'Сохранить изменения' }, 2000)
-  } catch (e) {
-      saveButtonText.value = 'Ошибка'
-  } finally {
-      isSaving.value = false
-  }
-}
-
-const handleLogout = async () => {
-    telegram.haptic.impact('medium')
-    if (confirm('Выйти из аккаунта?')) {
-        await authStore.signOut()
-    }
-}
-
-// Опции для селектов
-const weekDays = [
-  { val: 1, label: 'Понедельник' }, { val: 2, label: 'Вторник' }, { val: 3, label: 'Среда' },
-  { val: 4, label: 'Четверг' }, { val: 5, label: 'Пятница' }, { val: 6, label: 'Суббота' }, { val: 0, label: 'Воскресенье' }
-]
-const periods = [
-  { val: 3, label: '3 дня' }, { val: 7, label: 'Неделя (7 дней)' }, { val: 14, label: '2 Недели' }
-]
-</script>
-
-<template>
-  <div class="h-full flex flex-col bg-slate-50 relative">
-    
-    <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
-      <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
-      <div class="flex items-center gap-2 mt-2">
-          <div v-if="authStore.user?.user_metadata?.avatar_url" class="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
-              <img :src="authStore.user.user_metadata.avatar_url" class="w-full h-full object-cover">
-          </div>
-          <p class="text-sm font-bold text-slate-400">
-              {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
-          </p>
-      </div>
-    </div>
-
-    <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-32">
-      
-      <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Совместный доступ</h3>
-        
-        <div class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
-            
-            <div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-2">Участники</div>
-                <div class="flex -space-x-2 overflow-hidden py-1">
-                    <div 
-                        v-for="member in settingsStore.familyMembers" 
-                        :key="member.id"
-                        class="inline-block h-10 w-10 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-lg relative"
-                    >
-                        <img v-if="member.avatar_url" :src="member.avatar_url" class="w-full h-full rounded-full object-cover">
-                        <span v-else>👤</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="h-[1px] bg-slate-50 w-full"></div>
-
-            <div v-if="isOwner">
-                <div v-if="settingsStore.household?.invite_code">
-                    <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код приглашения</div>
-                    <div class="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 text-center relative overflow-hidden group" @click="telegram.haptic.selection()">
-                        <div class="text-3xl font-black text-indigo-600 tracking-[0.2em]">{{ settingsStore.household.invite_code }}</div>
-                    </div>
-                    <button @click="handleGenerateCode" class="w-full mt-2 text-xs font-bold text-slate-400 py-2">
-                        {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
-                    </button>
-                </div>
-                
-                <button 
-                    v-else 
-                    @click="handleGenerateCode"
-                    class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs tap-effect"
-                >
-                    Получить код приглашения
-                </button>
-            </div>
-
-            <div v-else>
-                 <button 
-                    @click="handleLeave"
-                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl font-bold text-xs tap-effect"
-                >
-                    Покинуть семью
-                </button>
-            </div>
-
-            <button 
-                v-if="isOwner && settingsStore.familyMembers.length === 1" 
-                @click="showJoinModal = true"
-                class="w-full py-3 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs tap-effect"
-            >
-                Ввести код другой семьи
-            </button>
-
-        </div>
-      </div>
-
-      <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Вид Планировщика</h3>
-        <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Начало недели</span>
-            <select v-model="selectedStartDay" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
-              <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
-            </select>
-          </div>
-          
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Период</span>
-            <select v-model="selectedPeriod" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
-              <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
-            </select>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Порции (по умолч.)</span>
-            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
-                <button @click="selectedPortions = Math.max(1, selectedPortions - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
-                  <span class="material-icons-round text-sm">remove</span>
-                </button>
-                <span class="w-8 text-center font-black text-slate-800 text-sm">{{ selectedPortions }}</span>
-                 <button @click="selectedPortions++" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
-                  <span class="material-icons-round text-sm">add</span>
-                 </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Аккаунт</h3>
-        <button 
-          @click="handleLogout" 
-          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-between tap-effect"
-        >
-          <div class="flex items-center gap-3">
-             <span class="material-icons-round text-red-400">logout</span>
-             <span class="font-bold text-slate-900 text-sm">Выйти</span>
-          </div>
-        </button>
-      </div>
-
-    </div>
-
-    <div class="absolute bottom-20 left-0 right-0 p-5 z-20 pointer-events-none">
-        <button 
-            @click="handleSave"
-            :disabled="isSaving"
-            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2 pointer-events-auto"
-             :class="saveButtonText === 'Успешно!' ? 'bg-green-500' : 'bg-slate-900'"
-        >
-            <span v-if="isSaving" class="material-icons-round animate-spin text-sm">sync</span>
-            {{ saveButtonText }}
-        </button>
-    </div>
-
-    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showJoinModal = false">
-        <div class="bg-white w-full max-w-xs rounded-[32px] p-6 animate-bounce-slow">
-            <h3 class="text-xl font-black text-slate-900 text-center mb-4">Ввод кода</h3>
-            <input 
-                v-model="joinCodeInput" 
-                placeholder="Например: 123456" 
-                class="w-full text-center text-2xl tracking-widest font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4"
-                maxlength="6"
-            >
-            <button @click="handleJoin" class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2">Присоединиться</button>
-            <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs">Отмена</button>
-        </div>
-    </div>
-
   </div>
 </template>
 </file>
@@ -2953,274 +2545,6 @@ onMounted(async () => {
 </style>
 </file>
 
-<file path="src/stores/auth.js">
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
-import { useTelegramStore } from './telegram'
-
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
-  const householdId = ref(null)
-  const isAuth = ref(false)
-  const loading = ref(true)
-
-  // Инициализация (проверка текущей сессии при перезагрузке)
-  const init = async () => {
-    loading.value = true
-    
-    // Проверяем, есть ли активная сессия в LocalStorage
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (session?.user) {
-      await handleUserSession(session.user)
-    } else {
-      // Если сессии нет - пробуем войти через Telegram (если мы внутри ТГ)
-      await loginWithTelegram()
-    }
-    
-    // Слушаем изменения (вдруг разлогинится)
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await handleUserSession(session.user)
-      } else {
-        resetState()
-      }
-      loading.value = false
-    })
-    
-    loading.value = false
-  }
-
-  // Главная функция входа через Telegram
-  const loginWithTelegram = async () => {
-    const telegramStore = useTelegramStore()
-    
-    // Если мы не в Телеграм (обычный браузер) — выходим, покажем экран-заглушку
-    if (!telegramStore.initData) {
-        console.log('Нет данных Telegram, пропускаем авто-вход')
-        loading.value = false
-        return
-    }
-
-    loading.value = true
-    try {
-        console.log('🚀 Отправляем данные охраннику (Edge Function)...')
-        
-        // 1. Вызываем нашу функцию telegram-auth
-        const { data, error } = await supabase.functions.invoke('telegram-auth', {
-            body: { initData: telegramStore.initData }
-        })
-
-        if (error) throw error
-        if (!data || !data.session) throw new Error('No session returned')
-
-        // 2. Устанавливаем сессию в Supabase (как будто ввели логин/пароль)
-        const { error: sessionError } = await supabase.auth.setSession(data.session)
-        if (sessionError) throw sessionError
-
-        console.log('✅ Успешный вход через Telegram!')
-        // handleUserSession вызовется автоматически через onAuthStateChange
-
-    } catch (e) {
-        console.error('Ошибка входа через Telegram:', e)
-        resetState()
-    } finally {
-        loading.value = false
-    }
-  }
-
-  // Загрузка данных пользователя после входа
-  const handleUserSession = async (authUser) => {
-    user.value = authUser
-    isAuth.value = true
-    
-    try {
-        // Получаем ID семьи из профиля
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('household_id')
-            .eq('id', authUser.id)
-            .single()
-            
-        if (data && data.household_id) {
-            householdId.value = data.household_id
-        }
-    } catch (e) {
-        console.error('Ошибка загрузки профиля:', e)
-    }
-  }
-
-  const resetState = () => {
-    user.value = null
-    householdId.value = null
-    isAuth.value = false
-  }
-
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    resetState()
-    window.location.reload()
-  }
-
-  // Оставим функцию Dev Login на случай, если ты захочешь проверить что-то в браузере
-  // Но она больше не основная
-  const loginAsTestUser = async () => {
-    loading.value = true
-    try {
-        const { error } = await supabase.auth.signInWithPassword({
-            email: 'dev@telegram.mini.app',
-            password: 'dev-password-123'
-        })
-        if (error) {
-             // Если юзера нет, создаем (старый код)
-             if (error.message.includes('Invalid login')) {
-                await supabase.auth.signUp({
-                    email: 'dev@telegram.mini.app',
-                    password: 'dev-password-123'
-                })
-             } else throw error
-        }
-    } catch(e) { console.error(e) } finally { loading.value = false }
-  }
-
-  return { 
-    user, 
-    householdId, 
-    isAuth, 
-    loading, 
-    init, 
-    loginWithTelegram,
-    loginAsTestUser,
-    signOut
-  }
-})
-</file>
-
-<file path="src/stores/plan.js">
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from './auth'
-
-export const usePlanStore = defineStore('plan', () => {
-  const plan = ref([])
-  const loading = ref(false)
-
-  const fetchPlan = async () => {
-    const auth = useAuthStore()
-    if (!auth.householdId) return
-
-    // ТИХАЯ ЗАГРУЗКА: Если данные уже есть, не включаем главный спиннер,
-    // просто обновляем данные в фоне.
-    const isFirstLoad = plan.value.length === 0
-    if (isFirstLoad) loading.value = true
-    
-    try {
-        const { data, error } = await supabase
-        .from('plan')
-        .select(`
-            *,
-            meal_types (id, name), 
-            dishes (
-                *,
-                ingredients (
-                    product_id, amount,
-                    products ( * )
-                )
-            ),
-            products ( * )
-        `)
-        .eq('household_id', auth.householdId)
-        
-        if (error) throw error
-        
-        plan.value = data.map(item => ({
-            ...item,
-            slot: item.meal_types?.name || 'Неизвестно',
-            slot_id: item.meal_type_id
-        })) || []
-
-    } catch (e) {
-        console.error('Ошибка загрузки плана:', e)
-    } finally {
-        // ГАРАНТИЯ: Выключаем спиннер в любом случае
-        loading.value = false
-    }
-  }
-
-  const addToPlan = async (date, slotId, item) => {
-    const auth = useAuthStore()
-    
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-    // Сначала смотрим, передали ли нам порции явно (item.portions из настроек)
-    // Если нет, ищем amount (если это ингредиент)
-    // Если ничего нет — ставим 1
-    const finalPortions = item.portions || item.amount || 1
-
-    const payload = {
-      date,
-      meal_type_id: slotId,
-      slot: 'legacy', 
-      household_id: auth.householdId,
-      ignore_shopping: item.ignore_shopping || false,
-      portions: finalPortions // Используем правильное число
-    }
-
-    if (item.type === 'dish') {
-      payload.dish_id = item.id
-    } else {
-      payload.product_id = item.id
-    }
-    // -------------------------
-
-    const tempItem = { ...payload, id: 'temp_' + Date.now() }
-    if (item.type === 'dish') tempItem.dishes = item
-    else tempItem.products = item
-    
-    plan.value.push(tempItem)
-
-    const { error } = await supabase
-        .from('plan')
-        .insert(payload)
-        .select()
-        .single()
-        
-    if (error) {
-        console.error('Ошибка сохранения:', error)
-        plan.value = plan.value.filter(i => i.id !== tempItem.id)
-    } else {
-        await fetchPlan()
-    }
-  }
-
-  const updatePlanItem = async (id, updates) => {
-    const index = plan.value.findIndex(i => i.id === id)
-    if (index !== -1) {
-        plan.value[index] = { ...plan.value[index], ...updates }
-    }
-
-    const { error } = await supabase
-      .from('plan')
-      .update(updates)
-      .eq('id', id)
-
-    if (error) {
-        console.error('Ошибка обновления:', error)
-        await fetchPlan()
-    }
-  }
-
-  const removeFromPlan = async (id) => {
-    plan.value = plan.value.filter(i => i.id !== id)
-    const { error } = await supabase.from('plan').delete().eq('id', id)
-    if (error) await fetchPlan()
-  }
-
-  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }
-})
-</file>
-
 <file path="src/stores/products.js">
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -3331,247 +2655,6 @@ export const useProductStore = defineStore('products', () => {
     updateProduct
   }
 })
-</file>
-
-<file path="src/views/DishesView.vue">
-<script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useDishStore } from '../stores/dishes'
-import { useProductStore } from '../stores/products'
-import { useDictionariesStore } from '../stores/dictionaries'
-import { useUIStore } from '../stores/ui'
-import { useTelegramStore } from '../stores/telegram'
-import DishDetailModal from '../components/DishDetailModal.vue'
-import DishFilterModal from '../components/DishFilterModal.vue' // <-- Импорт
-
-const dishStore = useDishStore()
-const productStore = useProductStore()
-const dictionaries = useDictionariesStore()
-const uiStore = useUIStore()
-const telegram = useTelegramStore()
-
-// Справочники для фильтров
-const dishCategories = computed(() => dictionaries.dishTypes)
-const mealTypes = computed(() => dictionaries.mealTypes)
-
-// Состояние модалок
-const showDetailModal = ref(false)
-const showFilterModal = ref(false)
-const viewingDish = ref(null)
-
-const openDish = (dish) => {
-  viewingDish.value = dish
-  showDetailModal.value = true
-}
-
-const openCreateDish = () => {
-  viewingDish.value = {
-      id: null, 
-      name: '',
-      dish_type_id: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
-      meal_type_id: uiStore.dishes.activeTag || dictionaries.mealTypes[1]?.id, 
-      kcal: null, protein: null, fat: null, carbs: null,
-      tags: [],
-      ingredients: []
-  }
-  showDetailModal.value = true
-}
-
-const openFilters = () => {
-    telegram.haptic.impact('light')
-    showFilterModal.value = true
-}
-
-onMounted(async () => {
-  const promises = []
-  if (dishStore.dishes.length === 0) promises.push(dishStore.fetchDishes())
-  if (productStore.products.length === 0) promises.push(productStore.fetchProducts())
-  promises.push(dictionaries.fetchDictionaries())
-  await Promise.all(promises)
-})
-
-// --- ЛОГИКА ФИЛЬТРАЦИИ ---
-const filteredDishes = computed(() => {
-  let result = dishStore.dishes
-  
-  // 1. Поиск (самый приоритетный)
-  if (uiStore.dishes.searchQuery) {
-    const q = uiStore.dishes.searchQuery.toLowerCase()
-    result = result.filter(d => d.name.toLowerCase().includes(q))
-  }
-
-  // 2. Прием пищи (Завтрак/Обед...)
-  if (uiStore.dishes.activeTag) {
-    result = result.filter(d => d.meal_type_id === uiStore.dishes.activeTag)
-  }
-
-  // 3. Категория (Суп/Второе...)
-  if (uiStore.dishes.activeCategory !== 'all') {
-    result = result.filter(d => d.dish_type_id === uiStore.dishes.activeCategory)
-  }
-
-  // 4. ТЕГИ (Множественный выбор, логика AND - должны совпасть ВСЕ выбранные)
-  if (uiStore.dishes.filterTags.length > 0) {
-      result = result.filter(dish => {
-          // Получаем ID тегов этого блюда
-          const dishTagIds = dish.tags.map(t => t.id)
-          // Проверяем, содержит ли блюдо ВСЕ выбранные фильтры
-          return uiStore.dishes.filterTags.every(tagId => dishTagIds.includes(tagId))
-      })
-  }
-  
-  return result
-})
-
-// Переключатели с вибрацией
-const setCategory = (id) => {
-    if(uiStore.dishes.activeCategory !== id) {
-        telegram.haptic.selection()
-        uiStore.dishes.activeCategory = id
-    }
-}
-
-const setMealType = (id) => {
-    if(uiStore.dishes.activeTag !== id) {
-        telegram.haptic.selection()
-        uiStore.dishes.activeTag = id
-    }
-}
-</script>
-
-<template>
-  <div class="h-full flex flex-col bg-slate-50">
-    
-    <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20 shadow-sm border-b border-slate-100">
-      <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Блюда</h1>
-      
-      <div class="flex gap-2 mb-4">
-          <div class="relative flex-1">
-            <span class="material-icons-round absolute left-3.5 top-3.5 text-slate-400">search</span>
-            <input 
-              v-model="uiStore.dishes.searchQuery" 
-              type="text" 
-              placeholder="Название..." 
-              class="w-full pl-10 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
-            >
-          </div>
-          
-          <button 
-            @click="openFilters"
-            class="w-14 h-full bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center relative tap-effect"
-          >
-             <span class="material-icons-round text-slate-700">tune</span>
-             <div v-if="uiStore.dishes.filterTags.length > 0" class="absolute top-3 right-3 w-2.5 h-2.5 bg-indigo-500 rounded-full border border-white"></div>
-          </button>
-      </div>
-      
-      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-3 mb-1">
-        <button 
-          @click="setMealType(null)" 
-          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
-          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-200'"
-        >
-          Все
-        </button>
-
-        <button 
-          v-for="type in mealTypes" 
-          :key="type.id" 
-          @click="setMealType(type.id)" 
-          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
-          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
-        >
-            {{ type.name }}
-        </button>
-      </div>
-
-      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-2">
-        <button 
-          @click="setCategory('all')" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-all tap-effect border" 
-          :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300' : 'bg-slate-50 text-slate-400 border-slate-100'"
-        >
-            Все типы
-        </button>
-
-        <button 
-          v-for="cat in dishCategories" 
-          :key="cat.id" 
-          @click="setCategory(cat.id)" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-all tap-effect border" 
-          :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
-        >
-            {{ cat.name }}
-        </button>
-      </div>
-    </div>
-
-    <div class="flex-1 overflow-y-auto px-5 pb-32 space-y-3 pt-4">
-      
-      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
-        <div class="text-5xl mb-2">🍳</div>
-        <p class="font-bold text-slate-400">Ничего не найдено</p>
-        <p v-if="uiStore.dishes.filterTags.length > 0" class="text-xs text-slate-300 mt-1">Попробуйте сбросить теги</p>
-      </div>
-
-      <div 
-        v-for="dish in filteredDishes" 
-        :key="dish.id" 
-        @click="openDish(dish)" 
-        class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group"
-      >
-        <div class="flex justify-between items-start">
-          <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
-          <span class="text-[9px] font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-slate-100">
-              {{ dish.dish_type_name }}
-          </span>
-        </div>
-        
-        <div class="flex flex-wrap gap-1 mt-1">
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
-               {{ dish.meal_type_name }}
-            </span>
-            <span 
-                v-for="tag in dish.tags.slice(0, 3)" 
-                :key="tag.id" 
-                class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50 border-slate-100 flex items-center gap-1" 
-            >
-               {{ tag.icon }} {{ tag.name }}
-            </span>
-            <span v-if="dish.tags.length > 3" class="text-[9px] font-bold text-slate-300 px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
-        </div>
-        
-        <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
-           <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
-           <span>Б {{ dish.protein || 0 }}</span>
-           <span>Ж {{ dish.fat || 0 }}</span>
-           <span>У {{ dish.carbs || 0 }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="fixed bottom-24 right-5 z-30">
-      <button 
-        @click="openCreateDish" 
-        class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"
-      >
-        <span class="material-icons-round text-3xl">add</span>
-      </button>
-    </div>
-
-    <DishDetailModal 
-       :is-open="showDetailModal" 
-       :dish="viewingDish"
-       @close="showDetailModal = false"
-    />
-
-    <DishFilterModal
-        :is-open="showFilterModal"
-        @close="showFilterModal = false"
-    />
-
-  </div>
-</template>
 </file>
 
 <file path="src/stores/dishes.js">
@@ -3713,6 +2796,990 @@ export const useDishStore = defineStore('dishes', () => {
   }
 
   return { dishes, loading, fetchDishes, addDish, updateDish, deleteDish }
+})
+</file>
+
+<file path="src/stores/plan.js">
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const usePlanStore = defineStore('plan', () => {
+  const plan = ref([])
+  const loading = ref(false)
+
+  const fetchPlan = async () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    const isFirstLoad = plan.value.length === 0
+    if (isFirstLoad) loading.value = true
+    
+    try {
+        const { data, error } = await supabase
+        .from('plan')
+        .select(`
+            *,
+            meal_types (id, name), 
+            dishes (
+                *,
+                ingredients (
+                    product_id, amount,
+                    products ( * )
+                )
+            ),
+            products ( * )
+        `)
+        .eq('household_id', auth.householdId)
+        
+        if (error) throw error
+        
+        plan.value = data.map(item => ({
+            ...item,
+            slot: item.meal_types?.name || 'Неизвестно',
+            slot_id: item.meal_type_id
+        })) || []
+
+    } catch (e) {
+        console.error('Ошибка загрузки плана:', e)
+    } finally {
+        loading.value = false
+    }
+  }
+
+  const addToPlan = async (date, slotId, item) => {
+    const auth = useAuthStore()
+    
+    // Определяем порции
+    const finalPortions = item.portions || item.amount || 1
+
+    const payload = {
+      date,
+      meal_type_id: slotId,
+      // slot: 'legacy' <--- УДАЛЕНО: Это вызывало ошибку, так как колонки slot в базе больше нет
+      household_id: auth.householdId,
+      ignore_shopping: item.ignore_shopping || false,
+      portions: finalPortions
+    }
+
+    if (item.type === 'dish') {
+      payload.dish_id = item.id
+    } else {
+      payload.product_id = item.id
+    }
+
+    // Оптимистичное добавление в интерфейс (временный ID)
+    const tempItem = { ...payload, id: 'temp_' + Date.now() }
+    // Подставляем объекты для корректного отображения сразу
+    if (item.type === 'dish') tempItem.dishes = item
+    else tempItem.products = item
+    
+    plan.value.push(tempItem)
+
+    // Отправка в базу
+    const { error } = await supabase
+        .from('plan')
+        .insert(payload)
+        .select()
+        .single()
+        
+    if (error) {
+        console.error('Ошибка сохранения:', error)
+        // Если ошибка - удаляем временный элемент
+        plan.value = plan.value.filter(i => i.id !== tempItem.id)
+        alert('Не удалось сохранить в план: ' + error.message)
+    } else {
+        await fetchPlan()
+    }
+  }
+
+  const updatePlanItem = async (id, updates) => {
+    const index = plan.value.findIndex(i => i.id === id)
+    if (index !== -1) {
+        plan.value[index] = { ...plan.value[index], ...updates }
+    }
+
+    const { error } = await supabase
+      .from('plan')
+      .update(updates)
+      .eq('id', id)
+
+    if (error) {
+        console.error('Ошибка обновления:', error)
+        await fetchPlan()
+    }
+  }
+
+  const removeFromPlan = async (id) => {
+    plan.value = plan.value.filter(i => i.id !== id)
+    const { error } = await supabase.from('plan').delete().eq('id', id)
+    if (error) await fetchPlan()
+  }
+
+  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }
+})
+</file>
+
+<file path="src/stores/settings.js">
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+
+export const useSettingsStore = defineStore('settings', () => {
+  const startDay = ref(1) 
+  const periodLength = ref(7)
+  const defaultPortions = ref(1)
+  
+  const household = ref(null)      
+  const familyMembers = ref([])
+  const loading = ref(false)
+  
+  const fetchSettings = async () => {
+    const auth = useAuthStore()
+    if (!auth.user) return
+
+    loading.value = true
+    try {
+      // 1. Грузим настройки профиля
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('start_day, period_length, default_portions, household_id')
+        .eq('id', auth.user.id)
+        .single()
+
+      if (error) throw error
+
+      if (profile) {
+        startDay.value = profile.start_day ?? 1
+        periodLength.value = profile.period_length ?? 7
+        defaultPortions.value = profile.default_portions ?? 1
+        
+        // 2. ОБЯЗАТЕЛЬНО грузим семью, если она есть
+        if (profile.household_id) {
+            await fetchHouseholdDetails(profile.household_id)
+        }
+      }
+    } catch (e) { 
+        console.error('Ошибка загрузки настроек:', e) 
+    } finally {
+        loading.value = false
+    }
+  }
+  
+  const fetchHouseholdDetails = async (householdId) => {
+      // Данные семьи
+      const { data: hhData, error: hhError } = await supabase
+          .from('households')
+          .select('*')
+          .eq('id', householdId)
+          .single()
+      
+      if (!hhError && hhData) {
+          household.value = hhData
+      }
+      
+      // Участники
+      const { data: members } = await supabase
+          .from('profiles')
+          .select('id, first_name, username, avatar_url, telegram_id')
+          .eq('household_id', householdId)
+      
+      familyMembers.value = members || []
+  }
+
+  const saveSettings = async (day, period, portions) => {
+    const auth = useAuthStore()
+    startDay.value = day
+    periodLength.value = period
+    defaultPortions.value = portions
+    
+    await supabase.from('profiles').update({ 
+        start_day: day, 
+        period_length: period, 
+        default_portions: portions 
+    }).eq('id', auth.user.id)
+  }
+
+  // --- ЛОГИКА СОВМЕСТНОГО ДОСТУПА ---
+
+  const generateInviteCode = async () => {
+      if (!household.value) throw new Error('Семья не найдена')
+
+      // Генерируем код
+      const code = Math.floor(100000 + Math.random() * 900000).toString()
+      
+      const { data, error } = await supabase
+          .from('households')
+          .update({ invite_code: code })
+          .eq('id', household.value.id)
+          .select()
+          .single()
+          
+      if (error) throw error
+      if (data) household.value = data
+  }
+
+  const joinHousehold = async (code) => {
+      const auth = useAuthStore()
+      
+      if (!code || code.length < 6) throw new Error('Код должен состоять из 6 цифр')
+
+      // 1. Ищем семью по коду
+      const { data: targetHousehold, error } = await supabase
+          .from('households')
+          .select('id')
+          .eq('invite_code', code)
+          .single()
+          
+      if (error || !targetHousehold) throw new Error('Неверный код приглашения или семья не найдена')
+
+      // 2. Меняем ID в профиле
+      const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ household_id: targetHousehold.id })
+          .eq('id', auth.user.id)
+          
+      if (updateError) throw updateError
+      
+      // 3. Перезагрузка страницы
+      window.location.reload()
+  }
+
+  const leaveHousehold = async () => {
+      const auth = useAuthStore()
+      
+      // 1. Ищем родную семью (где user = owner)
+      const { data: myOwnHousehold } = await supabase
+          .from('households')
+          .select('id')
+          .eq('owner_id', auth.user.id)
+          .single()
+          
+      if (!myOwnHousehold) {
+          // Если родной семьи нет (редкий случай), создаем её
+          const { data: newHousehold } = await supabase
+              .from('households')
+              .insert({ name: 'Моя семья', owner_id: auth.user.id })
+              .select()
+              .single()
+              
+           if (newHousehold) {
+                await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
+                window.location.reload()
+                return
+           }
+           throw new Error('Не удалось покинуть семью')
+      }
+
+      // 2. Переключаемся
+      await supabase
+          .from('profiles')
+          .update({ household_id: myOwnHousehold.id })
+          .eq('id', auth.user.id)
+          
+      window.location.reload()
+  }
+
+  return { 
+      startDay, periodLength, defaultPortions, 
+      household, familyMembers, loading,
+      fetchSettings, saveSettings,
+      generateInviteCode, joinHousehold, leaveHousehold
+  }
+})
+</file>
+
+<file path="src/views/DishesView.vue">
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import { useDishStore } from '../stores/dishes'
+import { useProductStore } from '../stores/products'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { useUIStore } from '../stores/ui'
+import { useTelegramStore } from '../stores/telegram'
+import DishDetailModal from '../components/DishDetailModal.vue'
+import DishFilterModal from '../components/DishFilterModal.vue'
+
+const dishStore = useDishStore()
+const productStore = useProductStore()
+const dictionaries = useDictionariesStore()
+const uiStore = useUIStore()
+const telegram = useTelegramStore()
+
+// Справочники для фильтров
+const dishCategories = computed(() => dictionaries.dishTypes)
+const mealTypes = computed(() => dictionaries.mealTypes)
+
+// Состояние модалок
+const showDetailModal = ref(false)
+const showFilterModal = ref(false)
+const viewingDish = ref(null)
+
+const openDish = (dish) => {
+  viewingDish.value = dish
+  showDetailModal.value = true
+}
+
+const openCreateDish = () => {
+  viewingDish.value = {
+      id: null, 
+      name: '',
+      dish_type_id: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
+      meal_type_id: uiStore.dishes.activeTag || dictionaries.mealTypes[1]?.id, 
+      kcal: null, protein: null, fat: null, carbs: null,
+      tags: [],
+      ingredients: []
+  }
+  showDetailModal.value = true
+}
+
+const openFilters = () => {
+    telegram.haptic.impact('light')
+    showFilterModal.value = true
+}
+
+onMounted(async () => {
+  const promises = []
+  if (dishStore.dishes.length === 0) promises.push(dishStore.fetchDishes())
+  if (productStore.products.length === 0) promises.push(productStore.fetchProducts())
+  promises.push(dictionaries.fetchDictionaries())
+  await Promise.all(promises)
+})
+
+// --- ЛОГИКА ФИЛЬТРАЦИИ ---
+const filteredDishes = computed(() => {
+  let result = dishStore.dishes
+  
+  // 1. Поиск (самый приоритетный)
+  if (uiStore.dishes.searchQuery) {
+    const q = uiStore.dishes.searchQuery.toLowerCase()
+    result = result.filter(d => d.name.toLowerCase().includes(q))
+  }
+
+  // 2. Прием пищи (Завтрак/Обед...)
+  if (uiStore.dishes.activeTag) {
+    result = result.filter(d => d.meal_type_id === uiStore.dishes.activeTag)
+  }
+
+  // 3. Категория (Суп/Второе...)
+  if (uiStore.dishes.activeCategory !== 'all') {
+    result = result.filter(d => d.dish_type_id === uiStore.dishes.activeCategory)
+  }
+
+  // 4. ТЕГИ (Множественный выбор, логика AND)
+  if (uiStore.dishes.filterTags.length > 0) {
+      result = result.filter(dish => {
+          const dishTagIds = dish.tags.map(t => t.id)
+          return uiStore.dishes.filterTags.every(tagId => dishTagIds.includes(tagId))
+      })
+  }
+  
+  return result
+})
+
+const setCategory = (id) => {
+    if(uiStore.dishes.activeCategory !== id) {
+        telegram.haptic.selection()
+        uiStore.dishes.activeCategory = id
+    }
+}
+
+const setMealType = (id) => {
+    if(uiStore.dishes.activeTag !== id) {
+        telegram.haptic.selection()
+        uiStore.dishes.activeTag = id
+    }
+}
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50">
+    
+    <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20 shadow-sm border-b border-slate-100">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Блюда</h1>
+      
+      <div class="flex gap-2 mb-4">
+          <div class="relative flex-1">
+            <span class="material-icons-round absolute left-3.5 top-3.5 text-slate-400">search</span>
+            <input 
+              v-model="uiStore.dishes.searchQuery" 
+              type="text" 
+              placeholder="Название..." 
+              class="w-full pl-10 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
+            >
+          </div>
+          
+          <button 
+            @click="openFilters"
+            class="w-14 h-full bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center relative tap-effect"
+          >
+             <span class="material-icons-round text-slate-700">tune</span>
+             <div v-if="uiStore.dishes.filterTags.length > 0" class="absolute top-3 right-3 w-2.5 h-2.5 bg-indigo-500 rounded-full border border-white"></div>
+          </button>
+      </div>
+      
+      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-3 mb-1">
+        <button 
+          @click="setMealType(null)" 
+          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
+          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-200'"
+        >
+          Все
+        </button>
+
+        <button 
+          v-for="type in mealTypes" 
+          :key="type.id" 
+          @click="setMealType(type.id)" 
+          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
+          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
+        >
+            {{ type.name }}
+        </button>
+      </div>
+
+      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-2">
+        <button 
+          @click="setCategory('all')" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-all tap-effect border" 
+          :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300' : 'bg-slate-50 text-slate-400 border-slate-100'"
+        >
+            Все типы
+        </button>
+
+        <button 
+          v-for="cat in dishCategories" 
+          :key="cat.id" 
+          @click="setCategory(cat.id)" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-all tap-effect border" 
+          :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
+        >
+            {{ cat.name }}
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 pb-32 space-y-3 pt-4">
+      
+      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
+        <div class="text-5xl mb-2">🍳</div>
+        <p class="font-bold text-slate-400">Ничего не найдено</p>
+        <p v-if="uiStore.dishes.filterTags.length > 0" class="text-xs text-slate-300 mt-1">Попробуйте сбросить теги</p>
+      </div>
+
+      <div 
+        v-for="dish in filteredDishes" 
+        :key="dish.id" 
+        @click="openDish(dish)" 
+        class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group"
+      >
+        <div class="flex justify-between items-start">
+          <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
+          <span class="text-[9px] font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-slate-100">
+              {{ dish.dish_type_name }}
+          </span>
+        </div>
+        
+        <div class="flex flex-wrap gap-1 mt-1">
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
+               {{ dish.meal_type_name }}
+            </span>
+            <span 
+                v-for="tag in dish.tags.slice(0, 3)" 
+                :key="tag.id" 
+                class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50 border-slate-100 flex items-center gap-1" 
+            >
+               {{ tag.icon }} {{ tag.name }}
+            </span>
+            <span v-if="dish.tags.length > 3" class="text-[9px] font-bold text-slate-300 px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+        </div>
+        
+        <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
+           <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
+           <span>Б {{ dish.protein || 0 }}</span>
+           <span>Ж {{ dish.fat || 0 }}</span>
+           <span>У {{ dish.carbs || 0 }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="fixed bottom-32 right-5 z-[60]">
+      <button 
+        @click="openCreateDish" 
+        class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"
+      >
+        <span class="material-icons-round text-3xl">add</span>
+      </button>
+    </div>
+
+    <DishDetailModal 
+       :is-open="showDetailModal" 
+       :dish="viewingDish"
+       @close="showDetailModal = false"
+    />
+
+    <DishFilterModal
+        :is-open="showFilterModal"
+        @close="showFilterModal = false"
+    />
+
+  </div>
+</template>
+</file>
+
+<file path="src/views/SettingsView.vue">
+<script setup>
+import { onMounted, ref, computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
+import { useTelegramStore } from '../stores/telegram'
+
+const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const telegram = useTelegramStore()
+
+const selectedStartDay = ref(1)
+const selectedPeriod = ref(7)
+const selectedPortions = ref(1)
+
+// Инициализация
+onMounted(async () => {
+    await settingsStore.fetchSettings()
+    selectedStartDay.value = settingsStore.startDay
+    selectedPeriod.value = settingsStore.periodLength
+    selectedPortions.value = settingsStore.defaultPortions
+})
+
+// --- ЛОГИКА СЕМЬИ ---
+const showJoinModal = ref(false)
+const joinCodeInput = ref('')
+const isGenerating = ref(false)
+const isJoining = ref(false)
+
+const isOwner = computed(() => {
+    if (!settingsStore.household || !authStore.user) return false
+    return settingsStore.household.owner_id === authStore.user.id
+})
+
+// Хелпер: Получить инициалы (Никита -> Н, Ivan Ivanov -> II)
+const getInitials = (name) => {
+    if (!name) return '?'
+    const parts = name.trim().split(' ')
+    if (parts.length === 1) return parts[0][0].toUpperCase()
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+// Хелпер: Определить, это я или нет
+const isMe = (memberId) => {
+    return authStore.user && memberId === authStore.user.id
+}
+
+const handleGenerateCode = async () => {
+    if (isGenerating.value) return
+    isGenerating.value = true
+    telegram.haptic.impact('medium')
+    try {
+        await settingsStore.generateInviteCode()
+    } catch (e) {
+        alert(e.message)
+    } finally {
+        isGenerating.value = false
+    }
+}
+
+const copyCode = () => {
+    if (settingsStore.household?.invite_code) {
+        navigator.clipboard.writeText(settingsStore.household.invite_code)
+        telegram.haptic.notification('success')
+        alert('Код скопирован!')
+    }
+}
+
+const handleJoin = async () => {
+    if (!joinCodeInput.value) {
+        alert('Введите код')
+        return
+    }
+    
+    isJoining.value = true
+    telegram.haptic.notification('success')
+    
+    try {
+        await settingsStore.joinHousehold(joinCodeInput.value)
+    } catch (e) {
+        telegram.haptic.notification('error')
+        alert('Ошибка: ' + e.message)
+        isJoining.value = false
+    }
+}
+
+const handleLeave = async () => {
+    telegram.haptic.notification('warning')
+    if(confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.')) {
+        try {
+            await settingsStore.leaveHousehold()
+        } catch (e) {
+            alert(e.message)
+        }
+    }
+}
+
+const handleSave = async () => {
+    telegram.haptic.notification('success')
+    await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
+    alert('Настройки сохранены')
+}
+
+const handleLogout = async () => {
+    telegram.haptic.impact('medium')
+    if (confirm('Выйти из аккаунта?')) {
+        await authStore.signOut()
+        window.location.reload()
+    }
+}
+
+const weekDays = [
+  { val: 1, label: 'Понедельник' }, { val: 2, label: 'Вторник' }, { val: 3, label: 'Среда' },
+  { val: 4, label: 'Четверг' }, { val: 5, label: 'Пятница' }, { val: 6, label: 'Суббота' }, { val: 0, label: 'Воскресенье' }
+]
+const periods = [
+  { val: 3, label: '3 дня' }, { val: 7, label: 'Неделя (7 дней)' }, { val: 14, label: '2 Недели' }
+]
+</script>
+
+<template>
+  <div class="h-full flex flex-col bg-slate-50 relative">
+    
+    <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+      <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
+      <div class="flex items-center gap-2 mt-2">
+          <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
+              {{ getInitials(authStore.user?.user_metadata?.first_name) }}
+          </div>
+          <p class="text-sm font-bold text-slate-500">
+              {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
+          </p>
+      </div>
+    </div>
+
+    <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-32">
+      
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Моя Семья</h3>
+        
+        <div v-if="settingsStore.loading" class="text-center py-4">
+            <span class="material-icons-round animate-spin text-slate-300">sync</span>
+        </div>
+
+        <div v-else class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
+            
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Вы находитесь в:</div>
+                    <div class="text-lg font-black text-slate-900 leading-tight">
+                        {{ settingsStore.household?.name || 'Загрузка...' }}
+                    </div>
+                </div>
+                <div v-if="isOwner" class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide">
+                    👑 Владелец
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div v-for="member in settingsStore.familyMembers" :key="member.id" class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                         :class="isMe(member.id) ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">
+                        {{ getInitials(member.first_name || member.username) }}
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-slate-700 text-sm truncate">
+                            {{ member.first_name || member.username }}
+                            <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-400">
+                            {{ member.id === settingsStore.household?.owner_id ? 'Администратор' : 'Участник' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-[1px] bg-slate-50 w-full"></div>
+
+            <div v-if="isOwner">
+                <div v-if="settingsStore.household?.invite_code">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код для приглашения</div>
+                    
+                    <button @click="copyCode" class="w-full bg-slate-900 rounded-2xl p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
+                        <div class="text-3xl font-black text-white tracking-[0.2em] text-center">
+                            {{ settingsStore.household.invite_code }}
+                        </div>
+                        <div class="text-[9px] text-slate-400 text-center mt-1 font-bold uppercase tracking-widest">
+                            Нажми, чтобы скопировать
+                        </div>
+                    </button>
+
+                    <button @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
+                        {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
+                    </button>
+                </div>
+                
+                <button 
+                    v-else 
+                    @click="handleGenerateCode"
+                    class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold text-xs tap-effect shadow-lg shadow-indigo-500/20"
+                >
+                    {{ isGenerating ? 'Создаем...' : 'Получить код доступа' }}
+                </button>
+
+                <button 
+                    @click="showJoinModal = true"
+                    class="w-full mt-2 py-3 border border-slate-200 text-slate-500 rounded-xl font-bold text-xs tap-effect"
+                >
+                    Вступить в другую семью
+                </button>
+            </div>
+
+            <div v-else>
+                 <button 
+                    @click="handleLeave"
+                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl font-bold text-xs tap-effect flex items-center justify-center gap-2"
+                >
+                    <span class="material-icons-round text-sm">logout</span>
+                    Покинуть семью
+                </button>
+            </div>
+
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Предпочтения</h3>
+        <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-700 text-sm">Начало недели</span>
+            <select v-model="selectedStartDay" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
+              <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-700 text-sm">Период планирования</span>
+            <select v-model="selectedPeriod" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
+              <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-700 text-sm">Порции (по умолч.)</span>
+            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
+                <button @click="selectedPortions = Math.max(1, selectedPortions - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                  <span class="material-icons-round text-sm">remove</span>
+                </button>
+                <span class="w-8 text-center font-black text-slate-800 text-sm">{{ selectedPortions }}</span>
+                 <button @click="selectedPortions++" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                  <span class="material-icons-round text-sm">add</span>
+                 </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <button 
+          @click="handleLogout" 
+          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-red-500 font-bold text-sm"
+        >
+             <span class="material-icons-round">logout</span>
+             <span>Выйти из аккаунта</span>
+        </button>
+      </div>
+
+    </div>
+
+    <div class="absolute bottom-20 left-0 right-0 p-5 z-20 pointer-events-none">
+        <button 
+            @click="handleSave"
+            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2 pointer-events-auto bg-slate-900"
+        >
+            Сохранить настройки
+        </button>
+    </div>
+
+    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showJoinModal = false">
+        <div class="bg-white w-full max-w-xs rounded-[32px] p-6 animate-bounce-slow">
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
+                <h3 class="text-xl font-black text-slate-900">Вход в семью</h3>
+                <p class="text-xs text-slate-400 font-bold mt-1">Введите 6-значный код приглашения</p>
+            </div>
+            
+            <input 
+                v-model="joinCodeInput" 
+                placeholder="000 000" 
+                type="tel"
+                class="w-full text-center text-3xl tracking-[0.2em] font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4 text-slate-900 placeholder:text-slate-200"
+                maxlength="6"
+            >
+            
+            <button 
+                @click="handleJoin" 
+                :disabled="isJoining || joinCodeInput.length < 6"
+                class="w-full py-3.5 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 transition-all"
+            >
+                <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
+                {{ isJoining ? 'Проверка...' : 'Войти' }}
+            </button>
+            
+            <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs tap-effect">Отмена</button>
+        </div>
+    </div>
+
+  </div>
+</template>
+</file>
+
+<file path="src/stores/auth.js">
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useTelegramStore } from './telegram'
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref(null)
+  const householdId = ref(null)
+  const isAuth = ref(false)
+  const loading = ref(true)
+
+  // Инициализация
+  const init = async () => {
+    loading.value = true
+    
+    try {
+        // 1. Проверяем текущую сессию
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user) {
+            await handleUserSession(session.user)
+        } else {
+            // 2. Если сессии нет, пробуем авто-вход через Telegram
+            await loginWithTelegram()
+        }
+        
+        // 3. Слушаем изменения (разлогин/смена юзера)
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user) {
+                await handleUserSession(session.user)
+            } else {
+                resetState()
+            }
+            // Всегда выключаем загрузку при изменении состояния
+            loading.value = false
+        })
+        
+    } catch (e) {
+        console.error('Ошибка инициализации Auth:', e)
+        // В случае любой ошибки - сбрасываем всё, чтобы показать экран входа
+        resetState()
+    } finally {
+        // ГАРАНТИЯ: Загрузка выключается всегда
+        loading.value = false
+    }
+  }
+
+  const loginWithTelegram = async () => {
+    const telegramStore = useTelegramStore()
+    
+    // Если мы не в Телеграм (обычный браузер)
+    if (!telegramStore.initData) {
+        console.log('Запущен в браузере. Авто-вход через TG пропущен.')
+        return
+    }
+
+    try {
+        const { data, error } = await supabase.functions.invoke('telegram-auth', {
+            body: { initData: telegramStore.initData }
+        })
+
+        if (error) throw error
+        if (!data || !data.session) throw new Error('No session returned')
+
+        const { error: sessionError } = await supabase.auth.setSession(data.session)
+        if (sessionError) throw sessionError
+
+    } catch (e) {
+        console.error('Auth Error:', e)
+        // Не сбрасываем state здесь, просто выходим. Пользователь увидит кнопку "Войти".
+    }
+  }
+
+  const handleUserSession = async (authUser) => {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('household_id')
+            .eq('id', authUser.id)
+            .single()
+            
+        if (error || !data) {
+            console.warn('Профиль не найден. Требуется повторная регистрация.')
+            await signOut()
+            return
+        }
+
+        user.value = authUser
+        householdId.value = data.household_id
+        isAuth.value = true
+        
+    } catch (e) {
+        console.error('Session Error:', e)
+        await signOut()
+    }
+  }
+
+  const resetState = () => {
+    user.value = null
+    householdId.value = null
+    isAuth.value = false
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    resetState()
+  }
+
+  const loginAsTestUser = async () => {
+    loading.value = true
+    try {
+        // Попытка входа
+        const { error } = await supabase.auth.signInWithPassword({
+            email: 'dev@telegram.mini.app',
+            password: 'dev-password-123'
+        })
+        
+        if (error) {
+             console.error('Ошибка Dev входа:', error)
+             alert('Ошибка входа Dev User. Проверьте консоль.')
+        }
+    } catch(e) { 
+        console.error(e)
+    } finally { 
+        loading.value = false 
+    }
+  }
+
+  return { 
+    user, 
+    householdId, 
+    isAuth, 
+    loading, 
+    init, 
+    loginWithTelegram,
+    loginAsTestUser,
+    signOut
+  }
 })
 </file>
 

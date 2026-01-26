@@ -3,9 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
-import { useTelegramStore } from './stores/telegram' 
+import { useTelegramStore } from './stores/telegram'
+import { useRealtimeStore } from './stores/realtime' // <-- Импортируем Realtime
 
-// Импортируем компоненты
+// Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
 import DishesView from './views/DishesView.vue'
 import ProductsView from './views/ProductsView.vue'
@@ -16,7 +17,9 @@ import AuthView from './views/AuthView.vue'
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
 const settings = useSettingsStore()
-const telegram = useTelegramStore() 
+const telegram = useTelegramStore()
+const realtime = useRealtimeStore() // <-- Инициализируем стор
+
 const currentTab = ref('plan')
 
 // Глобальный флаг загрузки
@@ -39,8 +42,6 @@ const activeComponent = computed(() => {
 // Логика переключения вкладок с вибрацией
 const switchTab = (tabId) => {
     if (currentTab.value === tabId) return
-    
-    // Легкий удар, как в нативных приложениях iOS
     telegram.haptic.impact('light') 
     currentTab.value = tabId
 }
@@ -52,10 +53,15 @@ const loadUserData = async () => {
     
     try {
         if (auth.isAuth) {
+            // Загружаем настройки и справочники параллельно
             await Promise.all([
                 settings.fetchSettings(),
                 dictionaries.fetchDictionaries()
             ])
+            
+            // <-- ЗАПУСКАЕМ REALTIME СИНХРОНИЗАЦИЮ
+            // Это позволит получать обновления от других членов семьи
+            realtime.init()
         }
     } catch (e) {
         console.error('Ошибка загрузки данных:', e)
@@ -64,6 +70,7 @@ const loadUserData = async () => {
     }
 }
 
+// Если статус авторизации меняется (например, вошли), грузим данные
 watch(() => auth.isAuth, (newVal) => {
   if (newVal) loadUserData()
 })
@@ -76,11 +83,12 @@ onMounted(async () => {
         if (auth.isAuth) {
             await loadUserData() 
         } else {
+            // Если не авторизованы, просто убираем загрузчик (покажем AuthView)
             isAppInitializing.value = false 
         }
     } catch (e) {
         console.error('Критическая ошибка старта:', e)
-        initError.value = 'Ошибка запуска приложения. Обновите страницу.'
+        initError.value = 'Ошибка запуска приложения. Попробуйте обновить страницу.'
         isAppInitializing.value = false
     }
 })
@@ -114,7 +122,13 @@ onMounted(async () => {
 
       <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
         <div class="h-[76px] grid grid-cols-5 items-center">
-          <button v-for="tab in tabs" :key="tab.id" @click="switchTab(tab.id)" class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'">
+          <button 
+            v-for="tab in tabs" 
+            :key="tab.id" 
+            @click="switchTab(tab.id)" 
+            class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" 
+            :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+          >
             <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
             <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
           </button>
