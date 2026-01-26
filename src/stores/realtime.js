@@ -16,34 +16,36 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (channel) return
 
-    console.log('📡 Подключение к Realtime для семьи:', auth.householdId)
+    console.log('📡 Подключение к каналу семьи:', auth.householdId)
 
     // Создаем канал
-    channel = supabase.channel('household-sync')
+    channel = supabase.channel(`household-${auth.householdId}`)
 
-    // 1. СЛУШАЕМ НАСТРОЙКИ (Таблица households)
-    // Тут фильтруем по колонке "id", так как это сама таблица семей
+    // 1. СЛУШАЕМ БАЗУ ДАННЫХ (Для Плана, Продуктов, Списка покупок)
+    // Это работает хорошо, оставляем как есть
     channel.on(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
-        table: 'households',
-        filter: `id=eq.${auth.householdId}` // <-- ВАЖНО: id, а не household_id
+        filter: `household_id=eq.${auth.householdId}`
       },
-      (payload) => handleUpdate(payload)
+      (payload) => handleDatabaseUpdate(payload)
     )
 
-    // 2. СЛУШАЕМ ВСЁ ОСТАЛЬНОЕ (Plan, Products, Shopping...)
-    // Тут фильтруем по "household_id", так как эти таблицы принадлежат семье
+    // 2. СЛУШАЕМ "РАДИО" (Для Настроек)
+    // Получаем мгновенные команды от других устройств
     channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        filter: `household_id=eq.${auth.householdId}` // <-- Обычный фильтр
-      },
-      (payload) => handleUpdate(payload)
+      'broadcast',
+      { event: 'settings_update' },
+      (payload) => {
+          console.log('📻 Получен сигнал об обновлении настроек:', payload)
+          const settings = useSettingsStore()
+          // Мгновенно применяем пришедшие настройки
+          settings.startDay = payload.payload.startDay
+          settings.periodLength = payload.payload.periodLength
+          settings.defaultPortions = payload.payload.defaultPortions
+      }
     )
 
     // Подписываемся
@@ -52,37 +54,35 @@ export const useRealtimeStore = defineStore('realtime', () => {
     })
   }
 
-  const handleUpdate = async (payload) => {
+  // Функция, чтобы САМОМУ отправить сигнал (вызывается из settings.js)
+  const notifySettingsChanged = async (newSettings) => {
+      if (!channel) return
+      await channel.send({
+          type: 'broadcast',
+          event: 'settings_update',
+          payload: newSettings
+      })
+  }
+
+  // Обработка изменений из Базы Данных (как и раньше)
+  const handleDatabaseUpdate = async (payload) => {
     const { table, eventType, new: newRecord, old: oldRecord } = payload
     
-    // Игнорируем свои же изменения (опционально), но пока оставим как есть для надежности
-    console.log(`⚡ Обновление в ${table}:`, eventType)
+    // Игнорируем household, так как для него теперь используем Broadcast
+    if (table === 'households') return 
+
+    console.log(`⚡ Обновление БД в ${table}:`, eventType)
 
     const plan = usePlanStore()
     const shopping = useShoppingStore()
     const products = useProductStore()
     const dishes = useDishStore()
-    const settings = useSettingsStore()
 
-    // --- ЛОГИКА ОБНОВЛЕНИЯ ---
-
-    if (table === 'households') {
-      console.log('Обновление настроек пришло!')
-      settings.periodLength = newRecord.period_length
-      settings.startDay = newRecord.start_day
-      settings.defaultPortions = newRecord.default_portions
-      if (settings.household) {
-          settings.household.name = newRecord.name
-      }
-    }
-
-    else if (table === 'plan') {
+    if (table === 'plan') {
       if (eventType === 'INSERT') {
-          // Трансформируем запись, чтобы UI не падал без joined полей
-          // В идеале можно вызвать fetchPlan(), но для скорости добавим так:
           const item = { ...newRecord, slot: 'Загрузка...' }
           plan.plan.push(item)
-          await plan.fetchPlan() // Подгрузим детали (имя блюда и т.д.)
+          await plan.fetchPlan() 
       }
       if (eventType === 'DELETE') {
           plan.plan = plan.plan.filter(i => i.id !== oldRecord.id)
@@ -90,7 +90,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
       if (eventType === 'UPDATE') {
         const idx = plan.plan.findIndex(i => i.id === newRecord.id)
         if (idx !== -1) {
-            // Аккуратно обновляем поля, сохраняя связи с dishes/products
             Object.assign(plan.plan[idx], {
                 portions: newRecord.portions,
                 ignore_shopping: newRecord.ignore_shopping,
@@ -133,5 +132,5 @@ export const useRealtimeStore = defineStore('realtime', () => {
       }
   }
 
-  return { init, unsubscribe }
+  return { init, unsubscribe, notifySettingsChanged }
 })
