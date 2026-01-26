@@ -11,8 +11,6 @@ export const usePlanStore = defineStore('plan', () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
-    // ТИХАЯ ЗАГРУЗКА: Если данные уже есть, не включаем главный спиннер,
-    // просто обновляем данные в фоне.
     const isFirstLoad = plan.value.length === 0
     if (isFirstLoad) loading.value = true
     
@@ -44,7 +42,6 @@ export const usePlanStore = defineStore('plan', () => {
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
     } finally {
-        // ГАРАНТИЯ: Выключаем спиннер в любом случае
         loading.value = false
     }
   }
@@ -52,19 +49,16 @@ export const usePlanStore = defineStore('plan', () => {
   const addToPlan = async (date, slotId, item) => {
     const auth = useAuthStore()
     
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-    // Сначала смотрим, передали ли нам порции явно (item.portions из настроек)
-    // Если нет, ищем amount (если это ингредиент)
-    // Если ничего нет — ставим 1
+    // Определяем порции
     const finalPortions = item.portions || item.amount || 1
 
     const payload = {
       date,
       meal_type_id: slotId,
-      slot: 'legacy', 
+      // slot: 'legacy' <--- УДАЛЕНО: Это вызывало ошибку, так как колонки slot в базе больше нет
       household_id: auth.householdId,
       ignore_shopping: item.ignore_shopping || false,
-      portions: finalPortions // Используем правильное число
+      portions: finalPortions
     }
 
     if (item.type === 'dish') {
@@ -72,14 +66,16 @@ export const usePlanStore = defineStore('plan', () => {
     } else {
       payload.product_id = item.id
     }
-    // -------------------------
 
+    // Оптимистичное добавление в интерфейс (временный ID)
     const tempItem = { ...payload, id: 'temp_' + Date.now() }
+    // Подставляем объекты для корректного отображения сразу
     if (item.type === 'dish') tempItem.dishes = item
     else tempItem.products = item
     
     plan.value.push(tempItem)
 
+    // Отправка в базу
     const { error } = await supabase
         .from('plan')
         .insert(payload)
@@ -88,7 +84,9 @@ export const usePlanStore = defineStore('plan', () => {
         
     if (error) {
         console.error('Ошибка сохранения:', error)
+        // Если ошибка - удаляем временный элемент
         plan.value = plan.value.filter(i => i.id !== tempItem.id)
+        alert('Не удалось сохранить в план: ' + error.message)
     } else {
         await fetchPlan()
     }
