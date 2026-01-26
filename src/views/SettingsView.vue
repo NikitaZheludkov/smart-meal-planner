@@ -12,7 +12,7 @@ const selectedStartDay = ref(1)
 const selectedPeriod = ref(7)
 const selectedPortions = ref(1)
 
-// Инициализация при открытии
+// Инициализация
 onMounted(async () => {
     await settingsStore.fetchSettings()
     selectedStartDay.value = settingsStore.startDay
@@ -26,13 +26,24 @@ const joinCodeInput = ref('')
 const isGenerating = ref(false)
 const isJoining = ref(false)
 
-// ВАЖНО: Правильное вычисление владельца
 const isOwner = computed(() => {
     if (!settingsStore.household || !authStore.user) return false
     return settingsStore.household.owner_id === authStore.user.id
 })
 
-// Генерация кода
+// Хелпер: Получить инициалы (Никита -> Н, Ivan Ivanov -> II)
+const getInitials = (name) => {
+    if (!name) return '?'
+    const parts = name.trim().split(' ')
+    if (parts.length === 1) return parts[0][0].toUpperCase()
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+// Хелпер: Определить, это я или нет
+const isMe = (memberId) => {
+    return authStore.user && memberId === authStore.user.id
+}
+
 const handleGenerateCode = async () => {
     if (isGenerating.value) return
     isGenerating.value = true
@@ -46,7 +57,14 @@ const handleGenerateCode = async () => {
     }
 }
 
-// Вход по коду
+const copyCode = () => {
+    if (settingsStore.household?.invite_code) {
+        navigator.clipboard.writeText(settingsStore.household.invite_code)
+        telegram.haptic.notification('success')
+        alert('Код скопирован!')
+    }
+}
+
 const handleJoin = async () => {
     if (!joinCodeInput.value) {
         alert('Введите код')
@@ -58,7 +76,6 @@ const handleJoin = async () => {
     
     try {
         await settingsStore.joinHousehold(joinCodeInput.value)
-        // После успеха страница перезагрузится сама
     } catch (e) {
         telegram.haptic.notification('error')
         alert('Ошибка: ' + e.message)
@@ -66,10 +83,9 @@ const handleJoin = async () => {
     }
 }
 
-// Выход из семьи
 const handleLeave = async () => {
-    if(confirm('Вернуться в свою личную семью?')) {
-        telegram.haptic.impact('heavy')
+    telegram.haptic.notification('warning')
+    if(confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.')) {
         try {
             await settingsStore.leaveHousehold()
         } catch (e) {
@@ -78,24 +94,10 @@ const handleLeave = async () => {
     }
 }
 
-// Сохранение настроек
-const isSaving = ref(false)
-const saveButtonText = ref('Сохранить изменения')
-
 const handleSave = async () => {
-  isSaving.value = true
-  saveButtonText.value = 'Сохраняем...'
-  try {
-      await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
-      saveButtonText.value = 'Успешно!'
-      telegram.haptic.notification('success')
-      setTimeout(() => { saveButtonText.value = 'Сохранить изменения' }, 2000)
-  } catch (e) {
-      saveButtonText.value = 'Ошибка'
-      alert(e.message)
-  } finally {
-      isSaving.value = false
-  }
+    telegram.haptic.notification('success')
+    await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
+    alert('Настройки сохранены')
 }
 
 const handleLogout = async () => {
@@ -106,7 +108,6 @@ const handleLogout = async () => {
     }
 }
 
-// Опции для селектов
 const weekDays = [
   { val: 1, label: 'Понедельник' }, { val: 2, label: 'Вторник' }, { val: 3, label: 'Среда' },
   { val: 4, label: 'Четверг' }, { val: 5, label: 'Пятница' }, { val: 6, label: 'Суббота' }, { val: 0, label: 'Воскресенье' }
@@ -122,10 +123,10 @@ const periods = [
     <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
       <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
       <div class="flex items-center gap-2 mt-2">
-          <div v-if="authStore.user?.user_metadata?.avatar_url" class="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
-              <img :src="authStore.user.user_metadata.avatar_url" class="w-full h-full object-cover">
+          <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
+              {{ getInitials(authStore.user?.user_metadata?.first_name) }}
           </div>
-          <p class="text-sm font-bold text-slate-400">
+          <p class="text-sm font-bold text-slate-500">
               {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
           </p>
       </div>
@@ -134,7 +135,7 @@ const periods = [
     <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-32">
       
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Совместный доступ</h3>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Моя Семья</h3>
         
         <div v-if="settingsStore.loading" class="text-center py-4">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
@@ -142,20 +143,34 @@ const periods = [
 
         <div v-else class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
             
-            <div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-2">Участники</div>
-                <div class="flex -space-x-2 overflow-hidden py-1 pl-2">
-                    <div 
-                        v-for="member in settingsStore.familyMembers" 
-                        :key="member.id"
-                        class="inline-block h-10 w-10 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-lg relative"
-                    >
-                        <img v-if="member.avatar_url" :src="member.avatar_url" class="w-full h-full rounded-full object-cover">
-                        <span v-else>👤</span>
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Вы находитесь в:</div>
+                    <div class="text-lg font-black text-slate-900 leading-tight">
+                        {{ settingsStore.household?.name || 'Загрузка...' }}
                     </div>
                 </div>
-                <div v-if="settingsStore.household" class="mt-2 text-xs text-slate-500 font-bold">
-                    {{ settingsStore.household.name }}
+                <div v-if="isOwner" class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide">
+                    👑 Владелец
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div v-for="member in settingsStore.familyMembers" :key="member.id" class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                         :class="isMe(member.id) ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">
+                        {{ getInitials(member.first_name || member.username) }}
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-slate-700 text-sm truncate">
+                            {{ member.first_name || member.username }}
+                            <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-400">
+                            {{ member.id === settingsStore.household?.owner_id ? 'Администратор' : 'Участник' }}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -163,11 +178,18 @@ const periods = [
 
             <div v-if="isOwner">
                 <div v-if="settingsStore.household?.invite_code">
-                    <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код приглашения</div>
-                    <div class="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 text-center relative overflow-hidden group active:scale-95 transition-transform" @click="telegram.haptic.selection()">
-                        <div class="text-3xl font-black text-indigo-600 tracking-[0.2em]">{{ settingsStore.household.invite_code }}</div>
-                    </div>
-                    <button @click="handleGenerateCode" class="w-full mt-2 text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код для приглашения</div>
+                    
+                    <button @click="copyCode" class="w-full bg-slate-900 rounded-2xl p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
+                        <div class="text-3xl font-black text-white tracking-[0.2em] text-center">
+                            {{ settingsStore.household.invite_code }}
+                        </div>
+                        <div class="text-[9px] text-slate-400 text-center mt-1 font-bold uppercase tracking-widest">
+                            Нажми, чтобы скопировать
+                        </div>
+                    </button>
+
+                    <button @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
                         {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
                     </button>
                 </div>
@@ -175,34 +197,34 @@ const periods = [
                 <button 
                     v-else 
                     @click="handleGenerateCode"
-                    class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs tap-effect shadow-lg shadow-slate-900/20"
+                    class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold text-xs tap-effect shadow-lg shadow-indigo-500/20"
                 >
-                    {{ isGenerating ? 'Создаем...' : 'Получить код приглашения' }}
+                    {{ isGenerating ? 'Создаем...' : 'Получить код доступа' }}
+                </button>
+
+                <button 
+                    @click="showJoinModal = true"
+                    class="w-full mt-2 py-3 border border-slate-200 text-slate-500 rounded-xl font-bold text-xs tap-effect"
+                >
+                    Вступить в другую семью
                 </button>
             </div>
 
             <div v-else>
                  <button 
                     @click="handleLeave"
-                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl font-bold text-xs tap-effect"
+                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl font-bold text-xs tap-effect flex items-center justify-center gap-2"
                 >
+                    <span class="material-icons-round text-sm">logout</span>
                     Покинуть семью
                 </button>
             </div>
-
-            <button 
-                v-if="isOwner" 
-                @click="showJoinModal = true"
-                class="w-full py-3 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs tap-effect hover:bg-slate-50 transition-colors"
-            >
-                Ввести код другой семьи
-            </button>
 
         </div>
       </div>
 
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Вид Планировщика</h3>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Предпочтения</h3>
         <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-700 text-sm">Начало недели</span>
@@ -212,7 +234,7 @@ const periods = [
           </div>
           
           <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Период</span>
+            <span class="font-bold text-slate-700 text-sm">Период планирования</span>
             <select v-model="selectedPeriod" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
               <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
             </select>
@@ -234,15 +256,12 @@ const periods = [
       </div>
 
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Аккаунт</h3>
         <button 
           @click="handleLogout" 
-          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-between tap-effect"
+          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-red-500 font-bold text-sm"
         >
-          <div class="flex items-center gap-3">
-             <span class="material-icons-round text-red-400">logout</span>
-             <span class="font-bold text-slate-900 text-sm">Выйти</span>
-          </div>
+             <span class="material-icons-round">logout</span>
+             <span>Выйти из аккаунта</span>
         </button>
       </div>
 
@@ -251,33 +270,37 @@ const periods = [
     <div class="absolute bottom-20 left-0 right-0 p-5 z-20 pointer-events-none">
         <button 
             @click="handleSave"
-            :disabled="isSaving"
-            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2 pointer-events-auto"
-             :class="saveButtonText === 'Успешно!' ? 'bg-green-500' : 'bg-slate-900'"
+            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2 pointer-events-auto bg-slate-900"
         >
-            <span v-if="isSaving" class="material-icons-round animate-spin text-sm">sync</span>
-            {{ saveButtonText }}
+            Сохранить настройки
         </button>
     </div>
 
     <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showJoinModal = false">
         <div class="bg-white w-full max-w-xs rounded-[32px] p-6 animate-bounce-slow">
-            <h3 class="text-xl font-black text-slate-900 text-center mb-4">Ввод кода</h3>
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
+                <h3 class="text-xl font-black text-slate-900">Вход в семью</h3>
+                <p class="text-xs text-slate-400 font-bold mt-1">Введите 6-значный код приглашения</p>
+            </div>
+            
             <input 
                 v-model="joinCodeInput" 
-                placeholder="Например: 123456" 
+                placeholder="000 000" 
                 type="tel"
-                class="w-full text-center text-2xl tracking-widest font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4 text-slate-900"
+                class="w-full text-center text-3xl tracking-[0.2em] font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4 text-slate-900 placeholder:text-slate-200"
                 maxlength="6"
             >
+            
             <button 
                 @click="handleJoin" 
-                :disabled="isJoining"
-                class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2 disabled:opacity-70 flex items-center justify-center gap-2"
+                :disabled="isJoining || joinCodeInput.length < 6"
+                class="w-full py-3.5 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 transition-all"
             >
                 <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
-                {{ isJoining ? 'Входим...' : 'Присоединиться' }}
+                {{ isJoining ? 'Проверка...' : 'Войти' }}
             </button>
+            
             <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs tap-effect">Отмена</button>
         </div>
     </div>
