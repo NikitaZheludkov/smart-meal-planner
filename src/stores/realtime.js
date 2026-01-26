@@ -14,49 +14,60 @@ export const useRealtimeStore = defineStore('realtime', () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
-    // Если уже подключены - не дублируем
     if (channel) return
 
-    console.log('📡 Подключение к Realtime...')
+    console.log('📡 Подключение к Realtime для семьи:', auth.householdId)
 
-    // Подписываемся на ВСЕ изменения в таблицах, где household_id совпадает с нашим
-    channel = supabase
-      .channel('household-sync')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          // Фильтр: слушаем только свою семью!
-          filter: `household_id=eq.${auth.householdId}` 
-        },
-        (payload) => {
-          handleUpdate(payload)
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.log('🟢 Синхронизация активна')
-      })
+    // Создаем канал
+    channel = supabase.channel('household-sync')
+
+    // 1. СЛУШАЕМ НАСТРОЙКИ (Таблица households)
+    // Тут фильтруем по колонке "id", так как это сама таблица семей
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'households',
+        filter: `id=eq.${auth.householdId}` // <-- ВАЖНО: id, а не household_id
+      },
+      (payload) => handleUpdate(payload)
+    )
+
+    // 2. СЛУШАЕМ ВСЁ ОСТАЛЬНОЕ (Plan, Products, Shopping...)
+    // Тут фильтруем по "household_id", так как эти таблицы принадлежат семье
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        filter: `household_id=eq.${auth.householdId}` // <-- Обычный фильтр
+      },
+      (payload) => handleUpdate(payload)
+    )
+
+    // Подписываемся
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('🟢 Синхронизация активна')
+    })
   }
 
-  // Главный распределитель обновлений
   const handleUpdate = async (payload) => {
     const { table, eventType, new: newRecord, old: oldRecord } = payload
     
+    // Игнорируем свои же изменения (опционально), но пока оставим как есть для надежности
     console.log(`⚡ Обновление в ${table}:`, eventType)
 
-    // Используем сторы
     const plan = usePlanStore()
     const shopping = useShoppingStore()
     const products = useProductStore()
     const dishes = useDishStore()
     const settings = useSettingsStore()
 
-    // --- ЛОГИКА ОБНОВЛЕНИЯ ПО ТАБЛИЦАМ ---
+    // --- ЛОГИКА ОБНОВЛЕНИЯ ---
 
-    // 1. НАСТРОЙКИ (Таблица households)
     if (table === 'households') {
-      // Обновляем локальные настройки мгновенно
+      console.log('Обновление настроек пришло!')
       settings.periodLength = newRecord.period_length
       settings.startDay = newRecord.start_day
       settings.defaultPortions = newRecord.default_portions
@@ -65,19 +76,31 @@ export const useRealtimeStore = defineStore('realtime', () => {
       }
     }
 
-    // 2. ПЛАН (Таблица plan)
     else if (table === 'plan') {
-      if (eventType === 'INSERT') plan.plan.push(transformPlanItem(newRecord))
-      if (eventType === 'DELETE') plan.plan = plan.plan.filter(i => i.id !== oldRecord.id)
+      if (eventType === 'INSERT') {
+          // Трансформируем запись, чтобы UI не падал без joined полей
+          // В идеале можно вызвать fetchPlan(), но для скорости добавим так:
+          const item = { ...newRecord, slot: 'Загрузка...' }
+          plan.plan.push(item)
+          await plan.fetchPlan() // Подгрузим детали (имя блюда и т.д.)
+      }
+      if (eventType === 'DELETE') {
+          plan.plan = plan.plan.filter(i => i.id !== oldRecord.id)
+      }
       if (eventType === 'UPDATE') {
         const idx = plan.plan.findIndex(i => i.id === newRecord.id)
-        if (idx !== -1) Object.assign(plan.plan[idx], newRecord)
+        if (idx !== -1) {
+            // Аккуратно обновляем поля, сохраняя связи с dishes/products
+            Object.assign(plan.plan[idx], {
+                portions: newRecord.portions,
+                ignore_shopping: newRecord.ignore_shopping,
+                meal_type_id: newRecord.meal_type_id,
+                date: newRecord.date
+            })
+        }
       }
-      // Для сложных связей (join) проще перезапросить, если пришла новая запись
-      if (eventType === 'INSERT') await plan.fetchPlan() 
     }
 
-    // 3. ПОКУПКИ (Таблица shopping_cart)
     else if (table === 'shopping_cart') {
        if (eventType === 'INSERT' || eventType === 'UPDATE') {
            if (newRecord.is_checked) shopping.checkedIds.add(newRecord.product_id)
@@ -88,7 +111,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
        }
     }
 
-    // 4. ПРОДУКТЫ (Таблица products)
     else if (table === 'products') {
         if (eventType === 'INSERT') products.products.push(newRecord)
         if (eventType === 'DELETE') products.products = products.products.filter(p => p.id !== oldRecord.id)
@@ -96,27 +118,20 @@ export const useRealtimeStore = defineStore('realtime', () => {
             const idx = products.products.findIndex(p => p.id === newRecord.id)
             if (idx !== -1) products.products[idx] = newRecord
         }
-        // Сортировка по алфавиту после изменений
         products.products.sort((a, b) => a.name.localeCompare(b.name))
     }
     
-    // 5. БЛЮДА (Dishes) - тут сложнее из-за ингредиентов
     else if (table === 'dishes' || table === 'ingredients') {
-        // Для блюд проще перезагрузить список, чтобы подтянулись связи
         await dishes.fetchDishes()
     }
   }
 
-  // Хелпер: отключаемся при выходе
   const unsubscribe = () => {
       if (channel) {
           supabase.removeChannel(channel)
           channel = null
       }
   }
-  
-  // Хелпер: заглушка для трансформации (если нужно)
-  const transformPlanItem = (item) => ({ ...item, slot: 'loading...' })
 
   return { init, unsubscribe }
 })
