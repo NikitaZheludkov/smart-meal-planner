@@ -203,6 +203,36 @@ onMounted(() => { if (auth.isAuth) loadData() })
 <template>
   <div class="flex flex-col h-full bg-slate-50 relative">
 
+    <!-- Header with Date and View Switcher -->
+    <div class="pt-14 pb-2 px-4 bg-white z-20 shrink-0 shadow-sm border-b border-slate-50">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+           <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">План питания</div>
+           <div class="text-xl font-black text-slate-900 flex items-center gap-2 tap-effect" @click="goToToday">
+              {{ displayDateLabel }}
+              <div v-if="showTodayBtn" class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+           </div>
+        </div>
+        <div class="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+           <button @click="changePeriod(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 active:scale-90 transition-transform tap-effect">
+               <span class="material-icons-round">chevron_left</span>
+           </button>
+           <button @click="changePeriod(1)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 active:scale-90 transition-transform tap-effect">
+               <span class="material-icons-round">chevron_right</span>
+           </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-100 p-1 rounded-xl flex relative">
+         <div class="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
+         <button @click="uiStore.plan.activeTab = 'day'" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
+             День
+         </button>
+         <button @click="uiStore.plan.activeTab = 'week'" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
+             Сетка
+         </button>
+      </div>
+    </div>
 
     <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto pb-20 pt-2 px-4">
       <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
