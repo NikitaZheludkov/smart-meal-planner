@@ -60,6 +60,7 @@ src/stores/dictionaries.js
 src/stores/dishes.js
 src/stores/plan.js
 src/stores/products.js
+src/stores/realtime.js
 src/stores/settings.js
 src/stores/shopping.js
 src/stores/telegram.js
@@ -1899,6 +1900,145 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
 })
 </file>
 
+<file path="src/stores/realtime.js">
+import { defineStore } from 'pinia'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+import { usePlanStore } from './plan'
+import { useShoppingStore } from './shopping'
+import { useProductStore } from './products'
+import { useDishStore } from './dishes'
+import { useSettingsStore } from './settings'
+
+export const useRealtimeStore = defineStore('realtime', () => {
+  let channel = null
+
+  const init = () => {
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    if (channel) return
+
+    console.log('📡 Подключение к каналу семьи:', auth.householdId)
+
+    // Создаем канал
+    channel = supabase.channel(`household-${auth.householdId}`)
+
+    // 1. СЛУШАЕМ БАЗУ ДАННЫХ (Для Плана, Продуктов, Списка покупок)
+    // Это работает хорошо, оставляем как есть
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        filter: `household_id=eq.${auth.householdId}`
+      },
+      (payload) => handleDatabaseUpdate(payload)
+    )
+
+    // 2. СЛУШАЕМ "РАДИО" (Для Настроек)
+    // Получаем мгновенные команды от других устройств
+    channel.on(
+      'broadcast',
+      { event: 'settings_update' },
+      (payload) => {
+          console.log('📻 Получен сигнал об обновлении настроек:', payload)
+          const settings = useSettingsStore()
+          // Мгновенно применяем пришедшие настройки
+          settings.startDay = payload.payload.startDay
+          settings.periodLength = payload.payload.periodLength
+          settings.defaultPortions = payload.payload.defaultPortions
+      }
+    )
+
+    // Подписываемся
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('🟢 Синхронизация активна')
+    })
+  }
+
+  // Функция, чтобы САМОМУ отправить сигнал (вызывается из settings.js)
+  const notifySettingsChanged = async (newSettings) => {
+      if (!channel) return
+      await channel.send({
+          type: 'broadcast',
+          event: 'settings_update',
+          payload: newSettings
+      })
+  }
+
+  // Обработка изменений из Базы Данных (как и раньше)
+  const handleDatabaseUpdate = async (payload) => {
+    const { table, eventType, new: newRecord, old: oldRecord } = payload
+    
+    // Игнорируем household, так как для него теперь используем Broadcast
+    if (table === 'households') return 
+
+    console.log(`⚡ Обновление БД в ${table}:`, eventType)
+
+    const plan = usePlanStore()
+    const shopping = useShoppingStore()
+    const products = useProductStore()
+    const dishes = useDishStore()
+
+    if (table === 'plan') {
+      if (eventType === 'INSERT') {
+          const item = { ...newRecord, slot: 'Загрузка...' }
+          plan.plan.push(item)
+          await plan.fetchPlan() 
+      }
+      if (eventType === 'DELETE') {
+          plan.plan = plan.plan.filter(i => i.id !== oldRecord.id)
+      }
+      if (eventType === 'UPDATE') {
+        const idx = plan.plan.findIndex(i => i.id === newRecord.id)
+        if (idx !== -1) {
+            Object.assign(plan.plan[idx], {
+                portions: newRecord.portions,
+                ignore_shopping: newRecord.ignore_shopping,
+                meal_type_id: newRecord.meal_type_id,
+                date: newRecord.date
+            })
+        }
+      }
+    }
+
+    else if (table === 'shopping_cart') {
+       if (eventType === 'INSERT' || eventType === 'UPDATE') {
+           if (newRecord.is_checked) shopping.checkedIds.add(newRecord.product_id)
+           else shopping.checkedIds.delete(newRecord.product_id)
+       }
+       if (eventType === 'DELETE') {
+           shopping.checkedIds.delete(oldRecord.product_id)
+       }
+    }
+
+    else if (table === 'products') {
+        if (eventType === 'INSERT') products.products.push(newRecord)
+        if (eventType === 'DELETE') products.products = products.products.filter(p => p.id !== oldRecord.id)
+        if (eventType === 'UPDATE') {
+            const idx = products.products.findIndex(p => p.id === newRecord.id)
+            if (idx !== -1) products.products[idx] = newRecord
+        }
+        products.products.sort((a, b) => a.name.localeCompare(b.name))
+    }
+    
+    else if (table === 'dishes' || table === 'ingredients') {
+        await dishes.fetchDishes()
+    }
+  }
+
+  const unsubscribe = () => {
+      if (channel) {
+          supabase.removeChannel(channel)
+          channel = null
+      }
+  }
+
+  return { init, unsubscribe, notifySettingsChanged }
+})
+</file>
+
 <file path="src/stores/shopping.js">
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -2412,139 +2552,6 @@ const switchViewTab = (mode) => {
 }
 </file>
 
-<file path="src/App.vue">
-<script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useAuthStore } from './stores/auth'
-import { useDictionariesStore } from './stores/dictionaries'
-import { useSettingsStore } from './stores/settings'
-import { useTelegramStore } from './stores/telegram' 
-
-// Импортируем компоненты
-import PlanView from './views/PlanView.vue'
-import DishesView from './views/DishesView.vue'
-import ProductsView from './views/ProductsView.vue'
-import ShoppingView from './views/ShoppingView.vue'
-import SettingsView from './views/SettingsView.vue'
-import AuthView from './views/AuthView.vue' 
-
-const auth = useAuthStore()
-const dictionaries = useDictionariesStore()
-const settings = useSettingsStore()
-const telegram = useTelegramStore() 
-const currentTab = ref('plan')
-
-// Глобальный флаг загрузки
-const isAppInitializing = ref(true)
-const initError = ref(null)
-
-const tabs = [
-  { id: 'plan', label: 'План', icon: 'calendar_today', component: PlanView },
-  { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu', component: DishesView },
-  { id: 'shopping', label: 'Купить', icon: 'shopping_bag', component: ShoppingView },
-  { id: 'products', label: 'Продукты', icon: 'kitchen', component: ProductsView },
-  { id: 'settings', label: 'Настр.', icon: 'tune', component: SettingsView }
-]
-
-const activeComponent = computed(() => {
-  const tab = tabs.find(t => t.id === currentTab.value)
-  return tab ? tab.component : PlanView
-})
-
-// Логика переключения вкладок с вибрацией
-const switchTab = (tabId) => {
-    if (currentTab.value === tabId) return
-    
-    // Легкий удар, как в нативных приложениях iOS
-    telegram.haptic.impact('light') 
-    currentTab.value = tabId
-}
-
-// Единая функция загрузки данных пользователя
-const loadUserData = async () => {
-    isAppInitializing.value = true 
-    initError.value = null
-    
-    try {
-        if (auth.isAuth) {
-            await Promise.all([
-                settings.fetchSettings(),
-                dictionaries.fetchDictionaries()
-            ])
-        }
-    } catch (e) {
-        console.error('Ошибка загрузки данных:', e)
-    } finally {
-        isAppInitializing.value = false
-    }
-}
-
-watch(() => auth.isAuth, (newVal) => {
-  if (newVal) loadUserData()
-})
-
-onMounted(async () => {
-    try {
-        telegram.init() 
-        await auth.init() 
-        
-        if (auth.isAuth) {
-            await loadUserData() 
-        } else {
-            isAppInitializing.value = false 
-        }
-    } catch (e) {
-        console.error('Критическая ошибка старта:', e)
-        initError.value = 'Ошибка запуска приложения. Обновите страницу.'
-        isAppInitializing.value = false
-    }
-})
-</script>
-
-<template>
-  <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
-    
-    <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
-      <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>
-      <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
-      <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
-    </div>
-
-    <div v-else-if="initError" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <span class="material-icons-round text-4xl text-red-400 mb-2">error_outline</span>
-        <p class="text-sm font-bold text-slate-600">{{ initError }}</p>
-        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">Обновить</button>
-    </div>
-
-    <div v-else-if="!auth.isAuth" class="flex-1 bg-white">
-      <AuthView />
-    </div>
-
-    <template v-else>
-      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0">
-        <transition name="fade" mode="out-in">
-           <component :is="activeComponent" />
-        </transition>
-      </main>
-
-      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
-        <div class="h-[76px] grid grid-cols-5 items-center">
-          <button v-for="tab in tabs" :key="tab.id" @click="switchTab(tab.id)" class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'">
-            <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
-            <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
-          </button>
-        </div>
-      </nav>
-    </template>
-  </div>
-</template>
-
-<style>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-</style>
-</file>
-
 <file path="src/stores/products.js">
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -2655,6 +2662,153 @@ export const useProductStore = defineStore('products', () => {
     updateProduct
   }
 })
+</file>
+
+<file path="src/App.vue">
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useAuthStore } from './stores/auth'
+import { useDictionariesStore } from './stores/dictionaries'
+import { useSettingsStore } from './stores/settings'
+import { useTelegramStore } from './stores/telegram'
+import { useRealtimeStore } from './stores/realtime' // <-- Импортируем Realtime
+
+// Импортируем компоненты страниц
+import PlanView from './views/PlanView.vue'
+import DishesView from './views/DishesView.vue'
+import ProductsView from './views/ProductsView.vue'
+import ShoppingView from './views/ShoppingView.vue'
+import SettingsView from './views/SettingsView.vue'
+import AuthView from './views/AuthView.vue' 
+
+const auth = useAuthStore()
+const dictionaries = useDictionariesStore()
+const settings = useSettingsStore()
+const telegram = useTelegramStore()
+const realtime = useRealtimeStore() // <-- Инициализируем стор
+
+const currentTab = ref('plan')
+
+// Глобальный флаг загрузки
+const isAppInitializing = ref(true)
+const initError = ref(null)
+
+const tabs = [
+  { id: 'plan', label: 'План', icon: 'calendar_today', component: PlanView },
+  { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu', component: DishesView },
+  { id: 'shopping', label: 'Купить', icon: 'shopping_bag', component: ShoppingView },
+  { id: 'products', label: 'Продукты', icon: 'kitchen', component: ProductsView },
+  { id: 'settings', label: 'Настр.', icon: 'tune', component: SettingsView }
+]
+
+const activeComponent = computed(() => {
+  const tab = tabs.find(t => t.id === currentTab.value)
+  return tab ? tab.component : PlanView
+})
+
+// Логика переключения вкладок с вибрацией
+const switchTab = (tabId) => {
+    if (currentTab.value === tabId) return
+    telegram.haptic.impact('light') 
+    currentTab.value = tabId
+}
+
+// Единая функция загрузки данных пользователя
+const loadUserData = async () => {
+    isAppInitializing.value = true 
+    initError.value = null
+    
+    try {
+        if (auth.isAuth) {
+            // Загружаем настройки и справочники параллельно
+            await Promise.all([
+                settings.fetchSettings(),
+                dictionaries.fetchDictionaries()
+            ])
+            
+            // <-- ЗАПУСКАЕМ REALTIME СИНХРОНИЗАЦИЮ
+            // Это позволит получать обновления от других членов семьи
+            realtime.init()
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки данных:', e)
+    } finally {
+        isAppInitializing.value = false
+    }
+}
+
+// Если статус авторизации меняется (например, вошли), грузим данные
+watch(() => auth.isAuth, (newVal) => {
+  if (newVal) loadUserData()
+})
+
+onMounted(async () => {
+    try {
+        telegram.init() 
+        await auth.init() 
+        
+        if (auth.isAuth) {
+            await loadUserData() 
+        } else {
+            // Если не авторизованы, просто убираем загрузчик (покажем AuthView)
+            isAppInitializing.value = false 
+        }
+    } catch (e) {
+        console.error('Критическая ошибка старта:', e)
+        initError.value = 'Ошибка запуска приложения. Попробуйте обновить страницу.'
+        isAppInitializing.value = false
+    }
+})
+</script>
+
+<template>
+  <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
+    
+    <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
+      <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>
+      <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
+      <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
+    </div>
+
+    <div v-else-if="initError" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <span class="material-icons-round text-4xl text-red-400 mb-2">error_outline</span>
+        <p class="text-sm font-bold text-slate-600">{{ initError }}</p>
+        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">Обновить</button>
+    </div>
+
+    <div v-else-if="!auth.isAuth" class="flex-1 bg-white">
+      <AuthView />
+    </div>
+
+    <template v-else>
+      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0">
+        <transition name="fade" mode="out-in">
+           <component :is="activeComponent" />
+        </transition>
+      </main>
+
+      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
+        <div class="h-[76px] grid grid-cols-5 items-center">
+          <button 
+            v-for="tab in tabs" 
+            :key="tab.id" 
+            @click="switchTab(tab.id)" 
+            class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" 
+            :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+          >
+            <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
+            <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
+          </button>
+        </div>
+      </nav>
+    </template>
+  </div>
+</template>
+
+<style>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>
 </file>
 
 <file path="src/stores/dishes.js">
@@ -2918,176 +3072,6 @@ export const usePlanStore = defineStore('plan', () => {
   }
 
   return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }
-})
-</file>
-
-<file path="src/stores/settings.js">
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from './auth'
-
-export const useSettingsStore = defineStore('settings', () => {
-  const startDay = ref(1) 
-  const periodLength = ref(7)
-  const defaultPortions = ref(1)
-  
-  const household = ref(null)      
-  const familyMembers = ref([])
-  const loading = ref(false)
-  
-  const fetchSettings = async () => {
-    const auth = useAuthStore()
-    if (!auth.user) return
-
-    loading.value = true
-    try {
-      // 1. Грузим настройки профиля
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('start_day, period_length, default_portions, household_id')
-        .eq('id', auth.user.id)
-        .single()
-
-      if (error) throw error
-
-      if (profile) {
-        startDay.value = profile.start_day ?? 1
-        periodLength.value = profile.period_length ?? 7
-        defaultPortions.value = profile.default_portions ?? 1
-        
-        // 2. ОБЯЗАТЕЛЬНО грузим семью, если она есть
-        if (profile.household_id) {
-            await fetchHouseholdDetails(profile.household_id)
-        }
-      }
-    } catch (e) { 
-        console.error('Ошибка загрузки настроек:', e) 
-    } finally {
-        loading.value = false
-    }
-  }
-  
-  const fetchHouseholdDetails = async (householdId) => {
-      // Данные семьи
-      const { data: hhData, error: hhError } = await supabase
-          .from('households')
-          .select('*')
-          .eq('id', householdId)
-          .single()
-      
-      if (!hhError && hhData) {
-          household.value = hhData
-      }
-      
-      // Участники
-      const { data: members } = await supabase
-          .from('profiles')
-          .select('id, first_name, username, avatar_url, telegram_id')
-          .eq('household_id', householdId)
-      
-      familyMembers.value = members || []
-  }
-
-  const saveSettings = async (day, period, portions) => {
-    const auth = useAuthStore()
-    startDay.value = day
-    periodLength.value = period
-    defaultPortions.value = portions
-    
-    await supabase.from('profiles').update({ 
-        start_day: day, 
-        period_length: period, 
-        default_portions: portions 
-    }).eq('id', auth.user.id)
-  }
-
-  // --- ЛОГИКА СОВМЕСТНОГО ДОСТУПА ---
-
-  const generateInviteCode = async () => {
-      if (!household.value) throw new Error('Семья не найдена')
-
-      // Генерируем код
-      const code = Math.floor(100000 + Math.random() * 900000).toString()
-      
-      const { data, error } = await supabase
-          .from('households')
-          .update({ invite_code: code })
-          .eq('id', household.value.id)
-          .select()
-          .single()
-          
-      if (error) throw error
-      if (data) household.value = data
-  }
-
-  const joinHousehold = async (code) => {
-      const auth = useAuthStore()
-      
-      if (!code || code.length < 6) throw new Error('Код должен состоять из 6 цифр')
-
-      // 1. Ищем семью по коду
-      const { data: targetHousehold, error } = await supabase
-          .from('households')
-          .select('id')
-          .eq('invite_code', code)
-          .single()
-          
-      if (error || !targetHousehold) throw new Error('Неверный код приглашения или семья не найдена')
-
-      // 2. Меняем ID в профиле
-      const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ household_id: targetHousehold.id })
-          .eq('id', auth.user.id)
-          
-      if (updateError) throw updateError
-      
-      // 3. Перезагрузка страницы
-      window.location.reload()
-  }
-
-  const leaveHousehold = async () => {
-      const auth = useAuthStore()
-      
-      // 1. Ищем родную семью (где user = owner)
-      const { data: myOwnHousehold } = await supabase
-          .from('households')
-          .select('id')
-          .eq('owner_id', auth.user.id)
-          .single()
-          
-      if (!myOwnHousehold) {
-          // Если родной семьи нет (редкий случай), создаем её
-          const { data: newHousehold } = await supabase
-              .from('households')
-              .insert({ name: 'Моя семья', owner_id: auth.user.id })
-              .select()
-              .single()
-              
-           if (newHousehold) {
-                await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
-                window.location.reload()
-                return
-           }
-           throw new Error('Не удалось покинуть семью')
-      }
-
-      // 2. Переключаемся
-      await supabase
-          .from('profiles')
-          .update({ household_id: myOwnHousehold.id })
-          .eq('id', auth.user.id)
-          
-      window.location.reload()
-  }
-
-  return { 
-      startDay, periodLength, defaultPortions, 
-      household, familyMembers, loading,
-      fetchSettings, saveSettings,
-      generateInviteCode, joinHousehold, leaveHousehold
-  }
 })
 </file>
 
@@ -3855,6 +3839,168 @@ onMounted(() => {
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
+</file>
+
+<file path="src/stores/settings.js">
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
+import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
+
+export const useSettingsStore = defineStore('settings', () => {
+  const startDay = ref(1) 
+  const periodLength = ref(7)
+  const defaultPortions = ref(1)
+  
+  const household = ref(null)      
+  const familyMembers = ref([])
+  const loading = ref(false)
+  
+  const fetchSettings = async () => {
+    const auth = useAuthStore()
+    if (!auth.user) return
+
+    loading.value = true
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('household_id')
+        .eq('id', auth.user.id)
+        .single()
+
+      if (profileError) throw profileError
+
+      if (profile?.household_id) {
+          await fetchHouseholdDetails(profile.household_id)
+      }
+    } catch (e) { 
+        console.error('Ошибка загрузки настроек:', e) 
+    } finally {
+        loading.value = false
+    }
+  }
+  
+  const fetchHouseholdDetails = async (householdId) => {
+      const { data: hhData, error: hhError } = await supabase
+          .from('households')
+          .select('*')
+          .eq('id', householdId)
+          .single()
+      
+      if (!hhError && hhData) {
+          household.value = hhData
+          startDay.value = hhData.start_day ?? 1
+          periodLength.value = hhData.period_length ?? 7
+          defaultPortions.value = hhData.default_portions ?? 1
+      }
+      
+      const { data: members } = await supabase
+          .from('profiles')
+          .select('id, first_name, username, avatar_url, telegram_id')
+          .eq('household_id', householdId)
+      
+      familyMembers.value = members || []
+  }
+
+  // --- ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
+  const saveSettings = async (day, period, portions) => {
+    // 1. Обновляем у себя локально
+    startDay.value = day
+    periodLength.value = period
+    defaultPortions.value = portions
+    
+    if (household.value?.id) {
+        // 2. Сохраняем в базу данных (чтобы не пропало при перезагрузке)
+        const { error } = await supabase
+            .from('households')
+            .update({ 
+                start_day: day, 
+                period_length: period, 
+                default_portions: portions 
+            })
+            .eq('id', household.value.id)
+
+        if (error) {
+            console.error('Ошибка сохранения настроек:', error)
+            return
+        }
+
+        // 3. ОТПРАВЛЯЕМ СИГНАЛ ВСЕМ ОСТАЛЬНЫМ (Broadcast)
+        // Это гарантирует, что другие устройства получат обновление мгновенно
+        const realtime = useRealtimeStore()
+        await realtime.notifySettingsChanged({
+            startDay: day,
+            periodLength: period,
+            defaultPortions: portions
+        })
+    }
+  }
+
+  const generateInviteCode = async () => {
+      if (!household.value) throw new Error('Семья не найдена')
+      const code = Math.floor(100000 + Math.random() * 900000).toString()
+      const { data, error } = await supabase
+          .from('households')
+          .update({ invite_code: code })
+          .eq('id', household.value.id)
+          .select()
+          .single()
+      if (error) throw error
+      if (data) household.value = data 
+  }
+
+  const joinHousehold = async (code) => {
+      const auth = useAuthStore()
+      if (!code || code.length < 6) throw new Error('Код должен состоять из 6 цифр')
+      const { data: targetHousehold, error } = await supabase
+          .from('households')
+          .select('id')
+          .eq('invite_code', code)
+          .single()
+      if (error || !targetHousehold) throw new Error('Неверный код или семья не найдена')
+      const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ household_id: targetHousehold.id })
+          .eq('id', auth.user.id)
+      if (updateError) throw updateError
+      window.location.reload()
+  }
+
+  const leaveHousehold = async () => {
+      const auth = useAuthStore()
+      const { data: myOwnHousehold } = await supabase
+          .from('households')
+          .select('id')
+          .eq('owner_id', auth.user.id)
+          .single()
+      if (!myOwnHousehold) {
+          const { data: newHousehold } = await supabase
+              .from('households')
+              .insert({ name: 'Моя семья', owner_id: auth.user.id })
+              .select()
+              .single()
+           if (newHousehold) {
+                await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
+                window.location.reload()
+                return
+           }
+           throw new Error('Не удалось создать новую семью')
+      }
+      await supabase
+          .from('profiles')
+          .update({ household_id: myOwnHousehold.id })
+          .eq('id', auth.user.id)
+      window.location.reload()
+  }
+
+  return { 
+      startDay, periodLength, defaultPortions, 
+      household, familyMembers, loading,
+      fetchSettings, saveSettings,
+      generateInviteCode, joinHousehold, leaveHousehold
+  }
+})
 </file>
 
 <file path="src/views/PlanView.vue">

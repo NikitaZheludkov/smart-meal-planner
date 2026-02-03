@@ -120,6 +120,11 @@ export const useSettingsStore = defineStore('settings', () => {
           .update({ household_id: targetHousehold.id })
           .eq('id', auth.user.id)
       if (updateError) throw updateError
+      
+      // Manually update the householdId in the auth store
+      const auth = useAuthStore()
+      await auth.handleUserSession(auth.user.value)
+
       window.location.reload()
   }
 
