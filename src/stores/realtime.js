@@ -45,6 +45,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
           settings.startDay = payload.payload.startDay
           settings.periodLength = payload.payload.periodLength
           settings.defaultPortions = payload.payload.defaultPortions
+          if (payload.payload.household) {
+              settings.household.value = payload.payload.household
+          }
       }
     )
 

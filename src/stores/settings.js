@@ -88,7 +88,8 @@ export const useSettingsStore = defineStore('settings', () => {
         await realtime.notifySettingsChanged({
             startDay: day,
             periodLength: period,
-            defaultPortions: portions
+            defaultPortions: portions,
+            household: household.value
         })
     }
   }
