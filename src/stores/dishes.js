@@ -131,7 +131,12 @@ export const useDishStore = defineStore('dishes', () => {
   }
 
   const deleteDish = async (id) => {
+    // Delete the dish from the plan table
+    await supabase.from('plan').delete().eq('dish_id', id);
+
+    // Delete the dish from the dishes table
     await supabase.from('dishes').delete().eq('id', id)
+
     await fetchDishes()
   }
 

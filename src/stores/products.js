@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth' // <-- 1. Импортируем AuthStore
+import { useDishStore } from './dishes'
 
 export const useProductStore = defineStore('products', () => {
   const products = ref([])
@@ -86,6 +87,29 @@ export const useProductStore = defineStore('products', () => {
 
   // Удаление продукта
   const deleteProduct = async (id) => {
+    // Delete the product from the plan table
+    await supabase.from('plan').delete().eq('product_id', id);
+
+    const dishStore = useDishStore()
+    // Find all dishes that use the product
+    const dishesToUpdate = dishStore.dishes.filter(dish =>
+      dish.ingredients.some(ingredient => ingredient.product_id === id)
+    );
+
+    // Remove the product from the ingredients array of each dish
+    for (const dish of dishesToUpdate) {
+      dish.ingredients = dish.ingredients.filter(ingredient => ingredient.product_id !== id);
+      // Update the ingredients table in the database
+      await supabase
+        .from('ingredients')
+        .delete()
+        .eq('dish_id', dish.id)
+        .eq('product_id', id);
+    }
+
+    // Delete the product from the plan table
+    await supabase.from('plan').delete().eq('product_id', id);
+
     const { error } = await supabase
       .from('products')
       .delete()
