@@ -134,6 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
     init, 
     loginWithTelegram,
     loginAsTestUser,
-    signOut
+    signOut,
+    handleUserSession
   }
 })

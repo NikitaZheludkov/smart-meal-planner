@@ -202,35 +202,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
 <template>
   <div class="flex flex-col h-full bg-slate-50 relative">
-    
-    <div class="bg-white px-5 pt-6 pb-2 rounded-b-[32px] shadow-sm z-10 sticky top-0">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Мой План</h1>
-        <div v-if="planStore.loading" class="w-6 h-6">
-           <span class="material-icons-round animate-spin text-slate-300">sync</span>
-        </div>
-      </div>
-      
-      <div class="flex bg-slate-100 p-1.5 rounded-2xl mb-4">
-        <button @click="uiStore.plan.activeTab = 'day'" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all" :class="uiStore.plan.activeTab === 'day' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'">День</button>
-        <button @click="uiStore.plan.activeTab = 'week'" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all" :class="uiStore.plan.activeTab === 'week' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'">Сетка</button>
-      </div>
 
-      <div class="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl mb-2">
-        <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
-            <span class="material-icons-round">chevron_left</span>
-        </button>
-        <div class="flex flex-col items-center">
-          <span class="text-sm font-bold text-slate-800 capitalize transition-all">{{ displayDateLabel }}</span>
-           <transition name="pop">
-             <button v-if="showTodayBtn" @click="goToToday" class="text-[10px] font-bold text-orange-500 uppercase mt-0.5 bg-orange-50 px-2 py-0.5 rounded-md">Сегодня</button>
-          </transition>
-        </div>
-        <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 rounded-xl transition-colors">
-            <span class="material-icons-round">chevron_right</span>
-        </button>
-      </div>
-    </div>
 
     <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto pb-20 pt-2 px-4">
       <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">

@@ -46,7 +46,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
           settings.periodLength = payload.payload.periodLength
           settings.defaultPortions = payload.payload.defaultPortions
           if (payload.payload.household) {
-              settings.household.value = payload.payload.household
+              // Fix: household is unwrapped by Pinia, so assign directly
+              settings.household = payload.payload.household
           }
       }
     )

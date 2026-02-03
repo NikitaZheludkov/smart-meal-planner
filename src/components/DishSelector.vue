@@ -6,6 +6,7 @@ import { usePlanStore } from '../stores/plan'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useTelegramStore } from '../stores/telegram'
 import { format, parseISO } from 'date-fns'
+import { ru } from 'date-fns/locale'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -150,7 +151,7 @@ const getDishSlotName = (id) => {
           <div>
               <h2 class="text-xl font-black text-slate-900">{{ getSlotName }}</h2>
               <p class="text-[11px] font-bold text-slate-400">
-                  {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: dictionaries.ru }) : '' }}
+                  {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
               </p>
           </div>
           <button @click="$emit('close')" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg tap-effect">

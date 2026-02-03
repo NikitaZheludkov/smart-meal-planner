@@ -104,7 +104,7 @@ const setMealType = (id) => {
   <div class="h-full flex flex-col bg-slate-50">
     
     <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20 shadow-sm border-b border-slate-100">
-      <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Блюда</h1>
+
       
       <div class="flex gap-2 mb-4">
           <div class="relative flex-1">
