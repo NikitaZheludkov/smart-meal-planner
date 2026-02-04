@@ -121,27 +121,37 @@ const periods = [
   <div class="h-full flex flex-col bg-slate-50 relative">
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
-      <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
-      <div class="flex items-center gap-2 mt-2">
-          <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-              {{ getInitials(authStore.user?.user_metadata?.first_name) }}
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Настройки</h1>
+          <div class="flex items-center gap-2 mt-1">
+              <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
+                  {{ getInitials(authStore.user?.user_metadata?.first_name) }}
+              </div>
+              <p class="text-sm font-bold text-slate-500">
+                  {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
+              </p>
           </div>
-          <p class="text-sm font-bold text-slate-500">
-              {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
-          </p>
+        </div>
+        <button 
+          @click="handleSave" 
+          class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect"
+        >
+          Сохранить
+        </button>
       </div>
     </div>
 
-    <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-safe">
+    <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-safe">
       
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Моя Семья</h3>
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Моя Семья</h3>
         
-        <div v-if="settingsStore.loading" class="text-center py-4">
+        <div v-if="settingsStore.loading" class="text-center py-6">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
         </div>
 
-        <div v-else class="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
+        <div v-else class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 space-y-4">
             
             <div class="flex items-center justify-between">
                 <div>
@@ -155,7 +165,7 @@ const periods = [
                 </div>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-2">
                 <div v-for="member in settingsStore.familyMembers" :key="member.id" class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
                          :class="isMe(member.id) ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">
@@ -224,8 +234,8 @@ const periods = [
       </div>
 
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Предпочтения</h3>
-        <div class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 space-y-4">
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Предпочтения</h3>
+        <div class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 space-y-3">
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-700 text-sm">Начало недели</span>
             <select v-model="selectedStartDay" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
@@ -258,7 +268,7 @@ const periods = [
       <div>
         <button 
           @click="handleLogout" 
-          class="w-full bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-red-500 font-bold text-sm"
+          class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-red-500 font-bold text-sm"
         >
              <span class="material-icons-round">logout</span>
              <span>Выйти из аккаунта</span>
@@ -267,14 +277,7 @@ const periods = [
 
     </div>
 
-    <div class="absolute bottom-20 left-0 right-0 p-5 z-20 pointer-events-none">
-        <button 
-            @click="handleSave"
-            class="w-full py-4 rounded-2xl font-bold text-white text-base shadow-xl tap-effect transition-all flex items-center justify-center gap-2 pointer-events-auto bg-slate-900"
-        >
-            Сохранить настройки
-        </button>
-    </div>
+    
 
     <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showJoinModal = false">
         <div class="bg-white w-full max-w-xs rounded-[32px] p-6 animate-bounce-slow">

@@ -15,20 +15,30 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const fetchSettings = async () => {
     const auth = useAuthStore()
+    // Дожидаемся готовности авторизации на мобильных TMA
+    let attempts = 0
+    while (!auth.user && attempts < 30) {
+      await new Promise(r => setTimeout(r, 200))
+      attempts++
+    }
     if (!auth.user) return
 
     loading.value = true
     try {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('household_id')
-        .eq('id', auth.user.id)
-        .single()
-
-      if (profileError) throw profileError
-
-      if (profile?.household_id) {
-          await fetchHouseholdDetails(profile.household_id)
+      // Если householdId уже известен из auth, используем его сразу
+      const hhId = auth.householdId
+      if (hhId) {
+        await fetchHouseholdDetails(hhId)
+      } else {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('household_id')
+          .eq('id', auth.user.id)
+          .single()
+        if (profileError) throw profileError
+        if (profile?.household_id) {
+            await fetchHouseholdDetails(profile.household_id)
+        }
       }
     } catch (e) { 
         console.error('Ошибка загрузки настроек:', e) 
