@@ -50,6 +50,10 @@ export const useTelegramStore = defineStore('telegram', () => {
     
     console.log('🦁 Telegram Store initialized on', platform.value)
 
+    try {
+      tg.enableClosingConfirmation(true)
+    } catch (e) {}
+
     // 5. Отслеживаем открытие клавиатуры (визуальный вьюпорт)
     const updateKeyboardState = () => {
       const vv = window.visualViewport
@@ -87,6 +91,12 @@ export const useTelegramStore = defineStore('telegram', () => {
     } catch (e) {
       console.log('Keyboard detection not supported')
     }
+
+    try {
+      tg.onEvent('viewportChanged', () => {
+        try { tg.expand() } catch (e) {}
+      })
+    } catch (e) {}
   }
 
   // --- МЕТОДЫ ВИБРАЦИИ (Haptic Feedback) ---

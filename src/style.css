@@ -10,6 +10,11 @@ body {
   background-color: #F8FAFC; /* Чуть более холодный оттенок фона */
 }
 
+html, body, #app { height: 100%; }
+html, body { overscroll-behavior-y: none; }
+#app { overflow: hidden; }
+.scroll-area { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+
 /* Эффект нажатия */
 .tap-effect {
   transition: transform 0.1s ease, opacity 0.1s ease;

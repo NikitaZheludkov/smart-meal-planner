@@ -81,7 +81,7 @@ onMounted(async () => {
         </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3 scroll-area">
         <div v-if="productStore.loading" class="flex justify-center py-10">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
         </div>
