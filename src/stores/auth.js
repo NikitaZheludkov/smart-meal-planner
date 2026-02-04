@@ -9,13 +9,18 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuth = ref(false)
   const loading = ref(true)
 
+  const withTimeout = async (promise, ms) => {
+    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    return Promise.race([promise, t])
+  }
+
   // Инициализация
   const init = async () => {
     loading.value = true
     
     try {
         // 1. Проверяем текущую сессию
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await withTimeout(supabase.auth.getSession(), 5000)
         
         if (session?.user) {
             await handleUserSession(session.user)
@@ -55,9 +60,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-        const { data, error } = await supabase.functions.invoke('telegram-auth', {
-            body: { initData: telegramStore.initData }
-        })
+        const { data, error } = await withTimeout(
+          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } }),
+          7000
+        )
 
         if (error) throw error
         if (!data || !data.session) throw new Error('No session returned')
