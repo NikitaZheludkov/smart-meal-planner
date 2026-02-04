@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
@@ -76,6 +76,12 @@ watch(() => auth.isAuth, (newVal) => {
 })
 
 onMounted(async () => {
+    // Фолбэк на случай зависания инициализации на мобильных TMA
+    const timer = setTimeout(() => {
+        if (isAppInitializing.value) {
+            isAppInitializing.value = false
+        }
+    }, 8000)
     try {
         telegram.init() 
         await auth.init() 
@@ -91,6 +97,11 @@ onMounted(async () => {
         initError.value = 'Ошибка запуска приложения. Попробуйте обновить страницу.'
         isAppInitializing.value = false
     }
+    clearTimeout(timer)
+})
+
+onUnmounted(() => {
+    // Ничего особого, но гарантируем отсутствие висящих таймеров
 })
 </script>
 
