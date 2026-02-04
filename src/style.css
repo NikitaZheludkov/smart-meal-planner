@@ -32,3 +32,11 @@ body {
   border-radius: 10px;
   margin: 0 auto 12px auto;
 }
+
+/* Безопасные отступы для Telegram Mini Apps */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-tg-safe {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 56px);
+}

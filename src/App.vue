@@ -114,7 +114,7 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0">
+      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0" :class="telegram.isReady ? 'pt-tg-safe' : ''">
         <transition name="fade" mode="out-in">
            <component :is="activeComponent" />
         </transition>
