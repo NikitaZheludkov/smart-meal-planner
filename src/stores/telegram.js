@@ -62,8 +62,26 @@ export const useTelegramStore = defineStore('telegram', () => {
         window.visualViewport.addEventListener('resize', updateKeyboardState)
         window.visualViewport.addEventListener('scroll', updateKeyboardState)
       }
-      window.addEventListener('focusin', () => setTimeout(updateKeyboardState, 0))
-      window.addEventListener('focusout', () => setTimeout(updateKeyboardState, 0))
+      // Немедленное переключение флага по фокусу на любых полях ввода
+      const isInputLike = (el) => {
+        if (!el) return false
+        const tag = (el.tagName || '').toUpperCase()
+        return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+      }
+      window.addEventListener('focusin', (e) => {
+        if (isInputLike(e.target)) {
+          isKeyboardOpen.value = true
+        }
+        setTimeout(updateKeyboardState, 0)
+      }, true)
+      window.addEventListener('focusout', (e) => {
+        if (isInputLike(e.target)) {
+          // Небольшая задержка, чтобы избежать мигания при переводе фокуса
+          setTimeout(() => { isKeyboardOpen.value = false; updateKeyboardState() }, 150)
+        } else {
+          setTimeout(updateKeyboardState, 0)
+        }
+      }, true)
       updateKeyboardState()
     } catch (e) {
       console.log('Keyboard detection not supported')
