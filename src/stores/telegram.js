@@ -112,6 +112,9 @@ export const useTelegramStore = defineStore('telegram', () => {
       }
   }
 
+  // Ручное управление флагом клавиатуры (для модалок)
+  const setKeyboardOpen = (val) => { isKeyboardOpen.value = !!val }
+
   return { 
     tg, 
     user, 
@@ -119,6 +122,7 @@ export const useTelegramStore = defineStore('telegram', () => {
     platform, 
     isReady,
     isKeyboardOpen,
+    setKeyboardOpen,
     init,
     haptic,
     mainButton

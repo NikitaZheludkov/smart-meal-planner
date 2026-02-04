@@ -43,5 +43,5 @@ body {
 
 /* Доп. безопасный отступ для шапки модалок под кнопками Telegram */
 .pt-tg-overlay {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 24px);
 }
