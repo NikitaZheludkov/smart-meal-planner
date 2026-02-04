@@ -9,6 +9,7 @@ export const useTelegramStore = defineStore('telegram', () => {
   const initData = ref(null)      // СЫРАЯ строка данных (нужна для проверки безопасности на сервере)
   const platform = ref('unknown') // ios, android, tdesktop...
   const isReady = ref(false)
+  const isKeyboardOpen = ref(false)
 
   // Инициализация (запускаем 1 раз при старте App.vue)
   const init = () => {
@@ -47,6 +48,26 @@ export const useTelegramStore = defineStore('telegram', () => {
     platform.value = tg.platform || 'unknown'
     
     console.log('🦁 Telegram Store initialized on', platform.value)
+
+    // 5. Отслеживаем открытие клавиатуры (визуальный вьюпорт)
+    const updateKeyboardState = () => {
+      const vv = window.visualViewport
+      if (!vv) return
+      // Если высота уменьшилась существенно — считаем, что клавиатура открыта
+      const delta = window.innerHeight - vv.height
+      isKeyboardOpen.value = delta > 120
+    }
+    try {
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateKeyboardState)
+        window.visualViewport.addEventListener('scroll', updateKeyboardState)
+      }
+      window.addEventListener('focusin', () => setTimeout(updateKeyboardState, 0))
+      window.addEventListener('focusout', () => setTimeout(updateKeyboardState, 0))
+      updateKeyboardState()
+    } catch (e) {
+      console.log('Keyboard detection not supported')
+    }
   }
 
   // --- МЕТОДЫ ВИБРАЦИИ (Haptic Feedback) ---
@@ -96,7 +117,8 @@ export const useTelegramStore = defineStore('telegram', () => {
     user, 
     initData, // <--- Важно: теперь мы возвращаем это поле
     platform, 
-    isReady, 
+    isReady,
+    isKeyboardOpen,
     init,
     haptic,
     mainButton

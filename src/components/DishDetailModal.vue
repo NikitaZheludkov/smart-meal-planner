@@ -219,7 +219,7 @@ const getMealTypeName = computed(() => {
     
     <div class="bg-white w-full max-w-sm h-[90vh] sm:h-[85vh] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
       
-      <div class="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
+      <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
         
         <div class="w-20 flex justify-start">
             <button 
