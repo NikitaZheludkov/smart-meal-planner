@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
@@ -88,13 +88,16 @@ const productSearchQuery = ref('')
 const showProductDropdown = ref(false)
 const selectedProductToAdd = ref(null)
 const amountToAdd = ref('')
+const quantityInput = ref(null)
 
 const filteredProducts = computed(() => {
     const q = productSearchQuery.value.toLowerCase().trim()
-    if (!q) return []
+    // Если запрос пустой, показываем первые 50 продуктов (они уже отсортированы в сторе)
+    if (!q) return productStore.products.slice(0, 50)
+    
     return productStore.products
         .filter(p => p.name.toLowerCase().includes(q))
-        .slice(0, 10)
+        .slice(0, 50)
 })
 
 const selectProductFromSearch = (prod) => {
@@ -102,6 +105,11 @@ const selectProductFromSearch = (prod) => {
     productSearchQuery.value = ''
     showProductDropdown.value = false
     amountToAdd.value = ''
+    
+    // Авто-фокус на поле ввода количества
+    nextTick(() => {
+        quantityInput.value?.focus()
+    })
 }
 
 const addIngredientToForm = () => {
@@ -144,6 +152,11 @@ watch(() => props.dish, (newVal) => {
     productSearchQuery.value = ''
     selectedProductToAdd.value = null
     showTagSelection.value = false 
+    
+    // Подгружаем продукты, если их нет
+    if (productStore.products.length === 0) {
+        productStore.fetchProducts()
+    }
   }
 }, { immediate: true })
 
@@ -197,6 +210,7 @@ const getDishTypeName = computed(() => {
 const getMealTypeName = computed(() => {
     return dictionaries.getMealTypeById(formData.value.meal_type_id)?.name || '...'
 })
+
 </script>
 
 <template>
@@ -318,6 +332,64 @@ const getMealTypeName = computed(() => {
                     <input v-model="formData.name" placeholder="Название блюда" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 text-lg">
                 </div>
 
+                <!-- MOVED INGREDIENTS HERE -->
+                <div class="space-y-3">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ингредиенты</label>
+                    
+                    <div v-if="formData.ingredients.length > 0" class="space-y-2">
+                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-lg">🥦</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-bold text-slate-800 text-sm truncate">{{ ing.name }}</div>
+                            </div>
+                            <div class="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold text-slate-500">
+                                {{ ing.amount }} {{ ing.unit }}
+                            </div>
+                            <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
+                                <span class="material-icons-round text-lg">close</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-3 relative">
+                        <div v-if="!selectedProductToAdd">
+                            <div class="relative">
+                                <span class="material-icons-round absolute left-3 top-3 text-slate-400 text-lg">search</span>
+                                <input 
+                                    v-model="productSearchQuery" 
+                                    @focus="showProductDropdown = true"
+                                    @blur="setTimeout(() => showProductDropdown = false, 200)"
+                                    placeholder="Добавить продукт..." 
+                                    class="w-full pl-10 p-3 bg-white rounded-xl font-bold text-slate-700 outline-none border border-slate-200 focus:border-indigo-300 transition-colors text-sm"
+                                >
+                                <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-40 overflow-y-auto">
+                                    <button 
+                                        v-for="prod in filteredProducts" 
+                                        :key="prod.id"
+                                        @click="selectProductFromSearch(prod)"
+                                        class="w-full text-left px-4 py-3 hover:bg-indigo-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between"
+                                    >
+                                        <span>{{ prod.name }}</span> <span class="text-xs text-slate-400">{{ prod.unit }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="flex gap-2 items-center animate-fade-in">
+                            <div class="flex-1 font-bold text-slate-800 text-sm pl-2 truncate">{{ selectedProductToAdd.name }}</div>
+                            <input 
+                                ref="quantityInput"
+                                v-model="amountToAdd" 
+                                type="number" 
+                                inputmode="decimal"
+                                :placeholder="selectedProductToAdd.unit" 
+                                class="w-20 p-2 bg-white rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" 
+                            >
+                            <button @click="addIngredientToForm" class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-lg tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round">check</span></button>
+                            <button @click="selectedProductToAdd = null" class="w-10 h-10 text-slate-400 flex items-center justify-center"><span class="material-icons-round">close</span></button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Тип блюда</label>
@@ -365,57 +437,6 @@ const getMealTypeName = computed(() => {
                         <input v-model.number="formData.protein" type="number" placeholder="Бел" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
                         <input v-model.number="formData.fat" type="number" placeholder="Жир" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
                         <input v-model.number="formData.carbs" type="number" placeholder="Угл" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
-                    </div>
-                </div>
-
-                <div class="h-[1px] bg-slate-100 w-full"></div>
-
-                <div class="space-y-3">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ингредиенты</label>
-                    
-                    <div v-if="formData.ingredients.length > 0" class="space-y-2">
-                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
-                            <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-lg">🥦</div>
-                            <div class="flex-1 min-w-0">
-                                <div class="font-bold text-slate-800 text-sm truncate">{{ ing.name }}</div>
-                            </div>
-                            <div class="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold text-slate-500">
-                                {{ ing.amount }} {{ ing.unit }}
-                            </div>
-                            <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
-                                <span class="material-icons-round text-lg">close</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-3 relative">
-                        <div v-if="!selectedProductToAdd">
-                            <div class="relative">
-                                <span class="material-icons-round absolute left-3 top-3 text-slate-400 text-lg">search</span>
-                                <input 
-                                    v-model="productSearchQuery" 
-                                    @focus="showProductDropdown = true"
-                                    placeholder="Добавить продукт..." 
-                                    class="w-full pl-10 p-3 bg-white rounded-xl font-bold text-slate-700 outline-none border border-slate-200 focus:border-indigo-300 transition-colors text-sm"
-                                >
-                                <div v-if="productSearchQuery && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-40 overflow-y-auto">
-                                    <button 
-                                        v-for="prod in filteredProducts" 
-                                        :key="prod.id"
-                                        @click="selectProductFromSearch(prod)"
-                                        class="w-full text-left px-4 py-3 hover:bg-indigo-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between"
-                                    >
-                                        <span>{{ prod.name }}</span> <span class="text-xs text-slate-400">{{ prod.unit }}</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div v-else class="flex gap-2 items-center animate-fade-in">
-                            <div class="flex-1 font-bold text-slate-800 text-sm pl-2 truncate">{{ selectedProductToAdd.name }}</div>
-                            <input v-model="amountToAdd" type="number" :placeholder="selectedProductToAdd.unit" class="w-20 p-2 bg-white rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" autoFocus>
-                            <button @click="addIngredientToForm" class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-lg tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round">check</span></button>
-                            <button @click="selectedProductToAdd = null" class="w-10 h-10 text-slate-400 flex items-center justify-center"><span class="material-icons-round">close</span></button>
-                        </div>
                     </div>
                 </div>
 
