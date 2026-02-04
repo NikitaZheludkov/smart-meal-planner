@@ -12,13 +12,18 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     try {
+        const auth = useAuthStore()
+        let attempts = 0
+        while (!auth.householdId && attempts < 30) {
+          await new Promise(r => setTimeout(r, 200))
+          attempts++
+        }
         const { data, error } = await supabase
           .from('products')
           .select('*')
+          .eq('household_id', auth.householdId)
           .order('name')
-        
         if (error) throw error
-        
         products.value = data || []
     } catch (e) {
         console.error('Ошибка загрузки продуктов:', e)
