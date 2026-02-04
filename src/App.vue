@@ -131,8 +131,8 @@ onUnmounted(() => {
         </transition>
       </main>
 
-      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-transform duration-200"
-           :class="telegram.isKeyboardOpen ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'">
+      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-transform duration-200 will-change-transform"
+           :style="{ transform: `translateY(${telegram.keyboardOffset}px)` }">
         <div class="h-[76px] grid grid-cols-5 items-center">
           <button 
             v-for="tab in tabs" 

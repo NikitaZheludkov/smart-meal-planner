@@ -10,6 +10,7 @@ export const useTelegramStore = defineStore('telegram', () => {
   const platform = ref('unknown') // ios, android, tdesktop...
   const isReady = ref(false)
   const isKeyboardOpen = ref(false)
+  const keyboardOffset = ref(0)
 
   // Инициализация (запускаем 1 раз при старте App.vue)
   const init = () => {
@@ -53,9 +54,9 @@ export const useTelegramStore = defineStore('telegram', () => {
     const updateKeyboardState = () => {
       const vv = window.visualViewport
       if (!vv) return
-      // Если высота уменьшилась существенно — считаем, что клавиатура открыта
       const delta = window.innerHeight - vv.height
-      isKeyboardOpen.value = delta > 120
+      keyboardOffset.value = Math.max(delta, 0)
+      isKeyboardOpen.value = keyboardOffset.value > 120
     }
     try {
       if (window.visualViewport) {
@@ -140,6 +141,7 @@ export const useTelegramStore = defineStore('telegram', () => {
     platform, 
     isReady,
     isKeyboardOpen,
+    keyboardOffset,
     setKeyboardOpen,
     init,
     haptic,
