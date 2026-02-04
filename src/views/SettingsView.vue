@@ -120,7 +120,7 @@ const periods = [
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white px-5 pt-12 pb-6 rounded-b-[32px] shadow-sm z-10 sticky top-0">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
       <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Настройки</h1>
       <div class="flex items-center gap-2 mt-2">
           <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
@@ -132,7 +132,7 @@ const periods = [
       </div>
     </div>
 
-    <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-32">
+    <div class="flex-1 px-5 py-6 space-y-8 overflow-y-auto pb-safe">
       
       <div>
         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-3">Моя Семья</h3>

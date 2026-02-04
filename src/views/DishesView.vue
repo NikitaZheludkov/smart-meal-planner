@@ -103,7 +103,7 @@ const setMealType = (id) => {
 <template>
   <div class="h-full flex flex-col bg-slate-50">
     
-    <div class="bg-slate-50 pt-12 pb-2 px-5 sticky top-0 z-20 shadow-sm border-b border-slate-100">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
 
       
       <div class="flex gap-2 mb-4">
@@ -167,7 +167,7 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pb-32 space-y-3 pt-4">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3">
       
       <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
         <div class="text-5xl mb-2">🍳</div>
@@ -211,7 +211,7 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="fixed bottom-32 right-5 z-[60]">
+    <div class="fixed bottom-24 right-5 z-[60]">
       <button 
         @click="openCreateDish" 
         class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"

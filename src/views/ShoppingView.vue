@@ -174,7 +174,7 @@ const switchViewTab = (mode) => {
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 overflow-hidden flex flex-col">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 overflow-hidden flex flex-col border-b border-slate-100">
       
       <div class="px-5 pt-12 pb-2 flex items-center justify-between">
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Купить</h1>
@@ -236,7 +236,7 @@ const switchViewTab = (mode) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 py-6 pb-24">
+    <div class="flex-1 overflow-y-auto px-5 py-6 pb-safe">
         
         <div v-if="totalItems === 0" class="h-full flex flex-col items-center justify-center text-center opacity-40 -mt-10">
             <span class="text-5xl mb-4">🛒</span>

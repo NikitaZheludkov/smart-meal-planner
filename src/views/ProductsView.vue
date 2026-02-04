@@ -56,7 +56,7 @@ onMounted(async () => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="px-5 pt-6 pb-4 bg-white rounded-b-[32px] shadow-sm z-10 shrink-0">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
         <h1 class="text-2xl font-black text-slate-900 mb-4 tracking-tight">Продукты</h1>
         
         <div class="relative mb-4">
@@ -81,7 +81,7 @@ onMounted(async () => {
         </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-28 space-y-3">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3">
         <div v-if="productStore.loading" class="flex justify-center py-10">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
         </div>
