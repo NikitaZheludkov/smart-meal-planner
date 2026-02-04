@@ -42,7 +42,7 @@ export const useProductStore = defineStore('products', () => {
     // Если нет ID семьи, мы не можем создать продукт (защита RLS не пропустит)
     if (!auth.householdId) {
         console.error('Нет householdId, сохранение невозможно')
-        return null
+        throw new Error('householdId_missing')
     }
 
     const { data, error } = await supabase
@@ -55,10 +55,7 @@ export const useProductStore = defineStore('products', () => {
       }])
       .select()
 
-    if (error) {
-        console.error('Ошибка добавления:', error)
-        return null
-    }
+    if (error) throw error
     if (data) {
         products.value.push(data[0])
         products.value.sort((a, b) => a.name.localeCompare(b.name))
@@ -80,51 +77,51 @@ export const useProductStore = defineStore('products', () => {
       .eq('id', id)
       .select()
 
-    if (error) {
-        console.error('Ошибка обновления:', error)
-        return
-    }
+    if (error) throw error
     if (data) {
         const idx = products.value.findIndex(p => p.id === id)
         if (idx !== -1) products.value[idx] = data[0]
+        return data[0]
     }
   }
 
   // Удаление продукта
   const deleteProduct = async (id) => {
-    // Delete the product from the plan table
-    await supabase.from('plan').delete().eq('product_id', id);
+    const auth = useAuthStore()
+    try {
+      // Чистим использование продукта в плане только для текущей семьи
+      await supabase.from('plan').delete().eq('product_id', id).eq('household_id', auth.householdId)
 
-    const dishStore = useDishStore()
-    // Find all dishes that use the product
-    const dishesToUpdate = dishStore.dishes.filter(dish =>
-      dish.ingredients.some(ingredient => ingredient.product_id === id)
-    );
+      const dishStore = useDishStore()
+      // Находим блюда, где используется продукт
+      const dishesToUpdate = dishStore.dishes.filter(dish =>
+        (dish.ingredients || []).some(ingredient => ingredient.product_id === id)
+      )
 
-    // Remove the product from the ingredients array of each dish
-    for (const dish of dishesToUpdate) {
-      dish.ingredients = dish.ingredients.filter(ingredient => ingredient.product_id !== id);
-      // Update the ingredients table in the database
-      await supabase
-        .from('ingredients')
+      // Удаляем из ингредиентов каждого блюда
+      for (const dish of dishesToUpdate) {
+        dish.ingredients = (dish.ingredients || []).filter(ingredient => ingredient.product_id !== id)
+        await supabase
+          .from('ingredients')
+          .delete()
+          .eq('dish_id', dish.id)
+          .eq('product_id', id)
+      }
+
+      // Удаляем сам продукт только у текущей семьи
+      const { error } = await supabase
+        .from('products')
         .delete()
-        .eq('dish_id', dish.id)
-        .eq('product_id', id);
+        .eq('id', id)
+        .eq('household_id', auth.householdId)
+      if (error) throw error
+
+      products.value = products.value.filter(p => p.id !== id)
+      return true
+    } catch (e) {
+      console.error('Ошибка удаления:', e)
+      throw e
     }
-
-    // Delete the product from the plan table
-    await supabase.from('plan').delete().eq('product_id', id);
-
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-        console.error('Ошибка удаления:', error)
-        return
-    }
-    products.value = products.value.filter(p => p.id !== id)
   }
 
   return { 

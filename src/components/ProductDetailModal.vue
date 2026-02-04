@@ -62,14 +62,21 @@ const handleSave = async () => {
   } catch (e) {
       console.error('Save error:', e)
       telegram.haptic.notification('error')
+      alert('Не удалось сохранить продукт. Проверьте соединение и попробуйте ещё раз.')
   }
 }
 
 const handleDelete = async () => {
     telegram.haptic.notification('warning')
     if(confirm('Удалить продукт? Это может повлиять на рецепты, где он используется.')) {
-        await productStore.deleteProduct(formData.value.id)
-        emit('close')
+        try {
+          await productStore.deleteProduct(formData.value.id)
+          emit('close')
+        } catch (e) {
+          console.error('Delete error:', e)
+          telegram.haptic.notification('error')
+          alert('Не удалось удалить продукт. Попробуйте ещё раз.')
+        }
     }
 }
 

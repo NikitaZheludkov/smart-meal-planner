@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useProductStore } from '../stores/products'
 import { useTelegramStore } from '../stores/telegram'
+import { useDictionariesStore } from '../stores/dictionaries'
 import ProductDetailModal from '../components/ProductDetailModal.vue'
 
 const productStore = useProductStore()
 const telegram = useTelegramStore()
+const dictionaries = useDictionariesStore()
 
 const searchQuery = ref('')
 const selectedCategory = ref('Все')
@@ -47,9 +49,10 @@ const filteredProducts = computed(() => {
 })
 
 onMounted(async () => {
-    if (productStore.products.length === 0) {
-        await productStore.fetchProducts()
-    }
+    const tasks = []
+    if (productStore.products.length === 0) tasks.push(productStore.fetchProducts())
+    tasks.push(dictionaries.fetchDictionaries())
+    await Promise.all(tasks)
 })
 </script>
 
