@@ -92,12 +92,19 @@ const quantityInput = ref(null)
 
 const filteredProducts = computed(() => {
     const q = productSearchQuery.value.toLowerCase().trim()
-    // Если запрос пустой, показываем первые 50 продуктов (они уже отсортированы в сторе)
-    if (!q) return productStore.products.slice(0, 50)
+    if (!q) return []
     
     return productStore.products
         .filter(p => p.name.toLowerCase().includes(q))
         .slice(0, 50)
+})
+
+watch(productSearchQuery, (newValue) => {
+  if (newValue.length > 0) {
+    showProductDropdown.value = true
+  } else {
+    showProductDropdown.value = false
+  }
 })
 
 const selectProductFromSearch = (prod) => {
@@ -357,7 +364,6 @@ const getMealTypeName = computed(() => {
                                 <span class="material-icons-round absolute left-3 top-3 text-slate-400 text-lg">search</span>
                                 <input 
                                     v-model="productSearchQuery" 
-                                    @focus="showProductDropdown = true; telegram.setKeyboardOpen(true)"
                                     @blur="setTimeout(() => showProductDropdown = false, 200)"
                                     placeholder="Добавить продукт..." 
                                     class="w-full pl-10 p-3 bg-white rounded-xl font-bold text-slate-700 outline-none border border-slate-200 focus:border-indigo-300 transition-colors text-sm"
