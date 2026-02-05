@@ -71,6 +71,13 @@ export const useAuthStore = defineStore('auth', () => {
         const { error: sessionError } = await supabase.auth.setSession(data.session)
         if (sessionError) throw sessionError
 
+        // Фолбэк: на мобильных TMA событие onAuthStateChange может не прийти сразу
+        // Явно получаем пользователя и инициируем пользовательскую сессию
+        const { data: userData } = await withTimeout(supabase.auth.getUser(), 5000)
+        if (userData?.user) {
+            await handleUserSession(userData.user)
+        }
+
     } catch (e) {
         console.error('Auth Error:', e)
         // Не сбрасываем state здесь, просто выходим. Пользователь увидит кнопку "Войти".

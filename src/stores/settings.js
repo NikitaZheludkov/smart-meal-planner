@@ -12,6 +12,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const household = ref(null)      
   const familyMembers = ref([])
   const loading = ref(false)
+  const withTimeout = async (promise, ms) => {
+    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    return Promise.race([promise, t])
+  }
   
   const fetchSettings = async () => {
     const auth = useAuthStore()
@@ -30,11 +34,14 @@ export const useSettingsStore = defineStore('settings', () => {
       if (hhId) {
         await fetchHouseholdDetails(hhId)
       } else {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await withTimeout(
+          supabase
           .from('profiles')
           .select('household_id')
           .eq('id', auth.user.id)
-          .single()
+          .single(),
+          7000
+        )
         if (profileError) throw profileError
         if (profile?.household_id) {
             await fetchHouseholdDetails(profile.household_id)
@@ -48,11 +55,14 @@ export const useSettingsStore = defineStore('settings', () => {
   }
   
   const fetchHouseholdDetails = async (householdId) => {
-      const { data: hhData, error: hhError } = await supabase
+      const { data: hhData, error: hhError } = await withTimeout(
+          supabase
           .from('households')
           .select('*')
           .eq('id', householdId)
-          .single()
+          .single(),
+          7000
+      )
       
       if (!hhError && hhData) {
           household.value = hhData

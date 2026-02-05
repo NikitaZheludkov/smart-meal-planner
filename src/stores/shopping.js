@@ -9,6 +9,10 @@ export const useShoppingStore = defineStore('shopping', () => {
   
   // Кэшированный список, чтобы не тормозить UI
   const shoppingListCache = ref([]) 
+  const withTimeout = async (promise, ms) => {
+    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    return Promise.race([promise, t])
+  }
 
   const fetchChecklist = async () => {
     // RLS защищает данные, householdId не обязателен в фильтре, но нужен контекст
@@ -16,10 +20,13 @@ export const useShoppingStore = defineStore('shopping', () => {
     if (!auth.user) return
 
     loading.value = true
-    const { data, error } = await supabase
+    const { data, error } = await withTimeout(
+      supabase
       .from('shopping_cart')
       .select('product_id')
-      .eq('is_checked', true)
+      .eq('is_checked', true),
+      7000
+    )
 
     if (error) {
       console.error('Ошибка списка покупок:', error)
@@ -37,14 +44,17 @@ export const useShoppingStore = defineStore('shopping', () => {
     else checkedIds.value.delete(productId)
 
     // Запись в базу
-    const { error } = await supabase
+    const { error } = await withTimeout(
+      supabase
       .from('shopping_cart')
       .upsert({ 
         household_id: auth.householdId, 
         product_id: productId, 
         is_checked: newState,
         updated_at: new Date()
-      }, { onConflict: 'household_id, product_id' })
+      }, { onConflict: 'household_id, product_id' }),
+      7000
+    )
 
     if (error) console.error('Ошибка сохранения:', error)
   }

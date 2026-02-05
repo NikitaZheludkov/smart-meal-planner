@@ -6,6 +6,10 @@ import { useAuthStore } from './auth'
 export const usePlanStore = defineStore('plan', () => {
   const plan = ref([])
   const loading = ref(false)
+  const withTimeout = async (promise, ms) => {
+    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    return Promise.race([promise, t])
+  }
 
   const fetchPlan = async () => {
     const auth = useAuthStore()
@@ -15,7 +19,8 @@ export const usePlanStore = defineStore('plan', () => {
     if (isFirstLoad) loading.value = true
     
     try {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(
+          supabase
         .from('plan')
         .select(`
             *,
@@ -29,7 +34,9 @@ export const usePlanStore = defineStore('plan', () => {
             ),
             products ( * )
         `)
-        .eq('household_id', auth.householdId)
+        .eq('household_id', auth.householdId),
+        7000
+        )
         
         if (error) throw error
         
