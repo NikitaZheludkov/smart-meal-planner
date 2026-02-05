@@ -10,7 +10,6 @@ export const useTelegramStore = defineStore('telegram', () => {
   const platform = ref('unknown') // ios, android, tdesktop...
   const isReady = ref(false)
   const isKeyboardOpen = ref(false)
-  const keyboardOffset = ref(0)
 
   // Инициализация (запускаем 1 раз при старте App.vue)
   const init = () => {
@@ -29,7 +28,6 @@ export const useTelegramStore = defineStore('telegram', () => {
     } catch (e) { console.error('Expand error:', e) }
 
     // 3. Настраиваем цвета шапки и фона
-    // Цвет #F8FAFC совпадает с твоим фоном в style.css
     const appBgColor = '#F8FAFC' 
     
     try {
@@ -40,12 +38,8 @@ export const useTelegramStore = defineStore('telegram', () => {
     }
 
     // 4. Сохраняем данные
-    // initDataUnsafe — это просто объект, ему верить нельзя (для UI пойдет)
     user.value = tg.initDataUnsafe?.user || null
-    
-    // initData — это строка с подписью. Ей верить можно, если проверить на сервере.
     initData.value = tg.initData 
-    
     platform.value = tg.platform || 'unknown'
     
     console.log('🦁 Telegram Store initialized on', platform.value)
@@ -54,43 +48,24 @@ export const useTelegramStore = defineStore('telegram', () => {
       tg.enableClosingConfirmation(true)
     } catch (e) {}
 
-    // 5. Отслеживаем открытие клавиатуры (визуальный вьюпорт)
-    const updateKeyboardState = () => {
-      const vv = window.visualViewport
-      if (!vv) return
-      const delta = window.innerHeight - vv.height
-      keyboardOffset.value = Math.max(delta, 0)
-      isKeyboardOpen.value = keyboardOffset.value > 120
+    // 5. Отслеживаем открытие клавиатуры по фокусу на полях ввода
+    const isInputLike = (el) => {
+      if (!el) return false
+      const tag = (el.tagName || '').toUpperCase()
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
     }
-    try {
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', updateKeyboardState)
-        window.visualViewport.addEventListener('scroll', updateKeyboardState)
+
+    window.addEventListener('focusin', (e) => {
+      if (isInputLike(e.target)) {
+        isKeyboardOpen.value = true
       }
-      // Немедленное переключение флага по фокусу на любых полях ввода
-      const isInputLike = (el) => {
-        if (!el) return false
-        const tag = (el.tagName || '').toUpperCase()
-        return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+    }, true)
+
+    window.addEventListener('focusout', (e) => {
+      if (isInputLike(e.target)) {
+        isKeyboardOpen.value = false
       }
-      window.addEventListener('focusin', (e) => {
-        if (isInputLike(e.target)) {
-          isKeyboardOpen.value = true
-        }
-        setTimeout(updateKeyboardState, 0)
-      }, true)
-      window.addEventListener('focusout', (e) => {
-        if (isInputLike(e.target)) {
-          // Небольшая задержка, чтобы избежать мигания при переводе фокуса
-          setTimeout(() => { isKeyboardOpen.value = false; updateKeyboardState() }, 150)
-        } else {
-          setTimeout(updateKeyboardState, 0)
-        }
-      }, true)
-      updateKeyboardState()
-    } catch (e) {
-      console.log('Keyboard detection not supported')
-    }
+    }, true)
 
     try {
       tg.onEvent('viewportChanged', () => {
@@ -141,9 +116,6 @@ export const useTelegramStore = defineStore('telegram', () => {
       }
   }
 
-  // Ручное управление флагом клавиатуры (для модалок)
-  const setKeyboardOpen = (val) => { isKeyboardOpen.value = !!val }
-
   return { 
     tg, 
     user, 
@@ -151,8 +123,6 @@ export const useTelegramStore = defineStore('telegram', () => {
     platform, 
     isReady,
     isKeyboardOpen,
-    keyboardOffset,
-    setKeyboardOpen,
     init,
     haptic,
     mainButton

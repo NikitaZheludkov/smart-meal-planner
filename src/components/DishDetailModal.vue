@@ -387,8 +387,6 @@ const getMealTypeName = computed(() => {
                                 v-model="amountToAdd" 
                                 type="number" 
                                 inputmode="decimal"
-                                @focus="telegram.setKeyboardOpen(true)"
-                                @blur="setTimeout(() => telegram.setKeyboardOpen(false), 150)"
                                 :placeholder="selectedProductToAdd.unit" 
                                 class="w-20 p-2 bg-white rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" 
                             >
