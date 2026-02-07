@@ -167,7 +167,7 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3 scroll-area">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 scroll-area">
       
       <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
         <div class="text-5xl mb-2">🍳</div>

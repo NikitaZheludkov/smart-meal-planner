@@ -142,7 +142,7 @@ const periods = [
       </div>
     </div>
 
-    <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-safe">
+    <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-[76px]">
       
       <div>
         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Моя Семья</h3>
