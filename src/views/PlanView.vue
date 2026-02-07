@@ -234,7 +234,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
       </div>
     </div>
 
-    <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto px-5 pt-4 pb-safe scroll-area">
+    <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area">
       <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
          <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
          <div class="h-6 w-[1px] bg-slate-100"></div>
@@ -285,7 +285,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
       </div>
     </div>
 
-    <div v-else class="flex-1 overflow-y-auto px-5 pt-4 pb-safe space-y-3 mt-2 scroll-area">
+    <div v-else class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area">
       <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex items-stretch gap-4">
         
         <div class="flex flex-col items-center justify-center w-8 flex-shrink-0 border-r border-slate-50 pr-3">
