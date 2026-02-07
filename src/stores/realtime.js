@@ -68,64 +68,32 @@ export const useRealtimeStore = defineStore('realtime', () => {
       })
   }
 
-  // Обработка изменений из Базы Данных (как и раньше)
+  // Обработка изменений из Базы Данных
   const handleDatabaseUpdate = async (payload) => {
-    const { table, eventType, new: newRecord, old: oldRecord } = payload
+    const { table } = payload
     
     // Игнорируем household, так как для него теперь используем Broadcast
     if (table === 'households') return 
 
-    console.log(`⚡ Обновление БД в ${table}:`, eventType)
+    console.log(`⚡ Обновление БД в ${table}, запрашиваем свежие данные...`)
 
     const plan = usePlanStore()
     const shopping = useShoppingStore()
     const products = useProductStore()
     const dishes = useDishStore()
 
+    // Просто запрашиваем свежие данные в зависимости от того, какая таблица изменилась
     if (table === 'plan') {
-      if (eventType === 'INSERT') {
-          const item = { ...newRecord, slot: 'Загрузка...' }
-          plan.plan.push(item)
-          await plan.fetchPlan() 
-      }
-      if (eventType === 'DELETE') {
-          plan.plan = plan.plan.filter(i => i.id !== oldRecord.id)
-      }
-      if (eventType === 'UPDATE') {
-        const idx = plan.plan.findIndex(i => i.id === newRecord.id)
-        if (idx !== -1) {
-            Object.assign(plan.plan[idx], {
-                portions: newRecord.portions,
-                ignore_shopping: newRecord.ignore_shopping,
-                meal_type_id: newRecord.meal_type_id,
-                date: newRecord.date
-            })
-        }
-      }
+      await plan.fetchPlan()
     }
-
     else if (table === 'shopping_cart') {
-       if (eventType === 'INSERT' || eventType === 'UPDATE') {
-           if (newRecord.is_checked) shopping.checkedIds.add(newRecord.product_id)
-           else shopping.checkedIds.delete(newRecord.product_id)
-       }
-       if (eventType === 'DELETE') {
-           shopping.checkedIds.delete(oldRecord.product_id)
-       }
+      await shopping.fetchChecklist()
     }
-
     else if (table === 'products') {
-        if (eventType === 'INSERT') products.products.push(newRecord)
-        if (eventType === 'DELETE') products.products = products.products.filter(p => p.id !== oldRecord.id)
-        if (eventType === 'UPDATE') {
-            const idx = products.products.findIndex(p => p.id === newRecord.id)
-            if (idx !== -1) products.products[idx] = newRecord
-        }
-        products.products.sort((a, b) => a.name.localeCompare(b.name))
+      await products.fetchProducts()
     }
-    
-    else if (table === 'dishes' || table === 'ingredients') {
-        await dishes.fetchDishes()
+    else if (table === 'dishes' || table === 'ingredients' || table === 'dish_tag_links') {
+      await dishes.fetchDishes()
     }
   }
 
