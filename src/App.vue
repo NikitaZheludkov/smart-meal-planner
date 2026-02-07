@@ -5,6 +5,8 @@ import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
 import { useTelegramStore } from './stores/telegram'
 import { useRealtimeStore } from './stores/realtime' // <-- Импортируем Realtime
+import FloatingButton from './components/FloatingButton.vue'
+import DebugModal from './components/DebugModal.vue'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -147,6 +149,8 @@ onUnmounted(() => {
         </div>
       </nav>
     </template>
+    <FloatingButton />
+    <DebugModal />
   </div>
 </template>
 
