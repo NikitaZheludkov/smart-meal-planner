@@ -2,20 +2,21 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useTelegramStore = defineStore('telegram', () => {
-  // Получаем доступ к объекту Telegram (если он есть)
-  const tg = window.Telegram?.WebApp
-  
-  const user = ref(null)          // Готовый объект пользователя (для отображения имени, аватарки)
-  const initData = ref(null)      // СЫРАЯ строка данных (нужна для проверки безопасности на сервере)
-  const platform = ref('unknown') // ios, android, tdesktop...
+  let tg = window.Telegram?.WebApp
+
+  const user = ref(null)
+  const initData = ref(null)
+  const platform = ref('unknown')
   const isReady = ref(false)
   const isKeyboardOpen = ref(false)
 
   // Инициализация (запускаем 1 раз при старте App.vue)
   const init = () => {
+    // Переносим получение tg сюда и добавляем проверку
+    tg = window.Telegram?.WebApp
     if (!tg) {
-        console.log('Telegram WebApp не найден (обычный браузер)')
-        return
+      console.log('Telegram WebApp не найден (обычный браузер)')
+      return
     }
 
     // 1. Сообщаем Телеграму, что приложение готово к показу
