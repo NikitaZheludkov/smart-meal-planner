@@ -38,33 +38,33 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
-    
-    // Оптимистик UI
-    if (newState) checkedIds.value.add(productId)
-    else checkedIds.value.delete(productId)
 
-    // Запись в базу
-    const { error } = await withTimeout(
-      supabase
+    const { error } = await supabase
       .from('shopping_cart')
       .upsert({ 
         household_id: auth.householdId, 
         product_id: productId, 
         is_checked: newState,
         updated_at: new Date()
-      }, { onConflict: 'household_id, product_id' }),
-      7000
-    )
+      }, { onConflict: 'household_id, product_id' })
 
-    if (error) console.error('Ошибка сохранения:', error)
+    if (error) {
+      console.error('Ошибка сохранения:', error)
+      alert('Не удалось обновить статус продукта')
+    }
+
+    await fetchChecklist()
   }
 
   const clearList = async () => {
-      const auth = useAuthStore()
-      checkedIds.value.clear()
-      await supabase.from('shopping_cart').delete().neq('id', '00000000-0000-0000-0000-000000000000') 
-      // Примечание: RLS удалит только строки текущей семьи. 
-      // neq - это хак, чтобы Supabase не ругался на отсутствие WHERE, если `delete()` пустой.
+      const { error } = await supabase.from('shopping_cart').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      
+      if (error) {
+        console.error('Ошибка очистки списка:', error)
+        alert('Не удалось очистить список покупок')
+      }
+
+      await fetchChecklist()
   }
   
   const isChecked = (id) => checkedIds.value.has(id)

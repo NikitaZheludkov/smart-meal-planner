@@ -127,16 +127,6 @@ export const useDishStore = defineStore('dishes', () => {
         await supabase.from('ingredients').insert(ingRows)
     }
 
-    await supabase.from('ingredients').delete().eq('dish_id', id)
-    if (dishData.ingredients?.length) {
-        const ingRows = dishData.ingredients.map(ing => ({
-            dish_id: id,
-            product_id: ing.product_id,
-            amount: parseFloat(ing.amount)
-        }))
-        await supabase.from('ingredients').insert(ingRows)
-    }
-
     await fetchDishes()
   }
 
