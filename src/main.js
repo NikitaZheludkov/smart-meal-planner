@@ -2,21 +2,25 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import './style.css'
-import { useDebugStore } from '@/stores/debug'
 
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
 
-const debugStore = useDebugStore()
 app.config.errorHandler = (err, instance, info) => {
-  debugStore.addLog(err, info)
+  if (instance) {
+    instance.$root.error = err
+  }
   console.error('Ошибка Vue:', err, info)
 }
 
 window.addEventListener('unhandledrejection', (event) => {
-  debugStore.addLog(event.reason, 'Unhandled Promise Rejection')
+  const root = app._container._vnode.component.proxy
+  if (root) {
+    root.error = event.reason
+  }
   console.error('Необработанный Promise rejection:', event.reason)
 })
 
 app.mount('#app')
+

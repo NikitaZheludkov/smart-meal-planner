@@ -5,8 +5,6 @@ import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
 import { useTelegramStore } from './stores/telegram'
 import { useRealtimeStore } from './stores/realtime' // <-- Импортируем Realtime
-import FloatingButton from './components/FloatingButton.vue'
-import DebugModal from './components/DebugModal.vue'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -23,6 +21,7 @@ const telegram = useTelegramStore()
 const realtime = useRealtimeStore() // <-- Инициализируем стор
 
 const currentTab = ref('plan')
+const error = ref(null)
 
 // Глобальный флаг загрузки
 const isAppInitializing = ref(true)
@@ -67,6 +66,7 @@ const loadUserData = async () => {
         }
     } catch (e) {
         console.error('Ошибка загрузки данных:', e)
+        error.value = e
     } finally {
         isAppInitializing.value = false
     }
@@ -96,7 +96,7 @@ onMounted(async () => {
         }
     } catch (e) {
         console.error('Критическая ошибка старта:', e)
-        initError.value = 'Ошибка запуска приложения. Попробуйте обновить страницу.'
+        error.value = e
         isAppInitializing.value = false
     }
     clearTimeout(timer)
@@ -116,10 +116,13 @@ onUnmounted(() => {
       <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
     </div>
 
-    <div v-else-if="initError" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+    <div v-else-if="error" class="flex-1 flex flex-col items-center justify-center p-4 text-center bg-red-50 text-red-800">
         <span class="material-icons-round text-4xl text-red-400 mb-2">error_outline</span>
-        <p class="text-sm font-bold text-slate-600">{{ initError }}</p>
-        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">Обновить</button>
+        <p class="text-sm font-bold">Произошла ошибка</p>
+        <div class="mt-4 p-2 bg-white rounded-lg text-left text-xs w-full overflow-auto" style="max-height: 50vh;">
+          <pre>{{ error.stack || error }}</pre>
+        </div>
+        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold">Обновить</button>
     </div>
 
     <div v-else-if="!auth.isAuth" class="flex-1 bg-white">
@@ -149,8 +152,6 @@ onUnmounted(() => {
         </div>
       </nav>
     </template>
-    <FloatingButton />
-    <DebugModal />
   </div>
 </template>
 
