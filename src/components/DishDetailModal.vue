@@ -277,7 +277,7 @@ const getMealTypeName = computed(() => {
         
         <transition name="slide-fade">
         
-        <div v-if="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-8 pt-4 no-scrollbar">
+        <div v-if="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-[76px] pt-4 no-scrollbar">
             
             <div v-if="!isEditing" class="flex flex-col space-y-6">
                 <div class="text-center">
