@@ -97,21 +97,48 @@ export const useAuthStore = defineStore('auth', () => {
         ui.addLog('Вызов Edge Function telegram-auth...')
         ui.addLog('InitData length: ' + (telegramStore.initData?.length || 0))
         
-        // Пытаемся вызвать функцию
-        const { data, error } = await withTimeout(
+        // 1. Попытка через стандартный SDK
+        ui.addLog('Попытка #1: SDK invoke...')
+        let response = await withTimeout(
           supabase.functions.invoke('telegram-auth', { 
-            body: { initData: telegramStore.initData },
-            headers: { 'X-Debug-Mode': 'true' }
+            body: { initData: telegramStore.initData }
           }),
-          20000
-        ).catch(err => {
-          ui.addLog('Низкоуровневая ошибка fetch функции', 'error', {
-            name: err.name,
-            message: err.message,
-            cause: err.cause
-          })
-          throw err
-        })
+          15000
+        ).catch(err => ({ error: err }))
+
+        // 2. Если SDK не сработал, пробуем прямой fetch (иногда SDK глючит с Edge Functions)
+        if (response.error) {
+            ui.addLog('SDK invoke не удался, пробуем прямой fetch...', 'warn', response.error.message)
+            
+            const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`
+            ui.addLog('URL функции: ' + functionUrl)
+            
+            const fetchResponse = await withTimeout(
+                fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({ initData: telegramStore.initData })
+                }),
+                15000
+            ).catch(err => {
+                ui.addLog('Прямой fetch тоже не удался', 'error', err.message)
+                throw err
+            })
+
+            if (!fetchResponse.ok) {
+                const errText = await fetchResponse.text()
+                ui.addLog('Ошибка прямого fetch: ' + fetchResponse.status, 'error', errText)
+                throw new Error(`Direct fetch error: ${fetchResponse.status}`)
+            }
+
+            const directData = await fetchResponse.json()
+            response = { data: directData, error: null }
+        }
+
+        const { data, error } = response
 
         if (error) {
           ui.addLog('Edge Function вернула ошибку', 'error', error)
