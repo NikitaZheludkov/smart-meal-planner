@@ -11,12 +11,17 @@ export const useProductStore = defineStore('products', () => {
   // Загрузка продуктов
   const fetchProducts = async () => {
     loading.value = true
+    const auth = useAuthStore()
     try {
-        // Запрос был упрощен. RLS на стороне Supabase сама обеспечит фильтрацию по household_id.
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name')
+        const { data, error } = await auth.withRetry(async () => {
+          return await auth.withTimeout(
+            supabase
+              .from('products')
+              .select('*')
+              .order('name'),
+            15000
+          )
+        })
         
         if (error) throw error
         products.value = data || []
@@ -35,16 +40,21 @@ export const useProductStore = defineStore('products', () => {
         throw new Error('Учётная запись не авторизована или ID семьи не найден.')
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .insert([{
-        name: product.name,
-        category: product.category,
-        unit: product.unit,
-        household_id: auth.householdId
-      }])
-      .select()
-      .single()
+    const { data, error } = await auth.withRetry(async () => {
+      return await auth.withTimeout(
+        supabase
+          .from('products')
+          .insert([{
+            name: product.name,
+            category: product.category,
+            unit: product.unit,
+            household_id: auth.householdId
+          }])
+          .select()
+          .single(),
+        15000
+      )
+    })
 
     if (error) {
         console.error('Supabase insert error:', error)

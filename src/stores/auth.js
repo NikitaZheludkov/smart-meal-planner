@@ -12,9 +12,29 @@ export const useAuthStore = defineStore('auth', () => {
 
   const ui = useUIStore()
 
-  const withTimeout = async (promise, ms = 15000) => { // Увеличим еще больше для мобильных сетей
-    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  const withTimeout = async (promise, ms = 20000) => { 
+    const t = new Promise((_, reject) => setTimeout(() => {
+        const err = new Error('timeout')
+        err.name = 'TimeoutError'
+        reject(err)
+    }, ms))
     return Promise.race([promise, t])
+  }
+
+  const withRetry = async (fn, retries = 3, delay = 1000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn()
+      } catch (err) {
+        const isLastRetry = i === retries - 1
+        const isNetworkError = err.name === 'TimeoutError' || err.message?.includes('fetch') || err.message?.includes('Abort')
+        
+        if (isLastRetry || !isNetworkError) throw err
+        
+        ui.addLog(`Retry ${i + 1}/${retries} after error: ${err.message}`, 'warn')
+        await new Promise(r => setTimeout(r, delay * (i + 1))) // Экспоненциальная задержка
+      }
+    }
   }
 
   // Инициализация
@@ -164,23 +184,44 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const handleUserSession = async (authUser) => {
+    if (!authUser) return
+    
+    // Предотвращаем множественные одновременные загрузки профиля
+    if (user.value?.id === authUser.id && isAuth.value) {
+        ui.addLog('Профиль уже загружен для этого пользователя', 'info')
+        return
+    }
+
     try {
         ui.addLog('Загрузка профиля из БД для: ' + authUser.id)
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('household_id')
-            .eq('id', authUser.id)
-            .single()
+        
+        const { data, error } = await withRetry(async () => {
+            return await withTimeout(
+                supabase
+                    .from('profiles')
+                    .select('household_id')
+                    .eq('id', authUser.id)
+                    .single(),
+                15000
+            )
+        })
             
         if (error) {
             ui.addLog('Ошибка загрузки профиля', 'error', error)
             if (error.code === 'PGRST116') {
                 ui.addLog('Профиль не найден в базе', 'warn')
             }
-            if (error.message === 'Load failed' || error.message?.includes('fetch')) {
-                ui.addLog('Сетевая ошибка при загрузке профиля', 'warn')
+            // При сетевых ошибках НЕ выходим из аккаунта, просто ждем
+            const isTransient = error.message?.includes('fetch') || 
+                              error.message?.includes('Load failed') || 
+                              error.name === 'TimeoutError' ||
+                              error.message?.includes('aborted')
+            
+            if (isTransient) {
+                ui.addLog('Временная ошибка сети, сессия сохранена', 'warn')
                 return 
             }
+            
             await signOut()
             return
         }
@@ -238,10 +279,12 @@ export const useAuthStore = defineStore('auth', () => {
     isAuth, 
     loading, 
     init, 
-    refreshSession,
-    loginWithTelegram,
-    loginAsTestUser,
-    signOut,
-    handleUserSession
+    refreshSession, 
+    loginWithTelegram, 
+    loginAsTestUser, 
+    signOut, 
+    handleUserSession, 
+    withRetry, 
+    withTimeout 
   }
 })
