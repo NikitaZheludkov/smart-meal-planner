@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useTelegramStore } from './telegram'
+import { useUIStore } from './ui'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -9,7 +10,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuth = ref(false)
   const loading = ref(true)
 
-  const withTimeout = async (promise, ms = 10000) => { // Увеличим таймаут по умолчанию
+  const ui = useUIStore()
+
+  const withTimeout = async (promise, ms = 15000) => { // Увеличим еще больше для мобильных сетей
     const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     return Promise.race([promise, t])
   }
@@ -17,31 +20,34 @@ export const useAuthStore = defineStore('auth', () => {
   // Инициализация
   const init = async () => {
     loading.value = true
+    ui.addLog('Запуск инициализации Auth...', 'info')
     
     try {
         // 1. Проверяем текущую сессию
-        const { data: { session } } = await withTimeout(supabase.auth.getSession())
+        const { data: { session }, error } = await withTimeout(supabase.auth.getSession())
+        if (error) ui.addLog('Ошибка getSession при старте', 'error', error)
         
         if (session?.user) {
+            ui.addLog('Сессия найдена при старте, юзер: ' + session.user.id)
             await handleUserSession(session.user)
         } else {
-            // 2. Если сессии нет, пробуем авто-вход через Telegram
+            ui.addLog('Сессия не найдена при старте, пробуем TG вход')
             await loginWithTelegram()
         }
         
-        // 3. Слушаем изменения (разлогин/смена юзера)
+        // 3. Слушаем изменения
         supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('AuthStateChange event:', event)
+            ui.addLog('AuthStateChange event: ' + event)
             if (session?.user) {
                 await handleUserSession(session.user)
             } else {
-                resetState()
+                if (event === 'SIGNED_OUT') resetState()
             }
             loading.value = false
         })
         
     } catch (e) {
-        console.error('Ошибка инициализации Auth:', e)
+        ui.addLog('Ошибка инициализации Auth', 'error', e)
         resetState()
     } finally {
         loading.value = false
@@ -50,28 +56,23 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Метод для принудительного обновления сессии (помогает при выходе из сна)
   const refreshSession = async () => {
-    console.log('🔄 [Refresh] Начало обновления сессии...')
+    ui.addLog('🔄 [Refresh] Начало обновления сессии...', 'info')
     try {
-        // 1. Проверяем наличие данных в localStorage напрямую, если стейт пуст
-        if (!isAuth.value) {
-            console.log('🔄 [Refresh] Стейт пуст, проверяем хранилище...')
-        }
-
-        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 8000)
+        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 10000)
         if (error) {
-            console.error('❌ [Refresh] Ошибка getSession:', error)
+            ui.addLog('❌ [Refresh] Ошибка getSession', 'error', error)
             throw error
         }
         
         if (session?.user) {
-            console.log('✅ [Refresh] Сессия найдена:', session.user.id)
+            ui.addLog('✅ [Refresh] Сессия активна: ' + session.user.id)
             await handleUserSession(session.user)
         } else {
-            console.log('ℹ️ [Refresh] Сессия не найдена, пробуем восстановить через TG...')
+            ui.addLog('ℹ️ [Refresh] Сессия не найдена, восстанавливаем...')
             await loginWithTelegram()
         }
     } catch (e) {
-        console.error('❌ [Refresh] Критическая ошибка:', e)
+        ui.addLog('❌ [Refresh] Критическая ошибка', 'error', e)
     }
   }
 
@@ -79,39 +80,40 @@ export const useAuthStore = defineStore('auth', () => {
     const telegramStore = useTelegramStore()
     
     if (!telegramStore.initData) {
-        console.log('Запущен в браузере. Авто-вход через TG пропущен.')
+        ui.addLog('Авто-вход через TG пропущен (не в TMA)')
         return
     }
 
     try {
-        console.log('Вызов функции telegram-auth...')
+        ui.addLog('Вызов Edge Function telegram-auth...')
         const { data, error } = await withTimeout(
-          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } })
+          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } }),
+          20000
         )
 
         if (error) throw new Error(`Function invoke error: ${error.message}`)
         if (!data || !data.session) throw new Error('No session returned from function')
 
-        console.log('Установка сессии...')
+        ui.addLog('Установка полученной сессии...')
         const { error: sessionError } = await supabase.auth.setSession(data.session)
         if (sessionError) throw new Error(`Set session error: ${sessionError.message}`)
 
-        console.log('Получение пользователя...')
+        ui.addLog('Получение данных пользователя...')
         const { data: userData, error: userError } = await withTimeout(supabase.auth.getUser())
         if (userError) throw new Error(`Get user error: ${userError.message}`)
         if (!userData?.user) throw new Error('User not found after setting session')
         
-        console.log('Успешная авторизация, обработка сессии...')
+        ui.addLog('Успешный вход через TG, загрузка профиля...')
         await handleUserSession(userData.user)
 
     } catch (e) {
-        console.error('Auth Error:', e.message)
+        ui.addLog('Ошибка входа через Telegram', 'error', { message: e.message, stack: e.stack })
     }
   }
 
   const handleUserSession = async (authUser) => {
     try {
-        console.log('🔄 Обработка сессии для:', authUser.id)
+        ui.addLog('Загрузка профиля из БД для: ' + authUser.id)
         const { data, error } = await supabase
             .from('profiles')
             .select('household_id')
@@ -119,12 +121,12 @@ export const useAuthStore = defineStore('auth', () => {
             .single()
             
         if (error) {
-            console.error('❌ Ошибка получения профиля:', error)
+            ui.addLog('Ошибка загрузки профиля', 'error', error)
             if (error.code === 'PGRST116') {
-                console.warn('Профиль не найден (PGRST116).')
+                ui.addLog('Профиль не найден в базе', 'warn')
             }
-            // Не выходим сразу, если это временная ошибка сети
             if (error.message === 'Load failed' || error.message?.includes('fetch')) {
+                ui.addLog('Сетевая ошибка при загрузке профиля', 'warn')
                 return 
             }
             await signOut()
@@ -132,19 +134,18 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         if (!data) {
-            console.warn('Профиль пуст. Требуется повторная регистрация.')
+            ui.addLog('Данные профиля пусты', 'warn')
             await signOut()
             return
         }
 
-        console.log('✅ Профиль загружен, householdId:', data.household_id)
+        ui.addLog('Профиль загружен, householdId: ' + data.household_id)
         user.value = authUser
         householdId.value = data.household_id
         isAuth.value = true
         
     } catch (e) {
-        console.error('Session Error in handleUserSession:', e)
-        // await signOut() // Убираем жесткий логаут при любой ошибке
+        ui.addLog('Исключение в handleUserSession', 'error', e)
     }
   }
 

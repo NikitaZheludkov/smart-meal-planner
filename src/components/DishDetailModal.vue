@@ -5,6 +5,7 @@ import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
 import { useTelegramStore } from '../stores/telegram'
+import { useUIStore } from '../stores/ui'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -17,9 +18,11 @@ const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
 const planStore = usePlanStore()
 const telegram = useTelegramStore()
+const ui = useUIStore()
 
 // Состояние интерфейса
 const isEditing = ref(false)
+const isSaving = ref(false)
 const showTagSelection = ref(false) // Переключатель экранов
 
 const formData = ref({
@@ -168,23 +171,35 @@ watch(() => props.dish, (newVal) => {
 }, { immediate: true })
 
 const handleSave = async () => {
-  if (!formData.value.name) return
+  if (!formData.value.name || isSaving.value) return
+  
+  isSaving.value = true
+  ui.addLog(`Попытка сохранения блюда: ${formData.value.name}`, 'info', formData.value)
   
   try {
     telegram.haptic.notification('success')
     
     if (formData.value.id) {
       await dishStore.updateDish(formData.value.id, formData.value)
+      ui.addLog('Блюдо успешно обновлено', 'info')
       await planStore.fetchPlan() 
     } else {
       await dishStore.addDish(formData.value)
+      ui.addLog('Блюдо успешно добавлено', 'info')
     }
     isEditing.value = false
     emit('close')
   } catch (e) {
+    ui.addLog('Ошибка при сохранении блюда', 'error', {
+      error: e.message,
+      stack: e.stack,
+      code: e.code
+    })
     console.error('Save error:', e)
     telegram.haptic.notification('error')
     alert(e.message || 'Не удалось сохранить блюдо. Проверьте соединение.')
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -264,9 +279,12 @@ const getMealTypeName = computed(() => {
                 <button 
                     v-if="isEditing" 
                     @click="handleSave" 
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect active:scale-95 transition-transform"
+                    class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
+                    :class="formData.name && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
+                    :disabled="!formData.name || isSaving"
                 >
-                    Готово
+                    <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
+                    {{ isSaving ? '...' : 'Готово' }}
                 </button>
                 
                 <button 

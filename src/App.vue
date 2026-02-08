@@ -4,7 +4,8 @@ import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
 import { useTelegramStore } from './stores/telegram'
-import { useRealtimeStore } from './stores/realtime' // <-- Импортируем Realtime
+import { useRealtimeStore } from './stores/realtime'
+import { useUIStore } from './stores/ui'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -13,12 +14,14 @@ import ProductsView from './views/ProductsView.vue'
 import ShoppingView from './views/ShoppingView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AuthView from './views/AuthView.vue' 
+import AppLogs from './components/AppLogs.vue'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
 const settings = useSettingsStore()
 const telegram = useTelegramStore()
-const realtime = useRealtimeStore() // <-- Инициализируем стор
+const realtime = useRealtimeStore()
+const ui = useUIStore()
 
 const currentTab = ref('plan')
 const error = ref(null)
@@ -167,6 +170,16 @@ onUnmounted(() => {
            <component :is="activeComponent" />
         </transition>
       </main>
+
+      <!-- Кнопка логов (только для отладки, маленькая и прозрачная) -->
+      <button 
+        @click="ui.isLogOpen = true" 
+        class="fixed top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-slate-200/20 text-slate-400 rounded-full active:scale-95"
+      >
+        <span class="material-icons-round text-sm">bug_report</span>
+      </button>
+
+      <AppLogs />
 
       <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-transform duration-300"
            :class="{ 'translate-y-full': telegram.isKeyboardOpen }">

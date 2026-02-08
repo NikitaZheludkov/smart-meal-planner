@@ -24,5 +24,22 @@ export const useUIStore = defineStore('ui', () => {
     filterMode: 'category' 
   })
 
-  return { plan, dishes, shopping }
+  // --- ЛОГИ ---
+  const logs = ref([])
+  const isLogOpen = ref(false)
+  
+  const addLog = (message, type = 'info', data = null) => {
+    const logEntry = {
+      id: Date.now() + Math.random(),
+      time: new Date().toLocaleTimeString(),
+      type,
+      message,
+      data: data ? JSON.parse(JSON.stringify(data)) : null
+    }
+    logs.value.unshift(logEntry)
+    console[type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'log'](`[${type.toUpperCase()}] ${message}`, data || '')
+    if (logs.value.length > 100) logs.value.pop()
+  }
+
+  return { plan, dishes, shopping, logs, isLogOpen, addLog }
 })

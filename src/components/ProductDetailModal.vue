@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useTelegramStore } from '../stores/telegram'
+import { useUIStore } from '../stores/ui'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -14,8 +15,10 @@ const emit = defineEmits(['close'])
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
 const telegram = useTelegramStore()
+const ui = useUIStore()
 
 const isEditing = ref(false)
+const isSaving = ref(false)
 
 const formData = ref({
     id: null,
@@ -46,23 +49,34 @@ watch(() => props.product, (newVal) => {
 
 const handleSave = async () => {
   // Валидация
-  if (!formData.value.name) return
+  if (!formData.value.name || isSaving.value) return
   
+  isSaving.value = true
   telegram.haptic.notification('success')
+  ui.addLog(`Попытка сохранения продукта: ${formData.value.name}`, 'info', formData.value)
   
   try {
       if (formData.value.id) {
         await productStore.updateProduct(formData.value.id, formData.value)
+        ui.addLog('Продукт успешно обновлен', 'info')
       } else {
         await productStore.addProduct(formData.value)
+        ui.addLog('Продукт успешно добавлен', 'info')
       }
       // Закрываем только после успешного сохранения
       isEditing.value = false
       emit('close')
   } catch (e) {
+      ui.addLog('Ошибка при сохранении продукта', 'error', {
+        error: e.message,
+        stack: e.stack,
+        code: e.code
+      })
       console.error('Save error:', e)
       telegram.haptic.notification('error')
       alert('Не удалось сохранить продукт. Проверьте соединение и попробуйте ещё раз.')
+  } finally {
+      isSaving.value = false
   }
 }
 
@@ -118,11 +132,12 @@ const handleCancel = () => {
             <template v-if="isEditing">
                  <button 
                     @click="handleSave" 
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors"
-                    :class="formData.name ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
-                    :disabled="!formData.name"
+                    class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
+                    :class="formData.name && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
+                    :disabled="!formData.name || isSaving"
                 >
-                    Готово
+                    <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
+                    {{ isSaving ? '...' : 'Готово' }}
                 </button>
             </template>
             <template v-else>
