@@ -22,6 +22,15 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     ui.addLog('Запуск инициализации Auth...', 'info')
     
+    // Тест связи с Supabase
+    try {
+      const start = Date.now()
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`)
+      ui.addLog(`Связь с Auth API ок (${Date.now() - start}ms)`)
+    } catch (e) {
+      ui.addLog('Нет связи с Auth API (возможна блокировка)', 'warn', e.message)
+    }
+
     try {
         // 1. Проверяем текущую сессию
         const { data: { session }, error } = await withTimeout(supabase.auth.getSession())
@@ -86,12 +95,28 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
         ui.addLog('Вызов Edge Function telegram-auth...')
+        ui.addLog('InitData length: ' + (telegramStore.initData?.length || 0))
+        
+        // Пытаемся вызвать функцию
         const { data, error } = await withTimeout(
-          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } }),
+          supabase.functions.invoke('telegram-auth', { 
+            body: { initData: telegramStore.initData },
+            headers: { 'X-Debug-Mode': 'true' }
+          }),
           20000
-        )
+        ).catch(err => {
+          ui.addLog('Низкоуровневая ошибка fetch функции', 'error', {
+            name: err.name,
+            message: err.message,
+            cause: err.cause
+          })
+          throw err
+        })
 
-        if (error) throw new Error(`Function invoke error: ${error.message}`)
+        if (error) {
+          ui.addLog('Edge Function вернула ошибку', 'error', error)
+          throw new Error(`Function invoke error: ${error.message}`)
+        }
         if (!data || !data.session) throw new Error('No session returned from function')
 
         ui.addLog('Установка полученной сессии...')

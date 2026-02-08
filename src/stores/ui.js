@@ -29,6 +29,16 @@ export const useUIStore = defineStore('ui', () => {
   const isLogOpen = ref(false)
   
   const addLog = (message, type = 'info', data = null) => {
+    // Авто-добавление версии при первом логировании
+    if (logs.value.length === 0) {
+      logs.value.push({
+        id: 'version',
+        time: new Date().toLocaleTimeString(),
+        type: 'info',
+        message: 'App Version: 1.0.5 (Logging Update)',
+        data: { build: new Date().toISOString() }
+      })
+    }
     const logEntry = {
       id: Date.now() + Math.random(),
       time: new Date().toLocaleTimeString(),
