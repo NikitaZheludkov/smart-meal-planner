@@ -50,27 +50,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Метод для принудительного обновления сессии (помогает при выходе из сна)
   const refreshSession = async () => {
-    console.log('🔄 Обновление сессии Supabase...')
+    console.log('🔄 [Refresh] Начало обновления сессии...')
     try {
-        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 5000)
-        if (error) throw error
+        // 1. Проверяем наличие данных в localStorage напрямую, если стейт пуст
+        if (!isAuth.value) {
+            console.log('🔄 [Refresh] Стейт пуст, проверяем хранилище...')
+        }
+
+        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 8000)
+        if (error) {
+            console.error('❌ [Refresh] Ошибка getSession:', error)
+            throw error
+        }
         
         if (session?.user) {
-            console.log('✅ Сессия активна для пользователя:', session.user.id)
+            console.log('✅ [Refresh] Сессия найдена:', session.user.id)
             await handleUserSession(session.user)
         } else {
-            console.log('ℹ️ Сессия не найдена при обновлении, пробуем восстановить...')
-            // Если сессии нет, пробуем авто-вход через Telegram (если мы в TMA)
+            console.log('ℹ️ [Refresh] Сессия не найдена, пробуем восстановить через TG...')
             await loginWithTelegram()
-            
-            if (!isAuth.value) {
-                resetState()
-            }
         }
     } catch (e) {
-        console.error('❌ Ошибка при обновлении сессии:', e)
-        // В случае сетевой ошибки не сбрасываем всё сразу, 
-        // чтобы не разлогинивать пользователя при кратковременном сбое сети
+        console.error('❌ [Refresh] Критическая ошибка:', e)
     }
   }
 
@@ -110,25 +111,40 @@ export const useAuthStore = defineStore('auth', () => {
 
   const handleUserSession = async (authUser) => {
     try {
+        console.log('🔄 Обработка сессии для:', authUser.id)
         const { data, error } = await supabase
             .from('profiles')
             .select('household_id')
             .eq('id', authUser.id)
             .single()
             
-        if (error || !data) {
-            console.warn('Профиль не найден. Требуется повторная регистрация.')
+        if (error) {
+            console.error('❌ Ошибка получения профиля:', error)
+            if (error.code === 'PGRST116') {
+                console.warn('Профиль не найден (PGRST116).')
+            }
+            // Не выходим сразу, если это временная ошибка сети
+            if (error.message === 'Load failed' || error.message?.includes('fetch')) {
+                return 
+            }
             await signOut()
             return
         }
 
+        if (!data) {
+            console.warn('Профиль пуст. Требуется повторная регистрация.')
+            await signOut()
+            return
+        }
+
+        console.log('✅ Профиль загружен, householdId:', data.household_id)
         user.value = authUser
         householdId.value = data.household_id
         isAuth.value = true
         
     } catch (e) {
-        console.error('Session Error:', e)
-        await signOut()
+        console.error('Session Error in handleUserSession:', e)
+        // await signOut() // Убираем жесткий логаут при любой ошибке
     }
   }
 

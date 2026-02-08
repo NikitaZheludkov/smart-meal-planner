@@ -78,19 +78,28 @@ watch(() => auth.isAuth, (newVal) => {
 })
 
 // Обработчик возвращения приложения из фона/сна
-const handleAppResume = async () => {
-    if (document.visibilityState === 'visible') {
-        console.log('📱 Приложение вернулось в фокус, проверяем соединение...')
-        
-        // 1. Обновляем сессию Supabase
-        await auth.refreshSession()
-        
-        // 2. Если авторизованы, переподключаем Realtime
-        if (auth.isAuth) {
-            realtime.reconnect()
-        }
-    }
-}
+ const handleAppResume = async () => {
+     if (document.visibilityState === 'visible') {
+         console.log('📱 [App] Видимость восстановлена, запуск проверки...')
+         
+         // 1. Обновляем сессию Supabase
+         await auth.refreshSession()
+         
+         // 2. Если авторизованы, переподключаем Realtime
+         if (auth.isAuth) {
+             console.log('📱 [App] Авторизован, обновляем данные...')
+             realtime.reconnect()
+             // Принудительно обновляем справочники, если они пустые
+             if (dictionaries.productCategories.length === 0) {
+                 dictionaries.fetchDictionaries()
+             }
+         } else {
+             console.warn('📱 [App] После пробуждения сессия не восстановлена')
+         }
+     } else {
+         console.log('📱 [App] Приложение ушло в фон')
+     }
+ }
 
 onMounted(async () => {
     // Слушаем события видимости и сети

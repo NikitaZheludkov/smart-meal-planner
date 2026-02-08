@@ -46,7 +46,10 @@ export const useProductStore = defineStore('products', () => {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+        console.error('Supabase insert error:', error)
+        throw error
+    }
     
     await fetchProducts() // <--- Заново загружаем список
     return data

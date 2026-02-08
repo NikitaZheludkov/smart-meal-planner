@@ -6,8 +6,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 // Добавляем настройки auth, чтобы отключить проблемные блокировки
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    lock: false, // <-- ЭТО РЕШАЕТ ПРОБЛЕМУ AbortError
+    lock: false,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    autoRefreshToken: true, // Гарантируем автообновление
+    storageKey: 'sb-smart-meal-auth' // Явный ключ для надежности
+  },
+  global: {
+    headers: { 'x-application-name': 'smart-meal-planner' }
   }
 })
