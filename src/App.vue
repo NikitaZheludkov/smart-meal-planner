@@ -145,6 +145,16 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
     
+    <!-- Кнопка логов (ВСЕГДА ДОСТУПНА ДЛЯ ОТЛАДКИ) -->
+    <button 
+      @click="ui.isLogOpen = true" 
+      class="fixed top-2 right-2 z-[200] w-12 h-12 flex items-center justify-center bg-slate-900/40 text-white rounded-full active:scale-95 shadow-lg backdrop-blur-sm"
+    >
+      <span class="material-icons-round text-xl">bug_report</span>
+    </button>
+
+    <AppLogs />
+
     <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
       <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>
       <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
@@ -170,16 +180,6 @@ onUnmounted(() => {
            <component :is="activeComponent" />
         </transition>
       </main>
-
-      <!-- Кнопка логов (только для отладки, маленькая и прозрачная) -->
-      <button 
-        @click="ui.isLogOpen = true" 
-        class="fixed top-2 right-2 z-[60] w-8 h-8 flex items-center justify-center bg-slate-200/20 text-slate-400 rounded-full active:scale-95"
-      >
-        <span class="material-icons-round text-sm">bug_report</span>
-      </button>
-
-      <AppLogs />
 
       <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-transform duration-300"
            :class="{ 'translate-y-full': telegram.isKeyboardOpen }">
