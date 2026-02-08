@@ -48,6 +48,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Метод для принудительного обновления сессии (помогает при выходе из сна)
+  const refreshSession = async () => {
+    console.log('🔄 Обновление сессии Supabase...')
+    try {
+        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 5000)
+        if (error) throw error
+        
+        if (session?.user) {
+            console.log('✅ Сессия активна для пользователя:', session.user.id)
+            await handleUserSession(session.user)
+        } else {
+            console.log('ℹ️ Сессия не найдена при обновлении, пробуем восстановить...')
+            // Если сессии нет, пробуем авто-вход через Telegram (если мы в TMA)
+            await loginWithTelegram()
+            
+            if (!isAuth.value) {
+                resetState()
+            }
+        }
+    } catch (e) {
+        console.error('❌ Ошибка при обновлении сессии:', e)
+        // В случае сетевой ошибки не сбрасываем всё сразу, 
+        // чтобы не разлогинивать пользователя при кратковременном сбое сети
+    }
+  }
+
   const loginWithTelegram = async () => {
     const telegramStore = useTelegramStore()
     
@@ -143,6 +169,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuth, 
     loading, 
     init, 
+    refreshSession,
     loginWithTelegram,
     loginAsTestUser,
     signOut,

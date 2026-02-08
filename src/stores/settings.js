@@ -81,6 +81,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // --- ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
   const saveSettings = async (day, period, portions) => {
+    const auth = useAuthStore()
+    if (!auth.householdId) {
+        throw new Error('Учётная запись не авторизована. Сохранение настроек невозможно.')
+    }
+
     // 1. Обновляем у себя локально
     startDay.value = day
     periodLength.value = period
@@ -88,14 +93,17 @@ export const useSettingsStore = defineStore('settings', () => {
     
     if (household.value?.id) {
         // 2. Сохраняем в базу данных (чтобы не пропало при перезагрузке)
-        const { error } = await supabase
+        const { error } = await withTimeout(
+            supabase
             .from('households')
             .update({ 
                 start_day: day, 
                 period_length: period, 
                 default_portions: portions 
             })
-            .eq('id', household.value.id)
+            .eq('id', household.value.id),
+            5000
+        )
 
         if (error) {
             console.error('Ошибка сохранения настроек:', error)

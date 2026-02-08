@@ -38,15 +38,19 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
+    if (!auth.householdId) return
 
-    const { error } = await supabase
-      .from('shopping_cart')
-      .upsert({ 
-        household_id: auth.householdId, 
-        product_id: productId, 
-        is_checked: newState,
-        updated_at: new Date()
-      }, { onConflict: 'household_id, product_id' })
+    const { error } = await withTimeout(
+      supabase
+        .from('shopping_cart')
+        .upsert({ 
+          household_id: auth.householdId, 
+          product_id: productId, 
+          is_checked: newState,
+          updated_at: new Date()
+        }, { onConflict: 'household_id, product_id' }),
+      5000
+    )
 
     if (error) {
       console.error('Ошибка сохранения:', error)

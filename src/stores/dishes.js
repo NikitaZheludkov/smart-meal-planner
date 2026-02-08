@@ -50,8 +50,7 @@ export const useDishStore = defineStore('dishes', () => {
   const addDish = async (dishData) => {
     const auth = useAuthStore()
     if (!auth.householdId) {
-        console.error('Нет householdId')
-        return
+        throw new Error('Учётная запись не авторизована или ID семьи не найден. Попробуйте перезагрузить приложение.')
     }
     
     // 1. Создаем само блюдо
@@ -93,6 +92,11 @@ export const useDishStore = defineStore('dishes', () => {
   }
 
   const updateDish = async (id, dishData) => {
+    const auth = useAuthStore()
+    if (!auth.householdId) {
+        throw new Error('Учётная запись не авторизована. Сохранение невозможно.')
+    }
+
     // При обновлении household_id не меняем, он уже есть в базе
     const { error } = await supabase
       .from('dishes')

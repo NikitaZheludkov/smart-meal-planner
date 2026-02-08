@@ -95,9 +95,15 @@ const handleLeave = async () => {
 }
 
 const handleSave = async () => {
-    telegram.haptic.notification('success')
-    await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
-    alert('Настройки сохранены')
+    try {
+        telegram.haptic.notification('success')
+        await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
+        alert('Настройки сохранены')
+    } catch (e) {
+        console.error('Settings save error:', e)
+        telegram.haptic.notification('error')
+        alert(e.message || 'Не удалось сохранить настройки. Проверьте соединение.')
+    }
 }
 
 const handleLogout = async () => {

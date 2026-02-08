@@ -77,7 +77,29 @@ watch(() => auth.isAuth, (newVal) => {
   if (newVal) loadUserData()
 })
 
+// Обработчик возвращения приложения из фона/сна
+const handleAppResume = async () => {
+    if (document.visibilityState === 'visible') {
+        console.log('📱 Приложение вернулось в фокус, проверяем соединение...')
+        
+        // 1. Обновляем сессию Supabase
+        await auth.refreshSession()
+        
+        // 2. Если авторизованы, переподключаем Realtime
+        if (auth.isAuth) {
+            realtime.reconnect()
+        }
+    }
+}
+
 onMounted(async () => {
+    // Слушаем события видимости и сети
+    document.addEventListener('visibilitychange', handleAppResume)
+    window.addEventListener('online', handleAppResume)
+    window.addEventListener('offline', () => {
+        console.log('🌐 Соединение потеряно');
+    })
+
     // Фолбэк на случай зависания инициализации на мобильных TMA
     const timer = setTimeout(() => {
         if (isAppInitializing.value) {
@@ -103,7 +125,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-    // Ничего особого, но гарантируем отсутствие висящих таймеров
+    document.removeEventListener('visibilitychange', handleAppResume)
+    window.removeEventListener('online', handleAppResume)
 })
 </script>
 

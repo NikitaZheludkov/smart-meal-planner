@@ -169,16 +169,23 @@ watch(() => props.dish, (newVal) => {
 
 const handleSave = async () => {
   if (!formData.value.name) return
-  telegram.haptic.notification('success')
   
-  if (formData.value.id) {
-    await dishStore.updateDish(formData.value.id, formData.value)
-    await planStore.fetchPlan() 
-  } else {
-    await dishStore.addDish(formData.value)
+  try {
+    telegram.haptic.notification('success')
+    
+    if (formData.value.id) {
+      await dishStore.updateDish(formData.value.id, formData.value)
+      await planStore.fetchPlan() 
+    } else {
+      await dishStore.addDish(formData.value)
+    }
+    isEditing.value = false
+    emit('close')
+  } catch (e) {
+    console.error('Save error:', e)
+    telegram.haptic.notification('error')
+    alert(e.message || 'Не удалось сохранить блюдо. Проверьте соединение.')
   }
-  isEditing.value = false
-  emit('close')
 }
 
 const handleDelete = async () => {

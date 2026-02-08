@@ -32,8 +32,7 @@ export const useProductStore = defineStore('products', () => {
   const addProduct = async (product) => {
     const auth = useAuthStore()
     if (!auth.householdId) {
-        console.error('Нет householdId, сохранение невозможно')
-        throw new Error('householdId_missing')
+        throw new Error('Учётная запись не авторизована или ID семьи не найден.')
     }
 
     const { data, error } = await supabase
@@ -55,6 +54,11 @@ export const useProductStore = defineStore('products', () => {
 
   // Обновление продукта
   const updateProduct = async (id, updates) => {
+    const auth = useAuthStore()
+    if (!auth.householdId) {
+        throw new Error('Учётная запись не авторизована. Сохранение невозможно.')
+    }
+
     const cleanUpdates = {
         name: updates.name,
         category: updates.category,

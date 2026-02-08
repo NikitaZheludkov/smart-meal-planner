@@ -55,6 +55,10 @@ export const usePlanStore = defineStore('plan', () => {
 
   const addToPlan = async (date, slotId, item) => {
     const auth = useAuthStore()
+    if (!auth.householdId) {
+        throw new Error('Сессия потеряна. Перезагрузите страницу.')
+    }
+    
     const finalPortions = item.portions || item.amount || 1
 
     const payload = {
@@ -84,10 +88,16 @@ export const usePlanStore = defineStore('plan', () => {
   }
 
   const updatePlanItem = async (id, updates) => {
-    const { error } = await supabase
-      .from('plan')
-      .update(updates)
-      .eq('id', id)
+    const auth = useAuthStore()
+    if (!auth.householdId) return
+
+    const { error } = await withTimeout(
+      supabase
+        .from('plan')
+        .update(updates)
+        .eq('id', id),
+      5000
+    )
 
     if (error) {
         console.error('Ошибка обновления:', error)

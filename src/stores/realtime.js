@@ -98,11 +98,18 @@ export const useRealtimeStore = defineStore('realtime', () => {
   }
 
   const unsubscribe = () => {
-      if (channel) {
-          supabase.removeChannel(channel)
-          channel = null
-      }
+    if (channel) {
+      console.log('🔌 Отключение от канала')
+      supabase.removeChannel(channel)
+      channel = null
+    }
   }
 
-  return { init, unsubscribe, notifySettingsChanged }
+  const reconnect = () => {
+    console.log('🔄 Переподключение Realtime...')
+    unsubscribe()
+    init()
+  }
+
+  return { init, unsubscribe, reconnect, notifySettingsChanged }
 })
