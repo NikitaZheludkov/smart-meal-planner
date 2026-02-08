@@ -9,7 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuth = ref(false)
   const loading = ref(true)
 
-  const withTimeout = async (promise, ms) => {
+  const withTimeout = async (promise, ms = 10000) => { // Увеличим таймаут по умолчанию
     const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     return Promise.race([promise, t])
   }
@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
     
     try {
         // 1. Проверяем текущую сессию
-        const { data: { session } } = await withTimeout(supabase.auth.getSession(), 5000)
+        const { data: { session } } = await withTimeout(supabase.auth.getSession())
         
         if (session?.user) {
             await handleUserSession(session.user)
@@ -31,21 +31,19 @@ export const useAuthStore = defineStore('auth', () => {
         
         // 3. Слушаем изменения (разлогин/смена юзера)
         supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('AuthStateChange event:', event)
             if (session?.user) {
                 await handleUserSession(session.user)
             } else {
                 resetState()
             }
-            // Всегда выключаем загрузку при изменении состояния
             loading.value = false
         })
         
     } catch (e) {
         console.error('Ошибка инициализации Auth:', e)
-        // В случае любой ошибки - сбрасываем всё, чтобы показать экран входа
         resetState()
     } finally {
-        // ГАРАНТИЯ: Загрузка выключается всегда
         loading.value = false
     }
   }
@@ -53,34 +51,34 @@ export const useAuthStore = defineStore('auth', () => {
   const loginWithTelegram = async () => {
     const telegramStore = useTelegramStore()
     
-    // Если мы не в Телеграм (обычный браузер)
     if (!telegramStore.initData) {
         console.log('Запущен в браузере. Авто-вход через TG пропущен.')
         return
     }
 
     try {
+        console.log('Вызов функции telegram-auth...')
         const { data, error } = await withTimeout(
-          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } }),
-          7000
+          supabase.functions.invoke('telegram-auth', { body: { initData: telegramStore.initData } })
         )
 
-        if (error) throw error
-        if (!data || !data.session) throw new Error('No session returned')
+        if (error) throw new Error(`Function invoke error: ${error.message}`)
+        if (!data || !data.session) throw new Error('No session returned from function')
 
+        console.log('Установка сессии...')
         const { error: sessionError } = await supabase.auth.setSession(data.session)
-        if (sessionError) throw sessionError
+        if (sessionError) throw new Error(`Set session error: ${sessionError.message}`)
 
-        // Фолбэк: на мобильных TMA событие onAuthStateChange может не прийти сразу
-        // Явно получаем пользователя и инициируем пользовательскую сессию
-        const { data: userData } = await withTimeout(supabase.auth.getUser(), 5000)
-        if (userData?.user) {
-            await handleUserSession(userData.user)
-        }
+        console.log('Получение пользователя...')
+        const { data: userData, error: userError } = await withTimeout(supabase.auth.getUser())
+        if (userError) throw new Error(`Get user error: ${userError.message}`)
+        if (!userData?.user) throw new Error('User not found after setting session')
+        
+        console.log('Успешная авторизация, обработка сессии...')
+        await handleUserSession(userData.user)
 
     } catch (e) {
-        console.error('Auth Error:', e)
-        // Не сбрасываем state здесь, просто выходим. Пользователь увидит кнопку "Войти".
+        console.error('Auth Error:', e.message)
     }
   }
 

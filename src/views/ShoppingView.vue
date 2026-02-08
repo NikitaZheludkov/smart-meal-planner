@@ -236,7 +236,7 @@ const switchViewTab = (mode) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 py-6 pb-safe scroll-area">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area">
         
         <div v-if="totalItems === 0" class="h-full flex flex-col items-center justify-center text-center opacity-40 -mt-10">
             <span class="text-5xl mb-4">🛒</span>
