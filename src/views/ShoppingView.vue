@@ -178,26 +178,9 @@ const switchViewTab = (mode) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100">
       
-      <div class="px-5 pt-app-header pb-2 flex items-center justify-between">
-        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Купить</h1>
-        
-        <div class="flex gap-2">
-            <button @click="planStore.fetchPlan(); telegram.haptic.impact('light')" class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 tap-effect">
-                <span class="material-icons-round" :class="planStore.loading ? 'animate-spin' : ''">refresh</span>
-            </button>
-            <div class="bg-slate-50 p-1 rounded-xl flex">
-                <button @click="switchViewTab('list')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
-                    <span class="material-icons-round text-lg">format_list_bulleted</span>
-                </button>
-                <button @click="switchViewTab('departments')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
-                    <span class="material-icons-round text-lg">grid_view</span>
-                </button>
-            </div>
-        </div>
-      </div>
-
-      <div class="px-5 pb-4">
-          <div class="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl">
+      <div class="px-5 pt-app-header pb-4 flex items-center gap-2">
+          
+        <div class="flex-1 flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl h-12">
             <button @click="changePeriod(-1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-lg transition-colors">
                 <span class="material-icons-round text-sm">chevron_left</span>
             </button>
@@ -205,7 +188,21 @@ const switchViewTab = (mode) => {
             <button @click="changePeriod(1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-lg transition-colors">
                 <span class="material-icons-round text-sm">chevron_right</span>
             </button>
-          </div>
+        </div>
+
+        <div class="flex gap-2">
+            <button @click="planStore.fetchPlan(); telegram.haptic.impact('light')" class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect">
+                <span class="material-icons-round" :class="planStore.loading ? 'animate-spin' : ''">refresh</span>
+            </button>
+            <div class="bg-slate-50 border border-slate-100 p-1 rounded-2xl flex h-12 items-center">
+                <button @click="switchViewTab('list')" class="w-10 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                    <span class="material-icons-round text-lg">format_list_bulleted</span>
+                </button>
+                <button @click="switchViewTab('departments')" class="w-10 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                    <span class="material-icons-round text-lg">grid_view</span>
+                </button>
+            </div>
+        </div>
       </div>
 
       <div v-if="dishStats.length > 0" class="pl-5 pb-4 overflow-x-auto no-scrollbar flex gap-2">

@@ -129,7 +129,7 @@ const periods = [
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-app-header pb-4">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Настройки</h1>
+          
           <div class="flex items-center gap-2 mt-1">
               <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
                   {{ getInitials(authStore.user?.user_metadata?.first_name) }}
