@@ -111,9 +111,16 @@ const setMealType = (id) => {
             <input 
               v-model="uiStore.dishes.searchQuery" 
               type="text" 
-              placeholder="Название..." 
-              class="w-full pl-10 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
+              placeholder="Поиск" 
+              class="w-full pl-10 pr-10 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
             >
+            <button 
+                v-if="uiStore.dishes.searchQuery" 
+                @click="uiStore.dishes.searchQuery = ''"
+                class="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 tap-effect"
+            >
+                <span class="material-icons-round text-lg">close</span>
+            </button>
           </div>
           
           <button 

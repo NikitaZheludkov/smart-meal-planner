@@ -65,9 +65,16 @@ onMounted(async () => {
             <span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
             <input 
                 v-model="searchQuery" 
-                placeholder="Найти продукт..." 
-                class="w-full pl-11 pr-4 py-3.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-indigo-500/10 transition-all border border-slate-100"
+                placeholder="Поиск" 
+                class="w-full pl-11 pr-10 py-3.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-indigo-500/10 transition-all border border-slate-100"
             >
+            <button 
+                v-if="searchQuery" 
+                @click="searchQuery = ''"
+                class="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 tap-effect"
+            >
+                <span class="material-icons-round text-lg">close</span>
+            </button>
         </div>
 
         <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
