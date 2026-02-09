@@ -101,9 +101,10 @@ const setMealType = (id) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-slate-50">
+  <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-12 pb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4">
+        <h1 class="text-2xl font-black text-slate-900 mb-4 tracking-tight">Блюда</h1>
 
       
       <div class="flex gap-2 mb-4">

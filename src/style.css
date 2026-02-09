@@ -38,6 +38,15 @@ html, body { overscroll-behavior-y: none; }
   margin: 0 auto 12px auto;
 }
 
+/* Единый стандарт верхнего отступа (Safe Area) для всех страниц */
+:root {
+  --app-header-pt: 48px; /* Эквивалент pt-12 */
+}
+
+.pt-app-header {
+  padding-top: var(--app-header-pt);
+}
+
 /* Безопасные отступы для Telegram Mini Apps */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

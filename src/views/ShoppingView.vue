@@ -178,7 +178,7 @@ const switchViewTab = (mode) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100">
       
-      <div class="px-5 pt-12 pb-2 flex items-center justify-between">
+      <div class="px-5 pt-app-header pb-2 flex items-center justify-between">
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Купить</h1>
         
         <div class="flex gap-2">
