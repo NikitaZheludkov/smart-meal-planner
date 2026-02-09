@@ -18,6 +18,20 @@ const settingsStore = useSettingsStore()
 const dishStore = useDishStore()
 const uiStore = useUIStore()
 
+const transitionName = ref('slide-left')
+const switchTab = (tab) => {
+    if (uiStore.plan.activeTab === tab) return
+    
+    if (tab === 'week') {
+        transitionName.value = 'slide-left'
+    } else {
+        transitionName.value = 'slide-right'
+    }
+    
+    telegram.haptic.selection()
+    uiStore.plan.activeTab = tab
+}
+
 // --- ИНИЦИАЛИЗАЦИЯ ДАТ ---
 const getStartOfWeekFromSettings = () => {
     const day = settingsStore.startDay ?? 1
@@ -225,79 +239,81 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
       <div class="bg-slate-100 p-1 rounded-xl flex relative">
          <div class="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
-         <button @click="uiStore.plan.activeTab = 'day'" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
+         <button @click="switchTab('day')" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
              День
          </button>
-         <button @click="uiStore.plan.activeTab = 'week'" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
+         <button @click="switchTab('week')" class="flex-1 relative z-10 py-1.5 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
              Сетка
          </button>
       </div>
     </div>
 
-    <div v-if="uiStore.plan.activeTab === 'day'" class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area">
-      <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
-         <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
-         <div class="h-6 w-[1px] bg-slate-100"></div>
-         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.protein) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Белки</div></div>
-         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.fat) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Жиры</div></div>
-         <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.carbs) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Угле</div></div>
-      </div>
-      
-      <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="text-center py-20 opacity-40">
-         <div class="text-4xl mb-2">🍽️</div>
-         <p class="text-sm font-bold text-slate-400">День свободен</p>
-         <button @click="uiStore.plan.activeTab = 'week'" class="mt-4 text-indigo-500 font-bold text-xs bg-indigo-50 px-4 py-2 rounded-xl">Перейти к сетке</button>
-      </div>
-
-      <div class="space-y-6 mt-2">
-        <div v-for="group in currentDayData" :key="group.slot.id">
-            <div v-if="group.hasItems">
-                <div class="flex items-center justify-between px-2 mb-2">
-                    <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
+    <div class="flex-1 relative overflow-hidden">
+        <transition :name="transitionName">
+            <div v-if="uiStore.plan.activeTab === 'day'" :key="'day'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
+                <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
+                    <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
+                    <div class="h-6 w-[1px] bg-slate-100"></div>
+                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.protein) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Белки</div></div>
+                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.fat) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Жиры</div></div>
+                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.carbs) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Угле</div></div>
                 </div>
-                <div class="space-y-2">
-                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
-                        <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
-                            <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
-                            <span v-else-if="item.product_id">🥦</span>
-                            <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
-                        </div>
-                        <div class="flex-1 min-w-0 py-1">
-                            <div class="text-base font-bold text-slate-800 truncate leading-tight">
-                                {{ item.dish_id ? item.dishes?.name : item.products?.name }}
-                                <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
-                             </div>
-                            <div class="mt-1.5 flex flex-wrap gap-2">
-                                <template v-if="item.dish_id">
-                                     <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
-                                    <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
-                                </template>
-                                <template v-else>
-                                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
-                                </template>
+                
+                <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="text-center py-20 opacity-40">
+                    <div class="text-4xl mb-2">🍽️</div>
+                    <p class="text-sm font-bold text-slate-400">День свободен</p>
+                    <button @click="switchTab('week')" class="mt-4 text-indigo-500 font-bold text-xs bg-indigo-50 px-4 py-2 rounded-xl">Перейти к сетке</button>
+                </div>
+
+                <div class="space-y-6 mt-2">
+                    <div v-for="group in currentDayData" :key="group.slot.id">
+                        <div v-if="group.hasItems">
+                            <div class="flex items-center justify-between px-2 mb-2">
+                                <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
+                            </div>
+                            <div class="space-y-2">
+                                <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
+                                    <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
+                                        <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
+                                        <span v-else-if="item.product_id">🥦</span>
+                                        <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0 py-1">
+                                        <div class="text-base font-bold text-slate-800 truncate leading-tight">
+                                            {{ item.dish_id ? item.dishes?.name : item.products?.name }}
+                                            <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
+                                        </div>
+                                        <div class="mt-1.5 flex flex-wrap gap-2">
+                                            <template v-if="item.dish_id">
+                                                <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
+                                                <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
+                                            </template>
+                                            <template v-else>
+                                                <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                                </div>
                             </div>
                         </div>
-                        <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
                     </div>
-                 </div>
+                </div>
             </div>
-        </div>
-      </div>
-    </div>
 
-    <div v-else class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area">
-      <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex items-stretch gap-4">
-        
-        <div class="flex flex-col items-center justify-center w-8 flex-shrink-0 border-r border-slate-50 pr-3">
-           <span class="text-lg font-black text-slate-800">{{ format(day, 'd') }}</span>
-          <span class="text-[9px] font-bold uppercase" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">{{ format(day, 'EEE', { locale: ru }) }}</span>
-        </div>
+            <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area w-full">
+                <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex items-stretch gap-4">
+                    
+                    <div class="flex flex-col items-center justify-center w-8 flex-shrink-0 border-r border-slate-50 pr-3">
+                    <span class="text-lg font-black text-slate-800">{{ format(day, 'd') }}</span>
+                    <span class="text-[9px] font-bold uppercase" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">{{ format(day, 'EEE', { locale: ru }) }}</span>
+                    </div>
 
-        <div class="flex-1 grid grid-cols-4 gap-2">
-          
-          <button 
-            v-for="slot in mealSlots" 
-            :key="slot.id" 
+                    <div class="flex-1 grid grid-cols-4 gap-2">
+                    
+                    <button 
+                        v-for="slot in mealSlots" 
+                        :key="slot.id" 
             @click="openSelector(day, slot)" 
             class="w-full h-28 rounded-2xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-all bg-white shadow-sm border-slate-100" 
             :class="getSlotItems(day, slot.id).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
@@ -357,6 +373,8 @@ onMounted(() => { if (auth.isAuth) loadData() })
           </button>
         </div>
       </div>
+    </div>
+        </transition>
     </div>
 
     <transition name="fade">

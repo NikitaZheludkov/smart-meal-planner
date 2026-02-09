@@ -24,6 +24,7 @@ const realtime = useRealtimeStore()
 const ui = useUIStore()
 
 const currentTab = ref('plan')
+const transitionName = ref('slide-left')
 const error = ref(null)
 
 // Глобальный флаг загрузки
@@ -43,9 +44,15 @@ const activeComponent = computed(() => {
   return tab ? tab.component : PlanView
 })
 
-// Логика переключения вкладок с вибрацией
+// Логика переключения вкладок с анимацией
 const switchTab = (tabId) => {
     if (currentTab.value === tabId) return
+    
+    const currentIndex = tabs.findIndex(t => t.id === currentTab.value)
+    const newIndex = tabs.findIndex(t => t.id === tabId)
+    
+    transitionName.value = newIndex > currentIndex ? 'slide-left' : 'slide-right'
+    
     telegram.haptic.impact('light') 
     currentTab.value = tabId
 }
@@ -187,9 +194,9 @@ onUnmounted(() => {
     </div>
 
     <template v-else>
-      <main class="flex-1 overflow-y-auto no-scrollbar relative z-0 pb-[76px] pb-safe" :class="telegram.isReady ? 'pt-tg-safe' : ''">
-        <transition name="fade" mode="out-in">
-           <component :is="activeComponent" />
+      <main class="flex-1 relative z-0 overflow-hidden" :class="telegram.isReady ? 'pt-tg-safe' : ''">
+        <transition :name="transitionName">
+           <component :is="activeComponent" :key="currentTab" class="absolute inset-0 w-full h-full" />
         </transition>
       </main>
 

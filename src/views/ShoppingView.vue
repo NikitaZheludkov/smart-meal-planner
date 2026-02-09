@@ -11,6 +11,7 @@ const settingsStore = useSettingsStore()
 const telegram = useTelegramStore() // <-- Инит
 
 const activeTab = ref('list') 
+const transitionName = ref('slide-left')
 
 // --- 1. УПРАВЛЕНИЕ ПЕРИОДОМ ---
 const currentWeekStart = ref(new Date())
@@ -165,6 +166,7 @@ const countChecked = computed(() => shoppingList.value.filter(i => checkedIds.va
 
 const switchViewTab = (mode) => {
     if(activeTab.value !== mode) {
+        transitionName.value = mode === 'departments' ? 'slide-left' : 'slide-right'
         telegram.haptic.selection()
         activeTab.value = mode
     }
@@ -236,44 +238,48 @@ const switchViewTab = (mode) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area">
-        
-        <div v-if="totalItems === 0" class="h-full flex flex-col items-center justify-center text-center opacity-40 -mt-10">
-            <span class="text-5xl mb-4">🛒</span>
-            <p class="font-bold text-slate-400">Список пуст</p>
-            <p class="text-xs text-slate-300 mt-2 max-w-[200px]">Добавьте блюда в план или уберите галочки "Не покупать"</p>
-        </div>
-
-        <div v-else class="space-y-6">
-            <div v-for="(items, category) in groupedList" :key="category">
-                <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{{ category }}</h3>
+    <div class="flex-1 relative overflow-hidden">
+        <transition :name="transitionName">
+            <div :key="activeTab" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
                 
-                <div class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden">
-                    <div 
-                        v-for="item in items" 
-                        :key="item.id" 
-                        class="flex items-center p-4 border-b border-slate-50 last:border-0 group cursor-pointer tap-effect" 
-                        @click="toggleCheck(item.id)"
-                    >
-                        <div 
-                            class="w-6 h-6 rounded-lg border-2 mr-4 flex items-center justify-center transition-all duration-200" 
-                            :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
-                        >
-                             <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-xs font-bold">check</span>
-                        </div>
+                <div v-if="totalItems === 0" class="h-full flex flex-col items-center justify-center text-center opacity-40 -mt-10">
+                    <span class="text-5xl mb-4">🛒</span>
+                    <p class="font-bold text-slate-400">Список пуст</p>
+                    <p class="text-xs text-slate-300 mt-2 max-w-[200px]">Добавьте блюда в план или уберите галочки "Не покупать"</p>
+                </div>
+
+                <div v-else class="space-y-6">
+                    <div v-for="(items, category) in groupedList" :key="category">
+                        <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{{ category }}</h3>
                         
-                        <div class="flex-1 font-bold text-slate-700 text-sm transition-all duration-200" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
-                            {{ item.name }}
-                        </div>
-                        
-                        <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
-                            {{ Number.isInteger(item.amount) ? item.amount : item.amount.toFixed(1) }} {{ item.unit }}
+                        <div class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden">
+                            <div 
+                                v-for="item in items" 
+                                :key="item.id" 
+                                class="flex items-center p-4 border-b border-slate-50 last:border-0 group cursor-pointer tap-effect" 
+                                @click="toggleCheck(item.id)"
+                            >
+                                <div 
+                                    class="w-6 h-6 rounded-lg border-2 mr-4 flex items-center justify-center transition-all duration-200" 
+                                    :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
+                                >
+                                    <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-xs font-bold">check</span>
+                                </div>
+                                
+                                <div class="flex-1 font-bold text-slate-700 text-sm transition-all duration-200" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                    {{ item.name }}
+                                </div>
+                                
+                                <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
+                                    {{ Number.isInteger(item.amount) ? item.amount : item.amount.toFixed(1) }} {{ item.unit }}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
+            </div>
+        </transition>
     </div>
   </div>
 </template>
