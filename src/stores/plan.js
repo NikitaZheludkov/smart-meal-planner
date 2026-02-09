@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { useUIStore } from './ui'
 
 export const usePlanStore = defineStore('plan', () => {
   const plan = ref([])
@@ -13,7 +14,12 @@ export const usePlanStore = defineStore('plan', () => {
 
   const fetchPlan = async () => {
     const auth = useAuthStore()
-    if (!auth.householdId) return
+    const ui = useUIStore()
+    
+    if (!auth.householdId) {
+        ui.addLog('fetchPlan пропущен: нет householdId', 'warn')
+        return
+    }
 
     const isFirstLoad = plan.value.length === 0
     if (isFirstLoad) loading.value = true

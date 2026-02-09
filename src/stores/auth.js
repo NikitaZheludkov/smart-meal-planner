@@ -227,9 +227,13 @@ export const useAuthStore = defineStore('auth', () => {
     
     // Предотвращаем множественные одновременные загрузки профиля
     if (user.value?.id === authUser.id && isAuth.value) {
-        ui.addLog('Профиль уже загружен для этого пользователя', 'info')
-        authStatus.value = 'success'
-        return
+        if (!householdId.value) {
+            ui.addLog('Профиль загружен, но householdId отсутствует. Повторная загрузка...', 'warn')
+        } else {
+            ui.addLog(`Профиль уже загружен. Household: ${householdId.value}`, 'info')
+            authStatus.value = 'success'
+            return
+        }
     }
 
     try {
