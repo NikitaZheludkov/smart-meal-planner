@@ -194,7 +194,7 @@ onUnmounted(() => {
     </div>
 
     <template v-else>
-      <main class="flex-1 relative z-0 overflow-hidden" :class="telegram.isReady ? 'pt-tg-safe' : ''">
+      <main class="flex-1 relative z-0 overflow-hidden">
         <transition :name="transitionName">
            <component :is="activeComponent" :key="currentTab" class="absolute inset-0 w-full h-full" />
         </transition>

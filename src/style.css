@@ -40,7 +40,8 @@ html, body { overscroll-behavior-y: none; }
 
 /* Единый стандарт верхнего отступа (Safe Area) для всех страниц */
 :root {
-  --app-header-pt: 48px; /* Эквивалент pt-12 */
+  /* Базовый отступ 48px + учет "челки" или статус-бара устройства */
+  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 48px);
 }
 
 .pt-app-header {
@@ -50,9 +51,6 @@ html, body { overscroll-behavior-y: none; }
 /* Безопасные отступы для Telegram Mini Apps */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.pt-tg-safe {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 56px);
 }
 
 /* Анимации перехода страниц (Soft Fade Slide) */
