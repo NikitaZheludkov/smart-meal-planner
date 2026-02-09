@@ -94,3 +94,23 @@ html, body { overscroll-behavior-y: none; }
   opacity: 0;
   transform: translateY(-10px);
 }
+
+/* List Transitions (для списков) */
+.list-move, /* apply transition to moving elements */
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* ensure leaving items are taken out of layout flow so that moving
+   items can be calculated correctly. */
+.list-leave-active {
+  position: absolute; 
+  width: 100%; /* Important for correct layout during leave */
+}

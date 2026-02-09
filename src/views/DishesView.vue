@@ -167,48 +167,50 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 scroll-area">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area relative">
       
-      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40">
+      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40 absolute inset-0 pointer-events-none">
         <div class="text-5xl mb-2">🍳</div>
         <p class="font-bold text-slate-400">Ничего не найдено</p>
         <p v-if="uiStore.dishes.filterTags.length > 0" class="text-xs text-slate-300 mt-1">Попробуйте сбросить теги</p>
       </div>
 
-      <div 
-        v-for="dish in filteredDishes" 
-        :key="dish.id" 
-        @click="openDish(dish)" 
-        class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group"
-      >
-        <div class="flex justify-between items-start">
-          <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
-          <span class="text-[9px] font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-slate-100">
-              {{ dish.dish_type_name }}
-          </span>
-        </div>
-        
-        <div class="flex flex-wrap gap-1 mt-1">
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
-               {{ dish.meal_type_name }}
+      <TransitionGroup name="list" tag="div" class="space-y-3 relative min-h-full">
+        <div 
+            v-for="dish in filteredDishes" 
+            :key="dish.id" 
+            @click="openDish(dish)" 
+            class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
+        >
+            <div class="flex justify-between items-start">
+            <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
+            <span class="text-[9px] font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-slate-100">
+                {{ dish.dish_type_name }}
             </span>
-            <span 
-                v-for="tag in dish.tags.slice(0, 3)" 
-                :key="tag.id" 
-                class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50 border-slate-100 flex items-center gap-1" 
-            >
-               {{ tag.icon }} {{ tag.name }}
-            </span>
-            <span v-if="dish.tags.length > 3" class="text-[9px] font-bold text-slate-300 px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+            </div>
+            
+            <div class="flex flex-wrap gap-1 mt-1">
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
+                {{ dish.meal_type_name }}
+                </span>
+                <span 
+                    v-for="tag in dish.tags.slice(0, 3)" 
+                    :key="tag.id" 
+                    class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50 border-slate-100 flex items-center gap-1" 
+                >
+                {{ tag.icon }} {{ tag.name }}
+                </span>
+                <span v-if="dish.tags.length > 3" class="text-[9px] font-bold text-slate-300 px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+            </div>
+            
+            <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
+            <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
+            <span>Б {{ dish.protein || 0 }}</span>
+            <span>Ж {{ dish.fat || 0 }}</span>
+            <span>У {{ dish.carbs || 0 }}</span>
+            </div>
         </div>
-        
-        <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
-           <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
-           <span>Б {{ dish.protein || 0 }}</span>
-           <span>Ж {{ dish.fat || 0 }}</span>
-           <span>У {{ dish.carbs || 0 }}</span>
-        </div>
-      </div>
+      </TransitionGroup>
     </div>
 
     <div class="fixed bottom-24 right-5 z-[60]">

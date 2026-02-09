@@ -203,6 +203,7 @@ const goToToday = () => {
 }
 
 const changePeriod = (direction) => {
+  transitionName.value = direction > 0 ? 'slide-left' : 'slide-right'
   if (uiStore.plan.activeTab === 'day') {
       selectedDate.value = addDays(selectedDate.value, direction)
   } else {
@@ -251,7 +252,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
     <div class="flex-1 relative overflow-hidden">
         <transition :name="transitionName">
-            <div v-if="uiStore.plan.activeTab === 'day'" :key="'day'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
+            <div v-if="uiStore.plan.activeTab === 'day'" :key="'day-' + selectedDate.toISOString()" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
                 <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
                     <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
                     <div class="h-6 w-[1px] bg-slate-100"></div>
@@ -268,36 +269,38 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
                 <div class="space-y-6 mt-2">
                     <div v-for="group in currentDayData" :key="group.slot.id">
-                        <div v-if="group.hasItems">
-                            <div class="flex items-center justify-between px-2 mb-2">
-                                <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
-                            </div>
-                            <div class="space-y-2">
-                                <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
-                                        <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
-                                        <span v-else-if="item.product_id">🥦</span>
-                                        <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
-                                    </div>
-                                    <div class="flex-1 min-w-0 py-1">
-                                        <div class="text-base font-bold text-slate-800 truncate leading-tight">
-                                            {{ item.dish_id ? item.dishes?.name : item.products?.name }}
-                                            <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
-                                        </div>
-                                        <div class="mt-1.5 flex flex-wrap gap-2">
-                                            <template v-if="item.dish_id">
-                                                <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
-                                                <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
-                                            </template>
-                                            <template v-else>
-                                                <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                        <transition name="fade">
+                            <div v-if="group.hasItems">
+                                <div class="flex items-center justify-between px-2 mb-2">
+                                    <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
                                 </div>
+                                <TransitionGroup name="list" tag="div" class="space-y-2 relative">
+                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
+                                        <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
+                                            <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
+                                            <span v-else-if="item.product_id">🥦</span>
+                                            <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
+                                        </div>
+                                        <div class="flex-1 min-w-0 py-1">
+                                            <div class="text-base font-bold text-slate-800 truncate leading-tight">
+                                                {{ item.dish_id ? item.dishes?.name : item.products?.name }}
+                                                <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
+                                            </div>
+                                            <div class="mt-1.5 flex flex-wrap gap-2">
+                                                <template v-if="item.dish_id">
+                                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
+                                                    <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
+                                                </template>
+                                                <template v-else>
+                                                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                                    </div>
+                                </TransitionGroup>
                             </div>
-                        </div>
+                        </transition>
                     </div>
                 </div>
             </div>

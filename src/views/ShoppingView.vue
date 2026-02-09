@@ -252,11 +252,11 @@ const switchViewTab = (mode) => {
                     <div v-for="(items, category) in groupedList" :key="category">
                         <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{{ category }}</h3>
                         
-                        <div class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden">
+                        <TransitionGroup name="list" tag="div" class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative">
                             <div 
                                 v-for="item in items" 
                                 :key="item.id" 
-                                class="flex items-center p-4 border-b border-slate-50 last:border-0 group cursor-pointer tap-effect" 
+                                class="flex items-center p-4 border-b border-slate-50 last:border-0 group cursor-pointer tap-effect w-full" 
                                 @click="toggleCheck(item.id)"
                             >
                                 <div 
@@ -274,7 +274,7 @@ const switchViewTab = (mode) => {
                                     {{ Number.isInteger(item.amount) ? item.amount : item.amount.toFixed(1) }} {{ item.unit }}
                                 </div>
                             </div>
-                        </div>
+                        </TransitionGroup>
                     </div>
                 </div>
 
