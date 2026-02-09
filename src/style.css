@@ -40,8 +40,8 @@ html, body { overscroll-behavior-y: none; }
 
 /* Единый стандарт верхнего отступа (Safe Area) для всех страниц */
 :root {
-  /* Базовый отступ 48px + учет "челки" или статус-бара устройства */
-  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 48px);
+  /* Базовый отступ увеличили до 64px, чтобы элементы управления не перекрывались кнопками меню TMA */
+  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 64px);
 }
 
 .pt-app-header {
