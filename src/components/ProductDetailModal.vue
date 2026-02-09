@@ -108,13 +108,14 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
-    
-    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
-    
-    <div class="bg-white w-full max-w-sm h-[60vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
+  <Transition name="modal">
+    <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       
-      <div class="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+      
+      <div class="bg-white w-full max-w-sm h-[60vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+        
+        <div class="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
         <div class="w-20 flex justify-start">
             <button 
                 @click="handleCancel" 
@@ -214,10 +215,6 @@ const handleCancel = () => {
 
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 </template>
-
-<style scoped>
-.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-</style>

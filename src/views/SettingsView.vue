@@ -285,8 +285,10 @@ const periods = [
 
     
 
-    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showJoinModal = false">
-        <div class="bg-white w-full max-w-xs rounded-[32px] p-6 animate-bounce-slow">
+    <Transition name="modal">
+    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="showJoinModal = false">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="bg-white w-full max-w-xs rounded-[32px] p-6 relative z-10 modal-content">
             <div class="text-center mb-6">
                 <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
                 <h3 class="text-xl font-black text-slate-900">Вход в семью</h3>
@@ -313,6 +315,7 @@ const periods = [
             <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs tap-effect">Отмена</button>
         </div>
     </div>
+    </Transition>
 
   </div>
 </template>

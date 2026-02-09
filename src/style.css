@@ -124,3 +124,24 @@ html, body { overscroll-behavior-y: none; }
   position: absolute; 
   width: 100%; /* Important for correct layout during leave */
 }
+
+/* Modal Transitions (Fade Backdrop + Slide Content) */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .modal-content,
+.modal-leave-active .modal-content {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: translateY(100%);
+}
