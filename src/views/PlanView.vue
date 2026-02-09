@@ -8,8 +8,8 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { useSettingsStore } from '../stores/settings'
 import { useDishStore } from '../stores/dishes'
 import { useUIStore } from '../stores/ui' 
+import { useTelegramStore } from '../stores/telegram'
 import DishSelector from '../components/DishSelector.vue'
-import DishDetailModal from '../components/DishDetailModal.vue'
 
 const auth = useAuthStore()
 const planStore = usePlanStore()
@@ -17,6 +17,7 @@ const dictionaries = useDictionariesStore()
 const settingsStore = useSettingsStore()
 const dishStore = useDishStore()
 const uiStore = useUIStore()
+const telegram = useTelegramStore()
 
 const transitionName = ref('slide-left')
 const switchTab = (tab) => {
@@ -218,7 +219,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
   <div class="flex flex-col h-full bg-slate-50 relative">
 
     <!-- Header with Date and View Switcher -->
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-12 pb-4">
       <div class="flex justify-between items-center mb-4">
         <div>
            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">План питания</div>

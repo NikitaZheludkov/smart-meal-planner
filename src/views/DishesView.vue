@@ -103,7 +103,7 @@ const setMealType = (id) => {
 <template>
   <div class="h-full flex flex-col bg-slate-50">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 sticky top-0 border-b border-slate-100 px-5 pt-12 pb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-12 pb-4">
 
       
       <div class="flex gap-2 mb-4">
