@@ -145,7 +145,7 @@ const getDishSlotName = (id) => {
   <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
     
-    <div class="bg-white w-full max-w-sm h-[92vh] sm:h-[850px] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
+    <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
       
       <div class="px-5 pt-5 pb-3 flex justify-between items-center shrink-0 bg-white z-20 shadow-sm border-b border-slate-50">
           <div>
@@ -212,17 +212,17 @@ const getDishSlotName = (id) => {
       </div>
 
       <div class="px-4 py-2 bg-white z-10 shrink-0 space-y-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border-b border-slate-50">
-          <div class="bg-slate-100 p-1 rounded-xl flex font-bold text-xs">
+          <div class="bg-slate-100 p-1 rounded-full flex font-bold text-xs">
               <button 
                 @click="activeMode = 'dish'; telegram.haptic.selection()" 
-                class="flex-1 py-2 rounded-lg transition-all duration-200"
+                class="flex-1 py-2 rounded-full transition-all duration-200"
                 :class="activeMode === 'dish' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
               >
                   🥘 Рецепты
               </button>
               <button 
                 @click="activeMode = 'product'; telegram.haptic.selection()" 
-                class="flex-1 py-2 rounded-lg transition-all duration-200"
+                class="flex-1 py-2 rounded-full transition-all duration-200"
                 :class="activeMode === 'product' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
               >
                   🥦 Продукты
@@ -234,8 +234,15 @@ const getDishSlotName = (id) => {
              <input 
                 v-model="searchQuery" 
                 :placeholder="activeMode === 'dish' ? 'Найти рецепт...' : 'Найти продукт...'" 
-                class="w-full pl-9 p-2.5 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none border border-slate-100 focus:border-indigo-200 transition-colors text-sm placeholder:font-medium"
+                class="w-full pl-9 pr-10 p-2.5 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none border border-slate-100 focus:border-indigo-200 transition-colors text-sm placeholder:font-medium"
              >
+             <button 
+                v-if="searchQuery" 
+                @click="searchQuery = ''; telegram.haptic.selection()"
+                class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 tap-effect"
+            >
+                <span class="material-icons-round text-lg">close</span>
+            </button>
           </div>
 
           <div v-if="activeMode === 'dish'" class="flex overflow-x-auto gap-2 no-scrollbar pb-1">
@@ -258,12 +265,14 @@ const getDishSlotName = (id) => {
           </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-4 pb-10 bg-slate-50">
-          <div v-if="activeMode === 'dish'" class="space-y-2 pt-3">
+      <div class="flex-1 overflow-y-auto px-4 pb-10 bg-slate-50 relative">
+          <Transition name="slide-fade" mode="out-in">
+          <div v-if="activeMode === 'dish'" key="dish" class="space-y-2 pt-3">
               <div v-if="filteredDishes.length === 0" class="text-center py-10 text-slate-400 text-sm font-bold">
                   {{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}
               </div>
 
+              <TransitionGroup name="list" tag="div" class="space-y-2">
               <div 
                 v-for="dish in filteredDishes" 
                 :key="dish.id"
@@ -301,9 +310,10 @@ const getDishSlotName = (id) => {
                       <span class="material-icons-round text-lg">add</span>
                   </button>
               </div>
+              </TransitionGroup>
           </div>
 
-          <div v-else class="space-y-4 pt-3">
+          <div v-else key="product" class="space-y-4 pt-3">
               <div v-for="(products, catName) in groupedProducts" :key="catName">
                   <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{{ catName }}</h3>
                   <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -324,7 +334,7 @@ const getDishSlotName = (id) => {
                   </div>
               </div>
           </div>
-
+          </Transition>
       </div>
     </div>
   </div>
