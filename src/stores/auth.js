@@ -9,8 +9,18 @@ export const useAuthStore = defineStore('auth', () => {
   const householdId = ref(null)
   const isAuth = ref(false)
   const loading = ref(true)
+  const authStatus = ref('idle') // idle, loading, success, error
+  const authError = ref(null) // { message, type: 'network'|'auth', canRetry: boolean }
 
   const ui = useUIStore()
+
+  const isNetworkError = (err) => {
+    return err.name === 'TimeoutError' || 
+           err.message?.includes('fetch') || 
+           err.message?.includes('Abort') ||
+           err.message?.includes('Load failed') ||
+           err.message?.includes('Failed to fetch')
+  }
 
   const withTimeout = async (promise, ms = 20000) => { 
     const t = new Promise((_, reject) => setTimeout(() => {
@@ -27,9 +37,9 @@ export const useAuthStore = defineStore('auth', () => {
         return await fn()
       } catch (err) {
         const isLastRetry = i === retries - 1
-        const isNetworkError = err.name === 'TimeoutError' || err.message?.includes('fetch') || err.message?.includes('Abort')
+        const networkErr = isNetworkError(err)
         
-        if (isLastRetry || !isNetworkError) throw err
+        if (isLastRetry || !networkErr) throw err
         
         ui.addLog(`Retry ${i + 1}/${retries} after error: ${err.message}`, 'warn')
         await new Promise(r => setTimeout(r, delay * (i + 1))) // Экспоненциальная задержка
@@ -40,6 +50,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Инициализация
   const init = async () => {
     loading.value = true
+    authStatus.value = 'loading'
+    authError.value = null
+    
     ui.addLog('Запуск инициализации Auth...', 'info')
     
     // Тест связи с Supabase
@@ -54,7 +67,19 @@ export const useAuthStore = defineStore('auth', () => {
     try {
         // 1. Проверяем текущую сессию
         const { data: { session }, error } = await withTimeout(supabase.auth.getSession())
-        if (error) ui.addLog('Ошибка getSession при старте', 'error', error)
+        
+        if (error) {
+            ui.addLog('Ошибка getSession при старте', 'error', error)
+            if (isNetworkError(error)) {
+                authStatus.value = 'error'
+                authError.value = { 
+                    message: 'Нет связи с сервером. Проверьте интернет.', 
+                    type: 'network', 
+                    canRetry: true 
+                }
+                return
+            }
+        }
         
         if (session?.user) {
             ui.addLog('Сессия найдена при старте, юзер: ' + session.user.id)
@@ -110,55 +135,61 @@ export const useAuthStore = defineStore('auth', () => {
     
     if (!telegramStore.initData) {
         ui.addLog('Авто-вход через TG пропущен (не в TMA)')
+        authStatus.value = 'idle'
         return
     }
+    
+    authStatus.value = 'loading'
+    authError.value = null
 
     try {
         ui.addLog('Вызов Edge Function telegram-auth...')
         ui.addLog('InitData length: ' + (telegramStore.initData?.length || 0))
         
-        // 1. Попытка через стандартный SDK
-        ui.addLog('Попытка #1: SDK invoke...')
-        let response = await withTimeout(
-          supabase.functions.invoke('telegram-auth', { 
-            body: { initData: telegramStore.initData }
-          }),
-          15000
-        ).catch(err => ({ error: err }))
+        // Оборачиваем весь процесс в withRetry
+        const { data, error } = await withRetry(async () => {
+            // 1. Попытка через стандартный SDK
+            ui.addLog('Попытка SDK invoke...')
+            let response = await withTimeout(
+            supabase.functions.invoke('telegram-auth', { 
+                body: { initData: telegramStore.initData }
+            }),
+            15000
+            ).catch(err => ({ error: err }))
 
-        // 2. Если SDK не сработал, пробуем прямой fetch (иногда SDK глючит с Edge Functions)
-        if (response.error) {
-            ui.addLog('SDK invoke не удался, пробуем прямой fetch...', 'warn', response.error.message)
-            
-            const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`
-            ui.addLog('URL функции: ' + functionUrl)
-            
-            const fetchResponse = await withTimeout(
-                fetch(functionUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-                    },
-                    body: JSON.stringify({ initData: telegramStore.initData })
-                }),
-                15000
-            ).catch(err => {
-                ui.addLog('Прямой fetch тоже не удался', 'error', err.message)
-                throw err
-            })
+            // 2. Если SDK не сработал, пробуем прямой fetch (иногда SDK глючит с Edge Functions)
+            if (response.error) {
+                ui.addLog('SDK invoke не удался, пробуем прямой fetch...', 'warn', response.error.message)
+                
+                const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`
+                
+                const fetchResponse = await withTimeout(
+                    fetch(functionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                        },
+                        body: JSON.stringify({ initData: telegramStore.initData })
+                    }),
+                    15000
+                ).catch(err => {
+                    ui.addLog('Прямой fetch тоже не удался', 'error', err.message)
+                    throw err
+                })
 
-            if (!fetchResponse.ok) {
-                const errText = await fetchResponse.text()
-                ui.addLog('Ошибка прямого fetch: ' + fetchResponse.status, 'error', errText)
-                throw new Error(`Direct fetch error: ${fetchResponse.status}`)
+                if (!fetchResponse.ok) {
+                    const errText = await fetchResponse.text()
+                    ui.addLog('Ошибка прямого fetch: ' + fetchResponse.status, 'error', errText)
+                    throw new Error(`Direct fetch error: ${fetchResponse.status}`)
+                }
+
+                const directData = await fetchResponse.json()
+                response = { data: directData, error: null }
             }
-
-            const directData = await fetchResponse.json()
-            response = { data: directData, error: null }
-        }
-
-        const { data, error } = response
+            
+            return response
+        })
 
         if (error) {
           ui.addLog('Edge Function вернула ошибку', 'error', error)
@@ -180,6 +211,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     } catch (e) {
         ui.addLog('Ошибка входа через Telegram', 'error', { message: e.message, stack: e.stack })
+        authStatus.value = 'error'
+        
+        const isNetwork = isNetworkError(e)
+        authError.value = {
+            message: isNetwork ? 'Ошибка сети. Попробуйте снова.' : 'Не удалось войти. Перезапустите приложение.',
+            type: isNetwork ? 'network' : 'auth',
+            canRetry: isNetwork
+        }
     }
   }
 
@@ -189,6 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Предотвращаем множественные одновременные загрузки профиля
     if (user.value?.id === authUser.id && isAuth.value) {
         ui.addLog('Профиль уже загружен для этого пользователя', 'info')
+        authStatus.value = 'success'
         return
     }
 
@@ -210,15 +250,16 @@ export const useAuthStore = defineStore('auth', () => {
             ui.addLog('Ошибка загрузки профиля', 'error', error)
             if (error.code === 'PGRST116') {
                 ui.addLog('Профиль не найден в базе', 'warn')
+                authStatus.value = 'error'
+                authError.value = { message: 'Профиль не найден', type: 'auth', canRetry: false }
             }
             // При сетевых ошибках НЕ выходим из аккаунта, просто ждем
-            const isTransient = error.message?.includes('fetch') || 
-                              error.message?.includes('Load failed') || 
-                              error.name === 'TimeoutError' ||
-                              error.message?.includes('aborted')
+            const isTransient = isNetworkError(error)
             
             if (isTransient) {
                 ui.addLog('Временная ошибка сети, сессия сохранена', 'warn')
+                authStatus.value = 'error'
+                authError.value = { message: 'Ошибка сети при загрузке профиля', type: 'network', canRetry: true }
                 return 
             }
             
@@ -236,9 +277,12 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = authUser
         householdId.value = data.household_id
         isAuth.value = true
+        authStatus.value = 'success'
         
     } catch (e) {
         ui.addLog('Исключение в handleUserSession', 'error', e)
+        authStatus.value = 'error'
+        authError.value = { message: 'Ошибка приложения', type: 'auth', canRetry: false }
     }
   }
 
@@ -277,7 +321,9 @@ export const useAuthStore = defineStore('auth', () => {
     user, 
     householdId, 
     isAuth, 
-    loading, 
+    loading,
+    authStatus,
+    authError,
     init, 
     refreshSession, 
     loginWithTelegram, 

@@ -29,9 +29,38 @@ onMounted(() => {
       <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Meal Planner</h1>
       <p class="text-slate-400 text-sm font-bold mb-8">Загрузка вашего профиля...</p>
 
-      <div v-if="auth.loading" class="flex flex-col items-center gap-3">
+      <div v-if="auth.loading || auth.authStatus === 'loading'" class="flex flex-col items-center gap-3">
         <span class="material-icons-round animate-spin text-3xl text-indigo-500">donut_large</span>
         <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Синхронизация с Telegram</p>
+      </div>
+
+      <div v-else-if="auth.authStatus === 'error'" class="w-full animate-fade-in">
+        <div class="bg-red-50 p-4 rounded-2xl border border-red-100 text-red-500 text-xs font-bold mb-4">
+            <div class="flex items-center justify-center gap-2 mb-2">
+                <span class="material-icons-round text-lg">
+                    {{ auth.authError?.type === 'network' ? 'wifi_off' : 'error_outline' }}
+                </span>
+                <span>{{ auth.authError?.message || 'Ошибка входа' }}</span>
+            </div>
+            <p v-if="auth.authError?.type === 'network'" class="opacity-70 font-normal">
+                Проверьте соединение и попробуйте снова.
+            </p>
+        </div>
+        
+        <button 
+            v-if="auth.authError?.canRetry"
+            @click="auth.loginWithTelegram()" 
+            class="w-full py-3 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95 transition-transform font-bold text-sm"
+        >
+            Попробовать снова
+        </button>
+        <button 
+            v-else
+            @click="auth.loginWithTelegram()" 
+            class="px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl text-xs font-bold"
+        >
+            Перезагрузить
+        </button>
       </div>
 
       <div v-else-if="!telegram.initData" class="w-full space-y-4 animate-fade-in">
@@ -46,11 +75,6 @@ onMounted(() => {
           Войти как Dev User
         </button>
       </div>
-
-       <div v-else class="bg-red-50 p-4 rounded-2xl border border-red-100 text-red-500 text-xs font-bold animate-fade-in">
-            <p class="mb-2">Не удалось войти.</p>
-            <button @click="auth.loginWithTelegram()" class="px-4 py-2 bg-white border border-red-100 rounded-xl shadow-sm">Попробовать снова</button>
-       </div>
 
     </div>
     

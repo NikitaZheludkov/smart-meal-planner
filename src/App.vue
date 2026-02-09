@@ -107,10 +107,17 @@ watch(() => auth.isAuth, (newVal) => {
 onMounted(async () => {
     // Слушаем события видимости и сети
     document.addEventListener('visibilitychange', handleAppResume)
-    window.addEventListener('online', handleAppResume)
+    window.addEventListener('online', () => {
+        handleAppResume()
+        ui.setOffline(false)
+    })
     window.addEventListener('offline', () => {
         console.log('🌐 Соединение потеряно');
+        ui.setOffline(true)
     })
+
+    // Инициализируем статус сети
+    ui.setOffline(!navigator.onLine)
 
     // Фолбэк на случай зависания инициализации на мобильных TMA
     const timer = setTimeout(() => {
@@ -138,13 +145,18 @@ onMounted(async () => {
 
 onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleAppResume)
-    window.removeEventListener('online', handleAppResume)
+    // window listeners are auto-cleaned usually but good practice to remove if we were strict
 })
 </script>
 
 <template>
   <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
     
+    <!-- Офлайн индикатор -->
+    <div v-if="ui.isOffline" class="fixed top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold text-center py-1 z-[2000] animate-slide-down">
+        Нет соединения с интернетом
+    </div>
+
     <!-- Кнопка логов (ВСЕГДА ДОСТУПНА ДЛЯ ОТЛАДКИ) -->
     <button 
       @click="ui.isLogOpen = true" 
@@ -203,4 +215,12 @@ onUnmounted(() => {
 <style>
 .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
 </style>

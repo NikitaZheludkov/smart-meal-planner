@@ -27,7 +27,14 @@ export const useUIStore = defineStore('ui', () => {
   // --- ЛОГИ ---
   const logs = ref([])
   const isLogOpen = ref(false)
+  const isOffline = ref(!navigator.onLine)
   
+  const setOffline = (value) => {
+    isOffline.value = value
+    if (value) addLog('Сетевое соединение потеряно', 'warn')
+    else addLog('Сетевое соединение восстановлено', 'info')
+  }
+
   const addLog = (message, type = 'info', data = null) => {
     // Авто-добавление версии при первом логировании
     if (logs.value.length === 0) {
@@ -51,5 +58,5 @@ export const useUIStore = defineStore('ui', () => {
     if (logs.value.length > 100) logs.value.pop()
   }
 
-  return { plan, dishes, shopping, logs, isLogOpen, addLog }
+  return { plan, dishes, shopping, logs, isLogOpen, isOffline, setOffline, addLog }
 })
