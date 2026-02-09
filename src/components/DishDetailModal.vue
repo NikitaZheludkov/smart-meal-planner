@@ -516,6 +516,7 @@ const getMealTypeName = computed(() => {
         </transition>
       </div>
     </div>
+    </div>
   </Transition>
 </template>
 
