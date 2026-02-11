@@ -178,6 +178,22 @@ const dailyTotals = computed(() => {
   return totals
 })
 
+const getDailyTotals = (day) => {
+  let totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 }
+  mealSlots.value.forEach(slot => {
+    const items = getSlotItems(day, slot.id)
+    items.forEach(item => {
+      if (item.dish_id && item.dishes) {
+        totals.kcal += (Number(item.dishes.kcal) || 0)
+        totals.protein += (Number(item.dishes.protein) || 0)
+        totals.fat += (Number(item.dishes.fat) || 0)
+        totals.carbs += (Number(item.dishes.carbs) || 0)
+      }
+    })
+  })
+  return totals
+}
+
 const displayDateLabel = computed(() => {
   if (uiStore.plan.activeTab === 'day') {
     return format(selectedDate.value, 'd MMMM, EEEE', { locale: ru })
@@ -311,14 +327,36 @@ onMounted(() => { if (auth.isAuth) loadData() })
             </div>
 
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area w-full">
-                <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex items-stretch gap-4">
+                <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-4 shadow-sm border border-slate-100 flex flex-col gap-3">
                     
-                    <div class="flex flex-col items-center justify-center w-8 flex-shrink-0 border-r border-slate-50 pr-3">
-                    <span class="text-lg font-black text-slate-800">{{ format(day, 'd') }}</span>
-                    <span class="text-[9px] font-bold uppercase" :class="isToday(day) ? 'text-orange-500' : 'text-slate-400'">{{ format(day, 'EEE', { locale: ru }) }}</span>
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg font-black text-slate-800">{{ format(day, 'd') }}</span>
+                            <span class="text-xs font-bold uppercase text-slate-500" :class="isToday(day) ? 'text-orange-500' : ''">{{ format(day, 'EEEE', { locale: ru }) }}</span>
+                        </div>
+
+                        <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-3">
+                            <div class="flex flex-col items-center">
+                                <span class="text-[10px] font-black text-slate-800">{{ Math.round(getDailyTotals(day).kcal) }}</span>
+                                <span class="text-[8px] font-bold text-slate-400 uppercase leading-none">ккал</span>
+                            </div>
+                            <div class="h-4 w-[1px] bg-slate-100"></div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-[9px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).protein) }}</span>
+                                <span class="text-[7px] font-bold text-slate-400 uppercase leading-none">Б</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-[9px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).fat) }}</span>
+                                <span class="text-[7px] font-bold text-slate-400 uppercase leading-none">Ж</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-[9px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).carbs) }}</span>
+                                <span class="text-[7px] font-bold text-slate-400 uppercase leading-none">У</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="flex-1 grid grid-cols-4 gap-2">
+                    <div class="w-full grid grid-cols-4 gap-2">
                     
                     <button 
                         v-for="slot in mealSlots" 
