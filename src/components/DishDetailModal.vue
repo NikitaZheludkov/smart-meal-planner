@@ -141,10 +141,23 @@ const removeIngredient = (index) => {
 }
 
 // --- ИНИЦИАЛИЗАЦИЯ ---
-watch(() => props.dish, (newVal) => {
-  if (newVal) {
-    formData.value = JSON.parse(JSON.stringify(newVal))
+const initForm = (dishData) => {
+    formData.value = JSON.parse(JSON.stringify(dishData))
     if (!formData.value.ingredients) formData.value.ingredients = []
+    
+    // Fix for nested ingredients from planStore
+    formData.value.ingredients = formData.value.ingredients.map(ing => {
+        if (ing.products && !ing.name) {
+            return {
+                product_id: ing.product_id,
+                name: ing.products.name || 'Неизвестно',
+                unit: ing.products.unit || '',
+                amount: ing.amount
+            }
+        }
+        return ing
+    })
+
     if (!formData.value.tags) formData.value.tags = []
     
     if (!formData.value.id) {
@@ -167,8 +180,19 @@ watch(() => props.dish, (newVal) => {
     if (productStore.products.length === 0) {
         productStore.fetchProducts()
     }
+}
+
+watch(() => props.isOpen, (newVal) => {
+    if (newVal && props.dish) {
+        initForm(props.dish)
+    }
+})
+
+watch(() => props.dish, (newVal) => {
+  if (newVal && props.isOpen) {
+    initForm(newVal)
   }
-}, { immediate: true })
+})
 
 const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
