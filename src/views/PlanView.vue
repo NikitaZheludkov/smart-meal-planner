@@ -167,11 +167,11 @@ const dailyTotals = computed(() => {
   currentDayData.value.forEach(group => {
     group.items.forEach(item => {
       if (item.dish_id && item.dishes) {
-        const mult = item.portions || 1
-        totals.kcal += (Number(item.dishes.kcal) || 0) * mult
-        totals.protein += (Number(item.dishes.protein) || 0) * mult
-        totals.fat += (Number(item.dishes.fat) || 0) * mult
-        totals.carbs += (Number(item.dishes.carbs) || 0) * mult
+        // Считаем КБЖУ только для одной порции (на 1 человека), игнорируем item.portions
+        totals.kcal += (Number(item.dishes.kcal) || 0)
+        totals.protein += (Number(item.dishes.protein) || 0)
+        totals.fat += (Number(item.dishes.fat) || 0)
+        totals.carbs += (Number(item.dishes.carbs) || 0)
       }
     })
   })
