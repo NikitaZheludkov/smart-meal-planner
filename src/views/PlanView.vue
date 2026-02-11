@@ -327,12 +327,15 @@ onMounted(() => { if (auth.isAuth) loadData() })
             </div>
 
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area w-full">
-                <div v-for="day in weekDays" :key="day" class="bg-white rounded-[24px] p-3 shadow-sm border border-slate-100 flex flex-col gap-2">
+                <div v-for="day in weekDays" :key="day" 
+                    class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-all duration-300"
+                    :class="isToday(day) ? 'shadow-md ring-2 ring-orange-500/10 border-orange-200' : 'shadow-sm border border-slate-100'"
+                >
                     
-                    <div class="flex items-center justify-between pb-1.5 border-b border-slate-50">
+                    <div class="flex items-center justify-between pb-1.5 border-b" :class="isToday(day) ? 'border-orange-100' : 'border-slate-50'">
                         <div class="flex items-center gap-2">
-                            <span class="text-base font-black text-slate-800">{{ format(day, 'd') }}</span>
-                            <span class="text-[10px] font-bold uppercase text-slate-500" :class="isToday(day) ? 'text-orange-500' : ''">{{ format(day, 'EEEE', { locale: ru }) }}</span>
+                            <span class="text-base font-black" :class="isToday(day) ? 'text-orange-500' : 'text-slate-800'">{{ format(day, 'd') }}</span>
+                            <span class="text-[10px] font-bold uppercase" :class="isToday(day) ? 'text-orange-400' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
                         </div>
 
                         <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-2">
