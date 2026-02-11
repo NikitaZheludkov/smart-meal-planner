@@ -10,6 +10,7 @@ import { useDishStore } from '../stores/dishes'
 import { useUIStore } from '../stores/ui' 
 import { useTelegramStore } from '../stores/telegram'
 import DishSelector from '../components/DishSelector.vue'
+import DishDetailModal from '../components/DishDetailModal.vue'
 
 const auth = useAuthStore()
 const planStore = usePlanStore()
