@@ -147,17 +147,28 @@ const dishStats = computed(() => {
 })
 
 const groupedList = computed(() => {
-    const items = shoppingList.value
+    const items = [...shoppingList.value]
+    
+    const sorter = (a, b) => {
+        const aChecked = checkedIds.value.has(a.id)
+        const bChecked = checkedIds.value.has(b.id)
+        
+        if (aChecked !== bChecked) {
+            return aChecked ? 1 : -1
+        }
+        return a.name.localeCompare(b.name)
+    }
+    
     if (activeTab.value === 'departments') {
         const groups = {}
-        items.forEach(item => {
+        items.sort(sorter).forEach(item => {
             const cat = item.category
             if (!groups[cat]) groups[cat] = []
             groups[cat].push(item)
         })
         return groups
     } else {
-        return { 'Все': items.sort((a, b) => a.name.localeCompare(b.name)) }
+        return { 'Все': items.sort(sorter) }
     }
 })
 
