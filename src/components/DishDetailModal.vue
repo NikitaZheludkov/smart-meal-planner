@@ -32,6 +32,8 @@ const formData = ref({
     meal_type_id: '',
     description: '',
     kcal: null, protein: null, fat: null, carbs: null,
+    is_batch: false,
+    batch_yield: 1,
     tags: [],
     ingredients: []
 })
@@ -384,7 +386,47 @@ const getMealTypeName = computed(() => {
 
             <div v-else class="space-y-6 pb-20">
                 
-                <div class="space-y-1">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Формат готовки</label>
+                        <div class="bg-slate-50 p-1 rounded-xl border border-slate-100 flex">
+                            <button 
+                                type="button"
+                                @click="formData.is_batch = false"
+                                :class="['flex-1 py-2 text-xs font-bold rounded-lg transition-all', !formData.is_batch ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600']"
+                            >
+                                Порционно
+                            </button>
+                            <button 
+                                type="button"
+                                @click="formData.is_batch = true"
+                                :class="['flex-1 py-2 text-xs font-bold rounded-lg transition-all', formData.is_batch ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600']"
+                            >
+                                Сразу много
+                            </button>
+                        </div>
+                        
+                        <div v-if="formData.is_batch" class="pt-2 animate-fade-in">
+                             <div class="flex items-center gap-3 bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
+                                <div class="w-10 h-10 rounded-full bg-white text-indigo-500 flex items-center justify-center font-bold shadow-sm shrink-0">
+                                    {{ formData.batch_yield }}
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xs font-bold text-indigo-900">Порций на выходе</div>
+                                    <div class="text-[10px] text-indigo-600 leading-tight">На сколько раз хватит одной готовки?</div>
+                                </div>
+                                <div class="flex items-center gap-1 bg-white rounded-lg p-1 shadow-sm">
+                                    <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-md active:bg-slate-100 transition-colors">
+                                        <span class="material-icons-round text-base">remove</span>
+                                    </button>
+                                    <button @click="formData.batch_yield++" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-md active:bg-slate-100 transition-colors">
+                                        <span class="material-icons-round text-base">add</span>
+                                    </button>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Название</label>
                     <input v-model="formData.name" placeholder="Название блюда" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 text-lg">
                 </div>

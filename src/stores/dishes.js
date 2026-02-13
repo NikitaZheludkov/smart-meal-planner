@@ -65,6 +65,8 @@ export const useDishStore = defineStore('dishes', () => {
         protein: dishData.protein || 0,
         fat: dishData.fat || 0,
         carbs: dishData.carbs || 0,
+        is_batch: dishData.is_batch || false,
+        batch_yield: dishData.batch_yield || 1,
         household_id: auth.householdId // <-- ВАЖНО: Добавили ID семьи
       })
       .select()
@@ -108,7 +110,9 @@ export const useDishStore = defineStore('dishes', () => {
         kcal: dishData.kcal,
         protein: dishData.protein,
         fat: dishData.fat,
-        carbs: dishData.carbs
+        carbs: dishData.carbs,
+        is_batch: dishData.is_batch || false,
+        batch_yield: dishData.batch_yield || 1
       })
       .eq('id', id)
 

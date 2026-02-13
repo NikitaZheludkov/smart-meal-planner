@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { startOfWeek, addDays, subDays, format, isToday, isSameDay } from 'date-fns'
+import { startOfWeek, addDays, subDays, format, isToday, isSameDay, isWithinInterval, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../stores/auth'
 import { usePlanStore } from '../stores/plan'
@@ -66,6 +66,57 @@ watch(() => settingsStore.startDay, (newStartDay) => {
     }
 })
 
+const batchStatusMap = computed(() => {
+    const map = new Map()
+    const plan = planStore.plan
+    const start = currentWeekStart.value
+    const end = addDays(start, (settingsStore.periodLength || 7) - 1)
+    
+    // Фильтруем по текущей неделе и только batch блюда
+    const weekItems = plan.filter(p => {
+        if (!p.dish_id || !p.dishes?.is_batch) return false
+        const d = parseISO(p.date)
+        return isWithinInterval(d, { start, end })
+    })
+
+    // Группируем по dish_id
+    const byDish = {}
+    weekItems.forEach(item => {
+        if (!byDish[item.dish_id]) byDish[item.dish_id] = []
+        byDish[item.dish_id].push(item)
+    })
+    
+    Object.values(byDish).forEach(items => {
+        // Сортируем: дата, потом слот
+        items.sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date)
+            return a.meal_type_id - b.meal_type_id
+        })
+        
+        const yieldAmount = items[0].dishes.batch_yield || 1
+        let currentBatch = 1
+        let usedInBatch = 0
+        
+        items.forEach(item => {
+            const portions = item.portions || 1
+            usedInBatch += portions
+            
+            while (usedInBatch > yieldAmount) {
+                currentBatch++
+                usedInBatch -= yieldAmount
+            }
+            
+            map.set(item.id, {
+                current: usedInBatch,
+                total: yieldAmount,
+                batch: currentBatch
+            })
+        })
+    })
+    
+    return map
+})
+
 const getSlotIcon = (slotName) => {
     if (!slotName) return '🥘'
     const name = slotName.toLowerCase()
@@ -112,6 +163,32 @@ const onDishSelected = async ({ item, type }) => {
   })
 
   if (isDuplicate) return 
+
+  // Проверка для Batch-блюд
+  if (type === 'dish' && item.is_batch) {
+      const yieldAmount = item.batch_yield || 1
+      const start = currentWeekStart.value
+      const end = addDays(start, (settingsStore.periodLength || 7) - 1)
+      
+      // Считаем сколько уже запланировано
+      const existingUses = planStore.plan.filter(p => 
+        p.dish_id === item.id && 
+        isWithinInterval(parseISO(p.date), { start, end })
+      )
+      
+      const totalUsed = existingUses.reduce((sum, p) => sum + (p.portions || 1), 0)
+      const adding = defaultPortions.value // Используем вычисленное значение
+      
+      const currentBatchCount = Math.ceil((totalUsed || 1) / yieldAmount)
+      const newTotal = totalUsed + adding
+      const newBatchCount = Math.ceil(newTotal / yieldAmount)
+      
+      // Если мы переходим границу батча (начинаем новый)
+      if (newBatchCount > currentBatchCount && totalUsed > 0) {
+          const confirmMsg = `Текущая партия этого блюда (${yieldAmount} порц.) закончится. Придется готовить заново (партия №${newBatchCount}). Добавить?`
+          if (!confirm(confirmMsg)) return
+      }
+  }
 
   // Берем значение из настроек
   const portionsToAdd = defaultPortions.value
@@ -307,6 +384,12 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                                 {{ item.dish_id ? item.dishes?.name : item.products?.name }}
                                                 <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
                                             </div>
+                                            <!-- Batch Indicator List View -->
+                                            <div v-if="batchStatusMap.has(item.id)" class="inline-flex items-center gap-1 mt-0.5 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                                                <span class="text-[9px] font-black text-indigo-500">Партия {{ batchStatusMap.get(item.id).batch }}</span>
+                                                <span class="text-[9px] text-indigo-300">|</span>
+                                                <span class="text-[9px] font-black text-indigo-700">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</span>
+                                            </div>
                                             <div class="mt-1.5 flex flex-wrap gap-2">
                                                 <template v-if="item.dish_id">
                                                     <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
@@ -378,6 +461,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
                     <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-500/30' : ''"></div>
                     <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent"></div>
                     <div class="absolute bottom-1.5 left-1.5 right-1.5 z-10 text-left">
+                        <!-- Batch Indicator Grid View (Image) -->
+                        <div v-if="batchStatusMap.has(getSlotItems(day, slot.id)[0].id)" class="absolute -top-16 right-0 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg border border-white/10 flex items-center gap-1">
+                             <span class="text-[8px] font-bold text-white">{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).current }}/{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).total }}</span>
+                        </div>
+
                         <div class="text-[9px] font-bold text-white leading-tight line-clamp-2 shadow-sm">
                              <span v-if="getSlotItems(day, slot.id)[0].ignore_shopping" class="text-[8px] mr-1">🚫</span>
                             {{ getSlotItems(day, slot.id)[0].dishes?.name }}
@@ -387,6 +475,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
                 </template>
                 <template v-else>
                     <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-50' : 'bg-white'">
+                        <!-- Batch Indicator Grid View (No Image) -->
+                        <div v-if="batchStatusMap.has(getSlotItems(day, slot.id)[0].id)" class="absolute top-1 right-1 bg-indigo-50 px-1 py-0.5 rounded-md border border-indigo-100">
+                             <span class="text-[7px] font-black text-indigo-600">{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).current }}/{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).total }}</span>
+                        </div>
+                        
                         <div class="text-xl mb-1">
                             {{ getSlotItems(day, slot.id)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
                         </div>

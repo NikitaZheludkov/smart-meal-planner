@@ -76,24 +76,46 @@ const activePlanItems = computed(() => {
 })
 
 const shoppingList = computed(() => {
-  const list = {}
+  const dishesMap = {} // Группировка по блюдам для расчета батчей
+  const finalList = {} // Итоговый список продуктов
   
   activePlanItems.value.forEach(planItem => {
       const portions = planItem.portions || 1
 
       if (planItem.dish_id) {
-          const ingredients = planItem.dishes.ingredients || []
-          ingredients.forEach(ing => {
-              if (!ing.products) return 
-              addToAggregatedList(list, ing.products, (ing.amount || 0) * portions)
-          })
+          const dishId = planItem.dish_id
+          if (!dishesMap[dishId]) {
+              dishesMap[dishId] = {
+                  is_batch: planItem.dishes?.is_batch,
+                  batch_yield: planItem.dishes?.batch_yield || 1,
+                  ingredients: planItem.dishes?.ingredients || [],
+                  totalPortions: 0
+              }
+          }
+          dishesMap[dishId].totalPortions += portions
       } 
       else if (planItem.product_id) {
-           addToAggregatedList(list, planItem.products, portions)
+           addToAggregatedList(finalList, planItem.products, portions)
       }
   })
 
-  return Object.values(list)
+  // Обрабатываем сгруппированные блюда
+  Object.values(dishesMap).forEach(dish => {
+      let multiplier = dish.totalPortions
+      
+      if (dish.is_batch && dish.batch_yield > 0) {
+          // Для пакетных блюд: кол-во готовок = ceil(всего порций / выход с одной готовки)
+          // Ингредиенты берем на одну готовку (они так хранятся в базе для batch блюд)
+          multiplier = Math.ceil(dish.totalPortions / dish.batch_yield)
+      }
+      
+      dish.ingredients.forEach(ing => {
+          if (!ing.products) return 
+          addToAggregatedList(finalList, ing.products, (ing.amount || 0) * multiplier)
+      })
+  })
+
+  return Object.values(finalList)
 })
 
 const addToAggregatedList = (list, product, amount) => {
