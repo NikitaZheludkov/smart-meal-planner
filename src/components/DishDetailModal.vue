@@ -162,6 +162,10 @@ const initForm = (dishData) => {
 
     if (!formData.value.tags) formData.value.tags = []
     
+    // Fix for batch fields defaults
+    if (formData.value.is_batch === undefined) formData.value.is_batch = false
+    formData.value.batch_yield = Number(formData.value.batch_yield) || 1
+    
     if (!formData.value.id) {
         if (!formData.value.dish_type_id && dictionaries.dishTypes.length) {
             formData.value.dish_type_id = dictionaries.dishTypes[0].id

@@ -185,7 +185,7 @@ const onDishSelected = async ({ item, type }) => {
       
       // Если мы переходим границу батча (начинаем новый)
       if (newBatchCount > currentBatchCount && totalUsed > 0) {
-          const confirmMsg = `Текущая партия этого блюда (${yieldAmount} порц.) закончится. Придется готовить заново (партия №${newBatchCount}). Добавить?`
+          const confirmMsg = `Блюдо закончится. Добавить новую готовку?`
           if (!confirm(confirmMsg)) return
       }
   }
