@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
-import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
+import { useRealtimeStore } from './realtime'
+import { useUIStore } from './ui' // <-- Добавил импорт
 
 export const useSettingsStore = defineStore('settings', () => {
   const startDay = ref(1) 
@@ -19,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const fetchSettings = async () => {
     const auth = useAuthStore()
+    const ui = useUIStore() // <-- Инициализируем UI
     // Дожидаемся готовности авторизации на мобильных TMA
     let attempts = 0
     while (!auth.user && attempts < 30) {
@@ -48,7 +50,7 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       }
     } catch (e) { 
-        console.error('Ошибка загрузки настроек:', e) 
+        ui.addLog('Ошибка загрузки настроек', 'error', e) 
     } finally {
         loading.value = false
     }
