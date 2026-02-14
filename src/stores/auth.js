@@ -105,6 +105,8 @@ export const useAuthStore = defineStore('auth', () => {
         supabase.auth.onAuthStateChange(async (event, session) => {
             ui.addLog('AuthStateChange event: ' + event)
             if (session?.user) {
+                // Избегаем повторной инициализации, если пользователь тот же и мы уже авторизованы
+                if (isAuth.value && user.value?.id === session.user.id) return
                 await handleUserSession(session.user)
             } else {
                 if (event === 'SIGNED_OUT') resetState()
