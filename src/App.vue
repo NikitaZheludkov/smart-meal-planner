@@ -64,11 +64,20 @@ const loadUserData = async () => {
     
     try {
         if (auth.isAuth) {
-            // Загружаем настройки и справочники параллельно
-            await Promise.all([
-                settings.fetchSettings(),
-                dictionaries.fetchDictionaries()
-            ])
+            // Загружаем данные ПОСЛЕДОВАТЕЛЬНО, чтобы избежать ошибок сети (Load failed)
+            // на мобильных устройствах при одновременных запросах
+            try {
+                await settings.fetchSettings()
+            } catch (e) { console.error('Settings load failed', e) }
+
+            try {
+                await dictionaries.fetchDictionaries()
+            } catch (e) { console.error('Dictionaries load failed', e) }
+
+            try {
+                const plan = await import('./stores/plan').then(m => m.usePlanStore())
+                await plan.fetchPlan()
+            } catch (e) { console.error('Plan load failed', e) }
             
             // <-- ЗАПУСКАЕМ REALTIME СИНХРОНИЗАЦИЮ
             // Это позволит получать обновления от других членов семьи

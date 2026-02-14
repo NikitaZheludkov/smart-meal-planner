@@ -218,13 +218,14 @@ const openDishDetails = async (item) => {
 const mealSlots = computed(() => dictionaries.mealTypes)
 
 const loadData = async () => {
-  await Promise.all([
-      planStore.fetchPlan(),
-      dictionaries.fetchDictionaries(),
-      settingsStore.fetchSettings() 
-  ])
+  // Грузим последовательно
+  try { await planStore.fetchPlan() } catch(e) {}
+  try { await dictionaries.fetchDictionaries() } catch(e) {}
+  try { await settingsStore.fetchSettings() } catch(e) {}
   
-  if (dishStore.dishes.length === 0) dishStore.fetchDishes()
+  if (dishStore.dishes.length === 0) {
+      try { await dishStore.fetchDishes() } catch(e) {}
+  }
 }
 
 const weekDays = computed(() => {
