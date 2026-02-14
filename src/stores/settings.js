@@ -49,7 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .select('household_id')
           .eq('id', auth.user.id)
           .single(),
-          7000
+          20000
         )
         if (profileError) throw profileError
         if (profile?.household_id) {
@@ -58,6 +58,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     } catch (e) { 
         console.error('Ошибка загрузки настроек:', e) 
+        ui.addLog('Ошибка загрузки настроек', 'error', e)
     } finally {
         loading.value = false
     }
@@ -70,7 +71,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .select('*')
           .eq('id', householdId)
           .single(),
-          7000
+          20000
       )
       
       if (!hhError && hhData) {
@@ -78,6 +79,8 @@ export const useSettingsStore = defineStore('settings', () => {
           startDay.value = hhData.start_day ?? 1
           periodLength.value = hhData.period_length ?? 7
           defaultPortions.value = hhData.default_portions ?? 1
+          const ui = useUIStore()
+          ui.addLog('Настройки семьи загружены')
       }
       
       const { data: members } = await supabase

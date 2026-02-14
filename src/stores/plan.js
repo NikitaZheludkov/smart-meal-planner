@@ -41,7 +41,7 @@ export const usePlanStore = defineStore('plan', () => {
             products ( * )
         `)
         .eq('household_id', auth.householdId),
-        7000
+        20000
         )
         
         if (error) throw error
@@ -52,8 +52,11 @@ export const usePlanStore = defineStore('plan', () => {
             slot_id: item.meal_type_id
         })) || []
 
+        ui.addLog(`План загружен: ${plan.value.length} записей`)
+
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
+        ui.addLog('Ошибка загрузки плана', 'error', e)
     } finally {
         loading.value = false
     }

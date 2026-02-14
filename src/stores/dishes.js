@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 
+import { useUIStore } from './ui'
+
 export const useDishStore = defineStore('dishes', () => {
   const dishes = ref([])
   const loading = ref(false)
@@ -10,6 +12,7 @@ export const useDishStore = defineStore('dishes', () => {
   const fetchDishes = async () => {
     // Если блюда уже загружены, не мигаем спиннером
     if (dishes.value.length === 0) loading.value = true
+    const ui = useUIStore()
 
     try {
         const { data, error } = await supabase
@@ -40,8 +43,11 @@ export const useDishStore = defineStore('dishes', () => {
                 unit: ing.products?.unit || ''
                 })) || []
         }))
+        
+        ui.addLog(`Загружено блюд: ${dishes.value.length}`)
     } catch (e) {
         console.error('Ошибка загрузки блюд:', e)
+        ui.addLog('Ошибка загрузки блюд', 'error', e)
     } finally {
         loading.value = false
     }
