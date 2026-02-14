@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth' // <-- 1. Импортируем AuthStore
 import { useDishStore } from './dishes'
 
-import { useUIStore } from './ui'
-
 export const useProductStore = defineStore('products', () => {
   const products = ref([])
   const loading = ref(false)
@@ -14,10 +12,9 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     const auth = useAuthStore()
-    const ui = useUIStore() // <-- Импорт UI стора
     
     if (!auth.householdId) {
-       ui.addLog('Нет householdId, пропускаем загрузку продуктов', 'warn')
+       console.warn('Нет householdId, пропускаем загрузку продуктов')
        loading.value = false
        return
     }
@@ -37,7 +34,7 @@ export const useProductStore = defineStore('products', () => {
         if (error) throw error
         products.value = data || []
     } catch (e) {
-        ui.addLog('Ошибка загрузки продуктов', 'error', e)
+        console.error('Ошибка загрузки продуктов:', e)
         products.value = [] 
     } finally {
         loading.value = false

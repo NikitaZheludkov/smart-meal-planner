@@ -2,8 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
-import { useRealtimeStore } from './realtime'
-import { useUIStore } from './ui' // <-- Добавил импорт
+import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
 
 export const useSettingsStore = defineStore('settings', () => {
   const startDay = ref(1) 
@@ -20,14 +19,21 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const fetchSettings = async () => {
     const auth = useAuthStore()
-    const ui = useUIStore() // <-- Инициализируем UI
-    // Дожидаемся готовности авторизации на мобильных TMA
+    const ui = useUIStore()
+
+    // Ждем авторизации более надежно (до 20 секунд)
     let attempts = 0
-    while (!auth.user && attempts < 30) {
+    // Если auth.loading === true, значит процесс еще идет, ждем его окончания
+    while ((auth.loading || !auth.user) && attempts < 100) {
       await new Promise(r => setTimeout(r, 200))
       attempts++
     }
-    if (!auth.user) return
+
+    if (!auth.user) {
+        console.warn('Settings: Auth timeout exceeded or user not found')
+        // Не блокируем UI ошибкой, возможно юзер просто не залогинен
+        return
+    }
 
     loading.value = true
     try {
@@ -50,7 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       }
     } catch (e) { 
-        ui.addLog('Ошибка загрузки настроек', 'error', e) 
+        console.error('Ошибка загрузки настроек:', e) 
     } finally {
         loading.value = false
     }
