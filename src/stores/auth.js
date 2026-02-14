@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
            err.message?.includes('Failed to fetch')
   }
 
-  const withTimeout = async (promise, ms = 20000) => { 
+  const withTimeout = async (promise, ms = 45000) => { // Увеличил с 20000 до 45000
     const t = new Promise((_, reject) => setTimeout(() => {
         const err = new Error('timeout')
         err.name = 'TimeoutError'
