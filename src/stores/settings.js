@@ -137,32 +137,48 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const joinHousehold = async (code) => {
       const auth = useAuthStore()
-      if (!code || code.length < 6) throw new Error('Код должен состоять из 6 цифр')
+      const ui = useUIStore() // <-- Нужно добавить импорт
+      if (!code || code.length < 6) {
+          ui.showToast('Код должен состоять из 6 цифр', 'warn')
+          throw new Error('Неверный код')
+      }
+      
       const { data: targetHousehold, error } = await supabase
           .from('households')
           .select('id')
           .eq('invite_code', code)
           .single()
-      if (error || !targetHousehold) throw new Error('Неверный код или семья не найдена')
+      
+      if (error || !targetHousehold) {
+          ui.showToast('Семья с таким кодом не найдена', 'error')
+          throw new Error('Неверный код')
+      }
+
       const { error: updateError } = await supabase
           .from('profiles')
           .update({ household_id: targetHousehold.id })
           .eq('id', auth.user.id)
+      
       if (updateError) throw updateError
       
-      // Manually update the householdId in the auth store
-      await auth.handleUserSession(auth.user.value)
-
-      window.location.reload()
+      ui.showToast('Вы присоединились к семье!', 'success')
+      
+      // Даем пользователю прочитать сообщение перед перезагрузкой
+      setTimeout(() => {
+          window.location.reload()
+      }, 1500)
   }
 
   const leaveHousehold = async () => {
       const auth = useAuthStore()
+      const ui = useUIStore()
+      
       const { data: myOwnHousehold } = await supabase
           .from('households')
           .select('id')
           .eq('owner_id', auth.user.id)
           .single()
+
       if (!myOwnHousehold) {
           const { data: newHousehold } = await supabase
               .from('households')
@@ -171,16 +187,20 @@ export const useSettingsStore = defineStore('settings', () => {
               .single()
            if (newHousehold) {
                 await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
-                window.location.reload()
+                ui.showToast('Создана новая семья', 'success')
+                setTimeout(() => window.location.reload(), 1000)
                 return
            }
            throw new Error('Не удалось создать новую семью')
       }
+      
       await supabase
           .from('profiles')
           .update({ household_id: myOwnHousehold.id })
           .eq('id', auth.user.id)
-      window.location.reload()
+      
+      ui.showToast('Вы вернулись в свою семью', 'success')
+      setTimeout(() => window.location.reload(), 1000)
   }
 
   return { 

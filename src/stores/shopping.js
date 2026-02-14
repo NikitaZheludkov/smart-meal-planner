@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { useUIStore } from './ui'
 
 export const useShoppingStore = defineStore('shopping', () => {
   const checkedIds = ref(new Set())
@@ -38,6 +39,7 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) return
 
     const { error } = await withTimeout(
@@ -54,21 +56,33 @@ export const useShoppingStore = defineStore('shopping', () => {
 
     if (error) {
       console.error('Ошибка сохранения:', error)
-      alert('Не удалось обновить статус продукта')
+      ui.showToast('Не удалось обновить статус', 'error')
     }
 
     await fetchChecklist()
   }
 
   const clearList = async () => {
-      const { error } = await supabase.from('shopping_cart').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      
-      if (error) {
-        console.error('Ошибка очистки списка:', error)
-        alert('Не удалось очистить список покупок')
-      }
+    const auth = useAuthStore()
+    const ui = useUIStore()
+    if (!auth.householdId) return
 
-      await fetchChecklist()
+    const { error } = await supabase
+      .from('shopping_cart')
+      .delete()
+      .eq('household_id', auth.householdId)
+      // Дополнительно проверяем ID, чтобы случайно не удалить "системные" записи, если они появятся
+      .neq('id', '00000000-0000-0000-0000-000000000000') 
+    
+    if (error) {
+      console.error('Ошибка очистки списка:', error)
+      ui.showToast('Не удалось очистить список', 'error')
+    } else {
+        ui.showToast('Список очищен', 'success')
+    }
+
+    checkedIds.value.clear()
+    await fetchChecklist()
   }
   
   const isChecked = (id) => checkedIds.value.has(id)

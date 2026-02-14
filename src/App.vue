@@ -173,6 +173,7 @@ onUnmounted(() => {
     </button>
 
     <AppLogs />
+    <ToastContainer />
 
     <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
       <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>

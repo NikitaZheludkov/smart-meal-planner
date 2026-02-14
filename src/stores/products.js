@@ -12,12 +12,20 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     const auth = useAuthStore()
+    
+    if (!auth.householdId) {
+       console.warn('Нет householdId, пропускаем загрузку продуктов')
+       loading.value = false
+       return
+    }
+
     try {
         const { data, error } = await auth.withRetry(async () => {
           return await auth.withTimeout(
             supabase
               .from('products')
               .select('*')
+              .eq('household_id', auth.householdId) // Явно фильтруем по семье
               .order('name'),
             15000
           )

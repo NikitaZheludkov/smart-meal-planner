@@ -26,13 +26,27 @@ export const useUIStore = defineStore('ui', () => {
 
   // --- ЛОГИ ---
   const logs = ref([])
+  const toasts = ref([]) // Очередь уведомлений
   const isLogOpen = ref(false)
   const isOffline = ref(!navigator.onLine)
   
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const id = Date.now()
+    toasts.value.push({ id, message, type })
+    setTimeout(() => {
+      toasts.value = toasts.value.filter(t => t.id !== id)
+    }, duration)
+  }
+
   const setOffline = (value) => {
     isOffline.value = value
-    if (value) addLog('Сетевое соединение потеряно', 'warn')
-    else addLog('Сетевое соединение восстановлено', 'info')
+    if (value) {
+        addLog('Сетевое соединение потеряно', 'warn')
+        showToast('Нет интернета', 'error')
+    } else {
+        addLog('Сетевое соединение восстановлено', 'info')
+        showToast('Связь восстановлена', 'success')
+    }
   }
 
   const addLog = (message, type = 'info', data = null) => {
