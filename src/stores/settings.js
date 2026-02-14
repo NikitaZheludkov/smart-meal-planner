@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
+import { useUIStore } from './ui'
 
 export const useSettingsStore = defineStore('settings', () => {
   const startDay = ref(1) 
