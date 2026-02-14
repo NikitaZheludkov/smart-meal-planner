@@ -58,10 +58,22 @@ export const useAuthStore = defineStore('auth', () => {
     // Тест связи с Supabase
     try {
       const start = Date.now()
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`)
+      // Добавляем жесткий таймаут 5 секунд для проверки связи
+      await withTimeout(
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`),
+          5000
+      )
       ui.addLog(`Связь с Auth API ок (${Date.now() - start}ms)`)
     } catch (e) {
       ui.addLog('Нет связи с Auth API (возможна блокировка)', 'warn', e.message)
+      authStatus.value = 'error'
+      authError.value = {
+          message: 'Сервер недоступен. Проверьте интернет или включите VPN.',
+          type: 'network',
+          canRetry: true
+      }
+      loading.value = false
+      return // ПРЕКРАЩАЕМ ИНИЦИАЛИЗАЦИЮ
     }
 
     try {

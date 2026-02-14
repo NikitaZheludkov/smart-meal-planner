@@ -14,9 +14,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     lock: false,
     persistSession: true,
-    detectSessionInUrl: true,
-    autoRefreshToken: true, // Гарантируем автообновление
-    storageKey: 'sb-smart-meal-auth' // Явный ключ для надежности
+    detectSessionInUrl: false, // Отключаем, так как авторизация идет через initData
+    autoRefreshToken: true,
+    storageKey: 'sb-smart-meal-auth'
   },
   global: {
     headers: { 'x-application-name': 'smart-meal-planner' }
