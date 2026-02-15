@@ -3,14 +3,11 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useUIStore } from './ui'
+import { withTimeout } from '../lib/utils'
 
 export const usePlanStore = defineStore('plan', () => {
   const plan = ref([])
   const loading = ref(false)
-  const withTimeout = async (promise, ms) => {
-    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-    return Promise.race([promise, t])
-  }
 
   const fetchPlan = async () => {
     const auth = useAuthStore()
@@ -57,6 +54,7 @@ export const usePlanStore = defineStore('plan', () => {
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
         ui.addLog('Ошибка загрузки плана', 'error', e)
+        ui.showToast('Ошибка загрузки плана', 'error')
     } finally {
         loading.value = false
     }
@@ -64,7 +62,9 @@ export const usePlanStore = defineStore('plan', () => {
 
   const addToPlan = async (date, slotId, item) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) {
+        ui.showToast('Сессия потеряна. Перезагрузите страницу.', 'error')
         throw new Error('Сессия потеряна. Перезагрузите страницу.')
     }
     
@@ -90,14 +90,16 @@ export const usePlanStore = defineStore('plan', () => {
         
     if (error) {
         console.error('Ошибка сохранения:', error)
-        alert('Не удалось сохранить в план: ' + error.message)
+        ui.showToast('Не удалось сохранить в план', 'error')
     } else {
         await fetchPlan()
+        ui.showToast('Добавлено в план', 'success')
     }
   }
 
   const updatePlanItem = async (id, updates) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) return
 
     const { error } = await withTimeout(
@@ -110,21 +112,23 @@ export const usePlanStore = defineStore('plan', () => {
 
     if (error) {
         console.error('Ошибка обновления:', error)
-        alert('Не удалось обновить: ' + error.message)
+        ui.showToast('Не удалось обновить', 'error')
+    } else {
+        await fetchPlan()
     }
-    
-    await fetchPlan()
   }
 
   const removeFromPlan = async (id) => {
+    const ui = useUIStore()
     const { error } = await supabase.from('plan').delete().eq('id', id)
     
     if (error) {
       console.error('Ошибка удаления из плана:', error)
-      alert('Не удалось удалить: ' + error.message)
+      ui.showToast('Не удалось удалить', 'error')
+    } else {
+      await fetchPlan()
+      ui.showToast('Удалено из плана', 'success')
     }
-
-    await fetchPlan()
   }
 
   return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }

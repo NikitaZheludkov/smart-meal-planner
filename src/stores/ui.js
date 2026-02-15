@@ -72,5 +72,5 @@ export const useUIStore = defineStore('ui', () => {
     if (logs.value.length > 100) logs.value.pop()
   }
 
-  return { plan, dishes, shopping, logs, isLogOpen, isOffline, setOffline, addLog }
+  return { plan, dishes, shopping, logs, toasts, isLogOpen, isOffline, setOffline, addLog, showToast }
 })

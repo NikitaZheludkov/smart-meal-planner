@@ -48,6 +48,7 @@ export const useDishStore = defineStore('dishes', () => {
     } catch (e) {
         console.error('Ошибка загрузки блюд:', e)
         ui.addLog('Ошибка загрузки блюд', 'error', e)
+        ui.showToast('Ошибка загрузки блюд', 'error')
     } finally {
         loading.value = false
     }
@@ -55,7 +56,9 @@ export const useDishStore = defineStore('dishes', () => {
 
   const addDish = async (dishData) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) {
+        ui.showToast('Ошибка авторизации', 'error')
         throw new Error('Учётная запись не авторизована или ID семьи не найден. Попробуйте перезагрузить приложение.')
     }
     
@@ -78,7 +81,11 @@ export const useDishStore = defineStore('dishes', () => {
       .select()
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) { 
+        console.error(error); 
+        ui.showToast('Ошибка при создании блюда', 'error')
+        return 
+    }
 
     // 2. Привязываем теги (если есть)
     if (dishData.tags?.length) {
@@ -97,11 +104,14 @@ export const useDishStore = defineStore('dishes', () => {
     }
 
     await fetchDishes()
+    ui.showToast('Блюдо создано', 'success')
   }
 
   const updateDish = async (id, dishData) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) {
+        ui.showToast('Ошибка авторизации', 'error')
         throw new Error('Учётная запись не авторизована. Сохранение невозможно.')
     }
 
@@ -122,7 +132,11 @@ export const useDishStore = defineStore('dishes', () => {
       })
       .eq('id', id)
 
-    if (error) { console.error(error); return }
+    if (error) { 
+        console.error(error); 
+        ui.showToast('Ошибка при обновлении', 'error')
+        return 
+    }
 
     // Обновляем связи (удаляем старые -> пишем новые)
     await supabase.from('dish_tag_links').delete().eq('dish_id', id)
@@ -142,16 +156,24 @@ export const useDishStore = defineStore('dishes', () => {
     }
 
     await fetchDishes()
+    ui.showToast('Блюдо обновлено', 'success')
   }
 
   const deleteDish = async (id) => {
+    const ui = useUIStore()
     // Delete the dish from the plan table
     await supabase.from('plan').delete().eq('dish_id', id);
 
     // Delete the dish from the dishes table
-    await supabase.from('dishes').delete().eq('id', id)
+    const { error } = await supabase.from('dishes').delete().eq('id', id)
 
-    await fetchDishes()
+    if (error) {
+        console.error(error)
+        ui.showToast('Ошибка при удалении', 'error')
+    } else {
+        await fetchDishes()
+        ui.showToast('Блюдо удалено', 'success')
+    }
   }
 
   return { dishes, loading, fetchDishes, addDish, updateDish, deleteDish }

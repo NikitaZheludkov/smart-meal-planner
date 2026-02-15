@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useTelegramStore } from './telegram'
 import { useUIStore } from './ui'
+import { withTimeout, withRetry, isNetworkError } from '../lib/utils'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -13,39 +14,6 @@ export const useAuthStore = defineStore('auth', () => {
   const authError = ref(null) // { message, type: 'network'|'auth', canRetry: boolean }
 
   const ui = useUIStore()
-
-  const isNetworkError = (err) => {
-    return err.name === 'TimeoutError' || 
-           err.message?.includes('fetch') || 
-           err.message?.includes('Abort') ||
-           err.message?.includes('Load failed') ||
-           err.message?.includes('Failed to fetch')
-  }
-
-  const withTimeout = async (promise, ms = 45000) => { // Увеличил с 20000 до 45000
-    const t = new Promise((_, reject) => setTimeout(() => {
-        const err = new Error('timeout')
-        err.name = 'TimeoutError'
-        reject(err)
-    }, ms))
-    return Promise.race([promise, t])
-  }
-
-  const withRetry = async (fn, retries = 3, delay = 1000) => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        return await fn()
-      } catch (err) {
-        const isLastRetry = i === retries - 1
-        const networkErr = isNetworkError(err)
-        
-        if (isLastRetry || !networkErr) throw err
-        
-        ui.addLog(`Retry ${i + 1}/${retries} after error: ${err.message}`, 'warn')
-        await new Promise(r => setTimeout(r, delay * (i + 1))) // Экспоненциальная задержка
-      }
-    }
-  }
 
   // Инициализация
   const init = async () => {
@@ -320,7 +288,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         if (error) {
              console.error('Ошибка Dev входа:', error)
-             alert('Ошибка входа Dev User. Проверьте консоль.')
+             ui.showToast('Ошибка входа Dev User', 'error')
         }
     } catch(e) { 
         console.error(e)
@@ -341,8 +309,6 @@ export const useAuthStore = defineStore('auth', () => {
     loginWithTelegram, 
     loginAsTestUser, 
     signOut, 
-    handleUserSession, 
-    withRetry, 
-    withTimeout 
+    handleUserSession
   }
 })
