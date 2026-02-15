@@ -19,7 +19,7 @@ export const useDishStore = defineStore('dishes', () => {
         .from('dishes')
         .select(`
             *,
-            meal_types (id, name),
+            dish_meal_type_links ( meal_types (id, name) ),
             dish_types (id, name),
             dish_tag_links ( dish_tags ( * ) ),
             ingredients (
@@ -33,7 +33,10 @@ export const useDishStore = defineStore('dishes', () => {
 
         dishes.value = data.map(dish => ({
             ...dish,
-            meal_type_name: dish.meal_types?.name,
+            // Map the nested M2M structure to a flat array of meal types
+            meal_types: dish.dish_meal_type_links?.map(link => link.meal_types).filter(Boolean) || [],
+            // Keep backward compatibility for display if needed, but prefer the array
+            meal_type_name: dish.dish_meal_type_links?.map(link => link.meal_types?.name).join(', '),
             dish_type_name: dish.dish_types?.name,
             tags: dish.dish_tag_links?.map(link => link.dish_tags).filter(t => t) || [],
             ingredients: dish.ingredients?.map(ing => ({
@@ -68,7 +71,7 @@ export const useDishStore = defineStore('dishes', () => {
       .insert({
         name: dishData.name,
         dish_type_id: dishData.dish_type_id, 
-        meal_type_id: dishData.meal_type_id, 
+        // meal_type_id removed
         description: dishData.description || '',
         kcal: dishData.kcal || 0,
         protein: dishData.protein || 0,
@@ -85,6 +88,12 @@ export const useDishStore = defineStore('dishes', () => {
         console.error(error); 
         ui.showToast('Ошибка при создании блюда', 'error')
         return 
+    }
+
+    // 1.1 Привязываем типы приема пищи
+    if (dishData.meal_type_ids?.length) {
+        const links = dishData.meal_type_ids.map(id => ({ dish_id: newDish.id, meal_type_id: id }))
+        await supabase.from('dish_meal_type_links').insert(links)
     }
 
     // 2. Привязываем теги (если есть)
@@ -121,7 +130,7 @@ export const useDishStore = defineStore('dishes', () => {
       .update({
         name: dishData.name,
         dish_type_id: dishData.dish_type_id,
-        meal_type_id: dishData.meal_type_id,
+        // meal_type_id: dishData.meal_type_id, // Deprecated
         description: dishData.description,
         kcal: dishData.kcal,
         protein: dishData.protein,
@@ -136,6 +145,16 @@ export const useDishStore = defineStore('dishes', () => {
         console.error(error); 
         ui.showToast('Ошибка при обновлении', 'error')
         return 
+    }
+
+    // Обновляем связи Meal Types
+    await supabase.from('dish_meal_type_links').delete().eq('dish_id', id)
+    if (dishData.meal_type_ids?.length) {
+        const mealLinks = dishData.meal_type_ids.map(tid => ({ 
+            dish_id: id, 
+            meal_type_id: tid 
+        }))
+        await supabase.from('dish_meal_type_links').insert(mealLinks)
     }
 
     // Обновляем связи (удаляем старые -> пишем новые)

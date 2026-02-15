@@ -33,7 +33,7 @@ const openCreateDish = () => {
       id: null, 
       name: '',
       dish_type_id: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
-      meal_type_id: uiStore.dishes.activeTag || dictionaries.mealTypes[1]?.id, 
+      meal_type_ids: uiStore.dishes.activeTag ? [uiStore.dishes.activeTag] : [dictionaries.mealTypes[1]?.id], 
       kcal: null, protein: null, fat: null, carbs: null,
       tags: [],
       ingredients: []
@@ -66,7 +66,12 @@ const filteredDishes = computed(() => {
 
   // 2. Прием пищи (Завтрак/Обед...)
   if (uiStore.dishes.activeTag) {
-    result = result.filter(d => d.meal_type_id === uiStore.dishes.activeTag)
+    result = result.filter(d => {
+        if (d.meal_types && d.meal_types.length > 0) {
+            return d.meal_types.some(m => m.id === uiStore.dishes.activeTag)
+        }
+        return d.meal_type_id === uiStore.dishes.activeTag
+    })
   }
 
   // 3. Категория (Суп/Второе...)
@@ -196,8 +201,17 @@ const setMealType = (id) => {
             </div>
             
             <div class="flex flex-wrap gap-1 mt-1">
-                <span class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
-                {{ dish.meal_type_name }}
+                <div v-if="dish.meal_types && dish.meal_types.length > 0" class="flex flex-wrap gap-1">
+                    <span 
+                        v-for="mt in dish.meal_types" 
+                        :key="mt.id"
+                        class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100"
+                    >
+                        {{ mt.name }}
+                    </span>
+                </div>
+                <span v-else class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
+                    {{ dish.meal_type_name }}
                 </span>
                 <span 
                     v-for="tag in dish.tags.slice(0, 3)" 

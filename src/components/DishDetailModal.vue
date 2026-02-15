@@ -29,7 +29,7 @@ const formData = ref({
     id: null,
     name: '',
     dish_type_id: '',
-    meal_type_id: '',
+    meal_type_ids: [],
     description: '',
     kcal: null, protein: null, fat: null, carbs: null,
     is_batch: false,
@@ -142,9 +142,30 @@ const removeIngredient = (index) => {
     telegram.haptic.impact('light')
 }
 
+const toggleMealType = (id) => {
+    const index = formData.value.meal_type_ids.indexOf(id)
+    if (index === -1) {
+        formData.value.meal_type_ids.push(id)
+    } else {
+        formData.value.meal_type_ids.splice(index, 1)
+    }
+    telegram.haptic.selection()
+}
+
 // --- ИНИЦИАЛИЗАЦИЯ ---
 const initForm = (dishData) => {
     formData.value = JSON.parse(JSON.stringify(dishData))
+    
+    // Transform flat meal_types array of objects to array of IDs for the form
+    if (dishData.meal_types && Array.isArray(dishData.meal_types)) {
+        formData.value.meal_type_ids = dishData.meal_types.map(m => m.id)
+    } else if (dishData.meal_type_id) {
+         // Fallback for old data or if not yet populated
+        formData.value.meal_type_ids = [dishData.meal_type_id]
+    } else {
+        formData.value.meal_type_ids = []
+    }
+
     if (!formData.value.ingredients) formData.value.ingredients = []
     
     // Fix for nested ingredients from planStore
@@ -170,8 +191,9 @@ const initForm = (dishData) => {
         if (!formData.value.dish_type_id && dictionaries.dishTypes.length) {
             formData.value.dish_type_id = dictionaries.dishTypes[0].id
         }
-        if (!formData.value.meal_type_id && dictionaries.mealTypes.length) {
-            formData.value.meal_type_id = dictionaries.mealTypes[1]?.id
+        if ((!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) && dictionaries.mealTypes.length) {
+             // Default to "Lunch" or the second option if available, otherwise the first
+            formData.value.meal_type_ids = [dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id]
         }
         isEditing.value = true
     } else {
@@ -267,9 +289,29 @@ const getDishTypeName = computed(() => {
     return dictionaries.getDishTypeById(formData.value.dish_type_id)?.name || '...'
 })
 const getMealTypeName = computed(() => {
-    return dictionaries.getMealTypeById(formData.value.meal_type_id)?.name || '...'
+    if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) return '...'
+    
+    // Sort selected IDs based on the order in dictionaries.mealTypes
+    const sortedIds = [...formData.value.meal_type_ids].sort((a, b) => {
+        const indexA = dictionaries.mealTypes.findIndex(m => m.id === a)
+        const indexB = dictionaries.mealTypes.findIndex(m => m.id === b)
+        return indexA - indexB
+    })
+
+    return sortedIds
+        .map(id => dictionaries.getMealTypeById(id)?.name)
+        .filter(n => n)
+        .join(', ')
 })
 
+const toggleMealType = (id) => {
+    telegram.haptic.selection()
+    if (formData.value.meal_type_ids.includes(id)) {
+        formData.value.meal_type_ids = formData.value.meal_type_ids.filter(tid => tid !== id)
+    } else {
+        formData.value.meal_type_ids.push(id)
+    }
+}
 </script>
 
 <template>
