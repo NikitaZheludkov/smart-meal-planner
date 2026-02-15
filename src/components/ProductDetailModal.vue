@@ -23,11 +23,11 @@ const isSaving = ref(false)
 const formData = ref({
     id: null,
     name: '',
-    unit: 'г',
+    unit: 'Кг',
     category: ''
 })
 
-const units = ['г', 'мл', 'шт', 'уп', 'кг', 'л']
+const units = ['Кг', 'Л', 'Шт', 'Упак']
 
 watch(() => props.product, (newVal) => {
   if (newVal) {
@@ -39,7 +39,7 @@ watch(() => props.product, (newVal) => {
     
     if (!formData.value.id) {
         isEditing.value = true
-        formData.value.unit = 'г'
+        formData.value.unit = 'Кг'
         formData.value.category = dictionaries.productCategories[0]?.name || 'Разное'
     } else {
         isEditing.value = false

@@ -204,6 +204,17 @@ const switchViewTab = (mode) => {
         activeTab.value = mode
     }
 }
+const formatAmount = (val) => {
+    // Если число целое, возвращаем как есть
+    if (Number.isInteger(val)) return val
+    
+    // Если число меньше 0.001 (но не 0), то покажем <0.001 (или просто 0.001)
+    // Но по условию задачи нам нужно до 3 знаков
+    
+    // Преобразуем в строку с 3 знаками, потом убираем лишние нули
+    // parseFloat(val.toFixed(3)) автоматически уберет "хвосты" типа 1.500 -> 1.5
+    return parseFloat(val.toFixed(3))
+}
 </script>
 
 <template>
@@ -301,7 +312,7 @@ const switchViewTab = (mode) => {
                                 </div>
                                 
                                 <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
-                                    {{ Number.isInteger(item.amount) ? item.amount : item.amount.toFixed(1) }} {{ item.unit }}
+                                    {{ formatAmount(item.amount) }} {{ item.unit }}
                                 </div>
                             </div>
                         </TransitionGroup>
