@@ -19,7 +19,7 @@ export const useDishStore = defineStore('dishes', () => {
         .from('dishes')
         .select(`
             *,
-            dish_meal_type_links!dish_meal_type_links_dish_id_fkey ( meal_types (id, name) ),
+            dish_meal_type_links ( meal_types (id, name) ),
             dish_types (id, name),
             dish_tag_links ( dish_tags ( * ) ),
             ingredients (
