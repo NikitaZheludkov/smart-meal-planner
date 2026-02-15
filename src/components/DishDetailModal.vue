@@ -539,11 +539,17 @@ const toggleMealType = (id) => {
 
                     <div class="space-y-1">
                         <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Прием пищи</label>
-                        <div class="relative">
-                            <select v-model="formData.meal_type_id" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
-                                <option v-for="t in dictionaries.mealTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
-                            </select>
-                            <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>
+                        <div class="flex flex-wrap gap-2">
+                             <button 
+                                v-for="t in dictionaries.mealTypes" 
+                                :key="t.id" 
+                                @click="toggleMealType(t.id)"
+                                type="button"
+                                class="px-3 py-2 rounded-xl text-xs font-bold transition-all border tap-effect"
+                                :class="formData.meal_type_ids.includes(t.id) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
+                             >
+                                {{ t.name }}
+                             </button>
                         </div>
                     </div>
                 </div>
