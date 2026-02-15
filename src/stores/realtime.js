@@ -53,8 +53,16 @@ export const useRealtimeStore = defineStore('realtime', () => {
     )
 
     // Подписываемся
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') console.log('🟢 Синхронизация активна')
+    channel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+          console.log('🟢 Синхронизация активна')
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('🔴 Ошибка Realtime:', status, err)
+          // Пробуем переподключиться через 5 секунд
+          setTimeout(() => reconnect(), 5000)
+      } else if (status === 'CLOSED') {
+          console.log('🔌 Канал закрыт')
+      }
     })
   }
 

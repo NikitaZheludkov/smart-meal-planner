@@ -42,6 +42,14 @@ export const useShoppingStore = defineStore('shopping', () => {
     const ui = useUIStore()
     if (!auth.householdId) return
 
+    // 1. Оптимистичное обновление (мгновенная реакция UI)
+    const wasChecked = checkedIds.value.has(productId)
+    
+    // Применяем новое состояние
+    if (newState) checkedIds.value.add(productId)
+    else checkedIds.value.delete(productId)
+
+    // 2. Отправка запроса
     const { error } = await withTimeout(
       supabase
         .from('shopping_cart')
@@ -54,12 +62,15 @@ export const useShoppingStore = defineStore('shopping', () => {
       5000
     )
 
+    // 3. Откат при ошибке
     if (error) {
       console.error('Ошибка сохранения:', error)
       ui.showToast('Не удалось обновить статус', 'error')
+      
+      // Возвращаем как было
+      if (wasChecked) checkedIds.value.add(productId)
+      else checkedIds.value.delete(productId)
     }
-
-    await fetchChecklist()
   }
 
   const clearList = async () => {

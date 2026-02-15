@@ -102,6 +102,13 @@ export const usePlanStore = defineStore('plan', () => {
     const ui = useUIStore()
     if (!auth.householdId) return
 
+    // 1. Оптимистичное обновление
+    const originalPlan = JSON.parse(JSON.stringify(plan.value))
+    const item = plan.value.find(p => p.id === id)
+    if (item) {
+        Object.assign(item, updates)
+    }
+
     const { error } = await withTimeout(
       supabase
         .from('plan')
@@ -113,21 +120,32 @@ export const usePlanStore = defineStore('plan', () => {
     if (error) {
         console.error('Ошибка обновления:', error)
         ui.showToast('Не удалось обновить', 'error')
-    } else {
-        await fetchPlan()
+        // Откат
+        plan.value = originalPlan
     }
   }
 
   const removeFromPlan = async (id) => {
     const ui = useUIStore()
+    
+    // 1. Оптимистичное удаление
+    const originalPlan = [...plan.value]
+    const itemIndex = plan.value.findIndex(item => item.id === id)
+    if (itemIndex > -1) {
+        plan.value.splice(itemIndex, 1)
+    }
+
     const { error } = await supabase.from('plan').delete().eq('id', id)
     
     if (error) {
       console.error('Ошибка удаления из плана:', error)
       ui.showToast('Не удалось удалить', 'error')
+      
+      // Откат
+      plan.value = originalPlan
     } else {
-      await fetchPlan()
       ui.showToast('Удалено из плана', 'success')
+      // Не вызываем fetchPlan(), данные уже обновлены
     }
   }
 
