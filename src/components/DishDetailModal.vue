@@ -217,6 +217,12 @@ watch(() => props.dish, (newVal) => {
 const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
   
+  if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) {
+      ui.showToast('Выберите хотя бы один прием пищи', 'error')
+      telegram.haptic.notification('error')
+      return
+  }
+  
   isSaving.value = true
   ui.addLog(`Попытка сохранения блюда: ${formData.value.name}`, 'info', formData.value)
   
@@ -345,8 +351,8 @@ const toggleMealType = (id) => {
                     v-if="isEditing" 
                     @click="handleSave" 
                     class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
-                    :class="formData.name && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
-                    :disabled="!formData.name || isSaving"
+                    :class="(formData.name && formData.meal_type_ids.length > 0 && !isSaving) ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
+                    :disabled="!formData.name || formData.meal_type_ids.length === 0 || isSaving"
                 >
                     <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
                     {{ isSaving ? '...' : 'Готово' }}
