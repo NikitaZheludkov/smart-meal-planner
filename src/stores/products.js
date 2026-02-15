@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
-import { useAuthStore } from './auth' // <-- 1. Импортируем AuthStore
+import { useAuthStore } from './auth'
 import { useDishStore } from './dishes'
+import { withRetry, withTimeout } from '../lib/utils'
+
+import { useUIStore } from './ui'
 
 export const useProductStore = defineStore('products', () => {
   const products = ref([])
@@ -12,6 +15,7 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     const auth = useAuthStore()
+    const ui = useUIStore()
     
     if (!auth.householdId) {
        console.warn('Нет householdId, пропускаем загрузку продуктов')
@@ -20,8 +24,8 @@ export const useProductStore = defineStore('products', () => {
     }
 
     try {
-        const { data, error } = await auth.withRetry(async () => {
-          return await auth.withTimeout(
+        const { data, error } = await withRetry(async () => {
+          return await withTimeout(
             supabase
               .from('products')
               .select('*')
@@ -35,6 +39,7 @@ export const useProductStore = defineStore('products', () => {
         products.value = data || []
     } catch (e) {
         console.error('Ошибка загрузки продуктов:', e)
+        ui.showToast('Ошибка загрузки продуктов', 'error')
         products.value = [] 
     } finally {
         loading.value = false
@@ -48,8 +53,8 @@ export const useProductStore = defineStore('products', () => {
         throw new Error('Учётная запись не авторизована или ID семьи не найден.')
     }
 
-    const { data, error } = await auth.withRetry(async () => {
-      return await auth.withTimeout(
+    const { data, error } = await withRetry(async () => {
+      return await withTimeout(
         supabase
           .from('products')
           .insert([{
