@@ -142,15 +142,7 @@ const removeIngredient = (index) => {
     telegram.haptic.impact('light')
 }
 
-const toggleMealType = (id) => {
-    const index = formData.value.meal_type_ids.indexOf(id)
-    if (index === -1) {
-        formData.value.meal_type_ids.push(id)
-    } else {
-        formData.value.meal_type_ids.splice(index, 1)
-    }
-    telegram.haptic.selection()
-}
+
 
 // --- ИНИЦИАЛИЗАЦИЯ ---
 const initForm = (dishData) => {
