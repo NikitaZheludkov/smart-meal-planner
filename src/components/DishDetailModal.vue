@@ -39,7 +39,6 @@ const formData = ref({
     is_batch: false,
     batch_yield: 1,
     tags: [],
-    ingredients: []// Ингредиенты
     ingredients: []
 })
 
