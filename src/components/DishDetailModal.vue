@@ -428,176 +428,198 @@ const toggleMealType = (id) => {
                 </div>
             </div>
 
-            <div v-else class="space-y-6 pb-20">
+            <div v-else class="space-y-4 pb-20">
                 
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Формат готовки</label>
-                        <div class="bg-slate-50 p-1 rounded-xl border border-slate-100 flex">
-                            <button 
-                                type="button"
-                                @click="formData.is_batch = false"
-                                :class="['flex-1 py-2 text-xs font-bold rounded-lg transition-all', !formData.is_batch ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600']"
-                            >
-                                Порционно
-                            </button>
-                            <button 
-                                type="button"
-                                @click="formData.is_batch = true"
-                                :class="['flex-1 py-2 text-xs font-bold rounded-lg transition-all', formData.is_batch ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600']"
-                            >
-                                Сразу много
-                            </button>
+                <!-- Основное инфо -->
+                <div class="space-y-4">
+                    <input 
+                        v-model="formData.name" 
+                        placeholder="Название блюда" 
+                        class="w-full text-2xl font-black text-slate-900 bg-transparent placeholder:text-slate-300 outline-none border-b-2 border-transparent focus:border-indigo-100 transition-colors py-2"
+                    >
+
+                    <!-- Категории (Тип и Прием пищи) -->
+                    <div class="space-y-3">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Тип блюда</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button 
+                                    v-for="t in dictionaries.dishTypes" 
+                                    :key="t.id" 
+                                    @click="formData.dish_type_id = t.id"
+                                    type="button"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border tap-effect"
+                                    :class="formData.dish_type_id === t.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                >
+                                    {{ t.name }}
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div v-if="formData.is_batch" class="pt-2 animate-fade-in">
-                             <div class="flex items-center gap-3 bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
-                                <div class="w-10 h-10 rounded-full bg-white text-indigo-500 flex items-center justify-center font-bold shadow-sm shrink-0">
-                                    {{ formData.batch_yield }}
-                                </div>
-                                <div class="flex-1">
-                                    <div class="text-xs font-bold text-indigo-900">Порций на выходе</div>
-                                    <div class="text-[10px] text-indigo-600 leading-tight">На сколько раз хватит одной готовки?</div>
-                                </div>
-                                <div class="flex items-center gap-1 bg-white rounded-lg p-1 shadow-sm">
-                                    <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-md active:bg-slate-100 transition-colors">
-                                        <span class="material-icons-round text-base">remove</span>
-                                    </button>
-                                    <button @click="formData.batch_yield++" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-md active:bg-slate-100 transition-colors">
-                                        <span class="material-icons-round text-base">add</span>
-                                    </button>
-                                </div>
-                             </div>
+
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Прием пищи</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button 
+                                    v-for="t in dictionaries.mealTypes" 
+                                    :key="t.id" 
+                                    @click="toggleMealType(t.id)"
+                                    type="button"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border tap-effect"
+                                    :class="formData.meal_type_ids.includes(t.id) ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'"
+                                >
+                                    {{ t.name }}
+                                </button>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Название</label>
-                    <input v-model="formData.name" placeholder="Название блюда" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 text-lg">
                 </div>
 
-                <!-- MOVED INGREDIENTS HERE -->
-                <div class="space-y-3">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ингредиенты</label>
+                <div class="h-px bg-slate-100 w-full my-2"></div>
+
+                <!-- Ингредиенты -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Ингредиенты</label>
+                        <span v-if="formData.ingredients.length" class="text-[10px] font-bold text-slate-300">{{ formData.ingredients.length }} шт</span>
+                    </div>
                     
-                    <div v-if="formData.ingredients.length > 0" class="space-y-2">
-                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
-                            <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-lg">🥦</div>
-                            <div class="flex-1 min-w-0">
-                                <div class="font-bold text-slate-800 text-sm truncate">{{ ing.name }}</div>
-                            </div>
-                            <div class="bg-slate-50 px-2 py-1 rounded-lg text-xs font-bold text-slate-500">
-                                {{ ing.amount }} {{ ing.unit }}
-                            </div>
-                            <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
-                                <span class="material-icons-round text-lg">close</span>
+                    <!-- Список ингредиентов -->
+                    <div v-if="formData.ingredients.length > 0" class="space-y-2 mb-3">
+                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+                            <div class="w-1.5 h-1.5 rounded-full bg-indigo-300"></div>
+                            <div class="flex-1 font-bold text-slate-700 text-sm">{{ ing.name }}</div>
+                            <div class="font-bold text-slate-400 text-xs">{{ ing.amount }} {{ ing.unit }}</div>
+                            <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
+                                <span class="material-icons-round text-base">close</span>
                             </button>
                         </div>
                     </div>
 
-                    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-3 relative">
-                        <div v-if="!selectedProductToAdd">
-                            <div class="relative">
-                                <span class="material-icons-round absolute left-3 top-3 text-slate-400 text-lg">search</span>
-                                <input 
-                                    v-model="productSearchQuery" 
-                                    @blur="setTimeout(() => showProductDropdown = false, 200)"
-                                    placeholder="Добавить продукт..." 
-                                    class="w-full pl-10 p-3 bg-white rounded-xl font-bold text-slate-700 outline-none border border-slate-200 focus:border-indigo-300 transition-colors text-sm"
-                                >
-                                <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-40 overflow-y-auto">
-                                    <button 
-                                        v-for="prod in filteredProducts" 
-                                        :key="prod.id"
-                                        @click="selectProductFromSearch(prod)"
-                                        class="w-full text-left px-4 py-3 hover:bg-indigo-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between"
-                                    >
-                                        <span>{{ prod.name }}</span> <span class="text-xs text-slate-400">{{ prod.unit }}</span>
-                                    </button>
-                                </div>
-                            </div>
+                    <!-- Добавление ингредиента -->
+                    <div class="relative bg-slate-50 rounded-xl p-1 border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-200 transition-all">
+                        <div v-if="!selectedProductToAdd" class="flex items-center">
+                            <span class="material-icons-round text-slate-400 text-lg ml-2">add</span>
+                            <input 
+                                v-model="productSearchQuery" 
+                                @blur="setTimeout(() => showProductDropdown = false, 200)"
+                                placeholder="Добавить продукт..." 
+                                class="w-full p-2 bg-transparent font-bold text-slate-700 outline-none text-sm placeholder:text-slate-400"
+                            >
                         </div>
-                        <div v-else class="flex gap-2 items-center animate-fade-in">
-                            <div class="flex-1 font-bold text-slate-800 text-sm pl-2 truncate">{{ selectedProductToAdd.name }}</div>
+                        <div v-else class="flex gap-2 items-center px-2 py-1">
+                            <div class="flex-1 font-bold text-slate-800 text-sm truncate">{{ selectedProductToAdd.name }}</div>
                             <input 
                                 ref="quantityInput"
                                 v-model="amountToAdd" 
                                 type="number" 
                                 inputmode="decimal"
                                 :placeholder="selectedProductToAdd.unit" 
-                                class="w-20 p-2 bg-white rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" 
+                                class="w-16 p-1 bg-white rounded-lg font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" 
+                                @keydown.enter="addIngredientToForm"
                             >
-                            <button @click="addIngredientToForm" class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-lg tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round">check</span></button>
-                            <button @click="selectedProductToAdd = null" class="w-10 h-10 text-slate-400 flex items-center justify-center"><span class="material-icons-round">close</span></button>
+                            <button @click="addIngredientToForm" class="w-7 h-7 bg-slate-900 text-white rounded-lg flex items-center justify-center shadow-md tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round text-sm">check</span></button>
+                            <button @click="selectedProductToAdd = null" class="w-7 h-7 text-slate-400 flex items-center justify-center hover:text-slate-600"><span class="material-icons-round text-sm">close</span></button>
+                        </div>
+
+                        <!-- Dropdown -->
+                        <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-48 overflow-y-auto">
+                            <button 
+                                v-for="prod in filteredProducts" 
+                                :key="prod.id"
+                                @click="selectProductFromSearch(prod)"
+                                class="w-full text-left px-4 py-2.5 hover:bg-slate-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between items-center group"
+                            >
+                                <span class="group-hover:text-indigo-600 transition-colors">{{ prod.name }}</span> 
+                                <span class="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{{ prod.unit }}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Тип блюда</label>
-                        <div class="relative">
-                            <select v-model="formData.dish_type_id" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm">
-                                <option v-for="t in dictionaries.dishTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
-                            </select>
-                            <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>
+                <!-- Доп параметры: КБЖУ, Теги, Batch -->
+                <div class="bg-slate-50/50 rounded-2xl p-4 space-y-4 border border-slate-100">
+                    <!-- КБЖУ -->
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">КБЖУ (на порцию)</label>
+                        <div class="flex gap-2">
+                            <div class="flex-1 relative">
+                                <input v-model.number="formData.kcal" type="number" placeholder="0" class="w-full py-2 px-1 bg-white text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-sm focus:border-indigo-300">
+                                <span class="text-[9px] text-slate-400 absolute -bottom-4 left-0 right-0 text-center">Ккал</span>
+                            </div>
+                            <div class="flex-1 relative">
+                                <input v-model.number="formData.protein" type="number" placeholder="0" class="w-full py-2 px-1 bg-white text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-sm focus:border-indigo-300">
+                                <span class="text-[9px] text-slate-400 absolute -bottom-4 left-0 right-0 text-center">Белки</span>
+                            </div>
+                            <div class="flex-1 relative">
+                                <input v-model.number="formData.fat" type="number" placeholder="0" class="w-full py-2 px-1 bg-white text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-sm focus:border-indigo-300">
+                                <span class="text-[9px] text-slate-400 absolute -bottom-4 left-0 right-0 text-center">Жиры</span>
+                            </div>
+                            <div class="flex-1 relative">
+                                <input v-model.number="formData.carbs" type="number" placeholder="0" class="w-full py-2 px-1 bg-white text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-sm focus:border-indigo-300">
+                                <span class="text-[9px] text-slate-400 absolute -bottom-4 left-0 right-0 text-center">Угл</span>
+                            </div>
                         </div>
                     </div>
+                    <div class="h-2"></div>
 
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Прием пищи</label>
-                        <div class="flex flex-wrap gap-2">
-                             <button 
-                                v-for="t in dictionaries.mealTypes" 
-                                :key="t.id" 
-                                @click="toggleMealType(t.id)"
-                                type="button"
-                                class="px-3 py-2 rounded-xl text-xs font-bold transition-all border tap-effect"
-                                :class="formData.meal_type_ids.includes(t.id) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
-                             >
-                                {{ t.name }}
-                             </button>
-                        </div>
+                    <!-- Теги -->
+                    <div class="space-y-2">
+                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Теги и свойства</label>
+                         <div class="flex flex-wrap gap-2">
+                            <button 
+                                @click="openTagSelector"
+                                class="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:border-indigo-200 transition-colors"
+                            >
+                                <span class="material-icons-round text-lg">add</span>
+                            </button>
+                            <span v-for="tag in formData.tags" :key="tag.id" class="h-8 px-3 rounded-full bg-white border border-slate-200 flex items-center gap-1.5 text-xs font-bold text-slate-600 shadow-sm">
+                                <span>{{ tag.icon }}</span>
+                                <span>{{ tag.name }}</span>
+                            </span>
+                         </div>
                     </div>
+
+                    <!-- Batch mode -->
+                     <div class="pt-2">
+                         <div class="flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-slate-700">Готовка впрок</span>
+                                <span class="text-[10px] text-slate-400">Сразу много порций</span>
+                            </div>
+                            <div class="flex items-center bg-white rounded-lg border border-slate-200 p-0.5">
+                                <button 
+                                    @click="formData.is_batch = false" 
+                                    class="px-3 py-1.5 rounded-md text-[10px] font-bold transition-all"
+                                    :class="!formData.is_batch ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-400'"
+                                >Нет</button>
+                                <button 
+                                    @click="formData.is_batch = true" 
+                                    class="px-3 py-1.5 rounded-md text-[10px] font-bold transition-all"
+                                    :class="formData.is_batch ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-400'"
+                                >Да</button>
+                            </div>
+                         </div>
+                         
+                         <div v-if="formData.is_batch" class="mt-3 flex items-center gap-3 bg-white p-2 rounded-xl border border-indigo-100">
+                            <div class="h-8 w-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">{{ formData.batch_yield }}</div>
+                            <div class="flex-1 text-xs font-bold text-indigo-900">Порций на выходе</div>
+                            <div class="flex gap-1">
+                                <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-6 h-6 flex items-center justify-center bg-slate-50 rounded hover:bg-slate-100 text-slate-500"><span class="material-icons-round text-sm">remove</span></button>
+                                <button @click="formData.batch_yield++" class="w-6 h-6 flex items-center justify-center bg-slate-50 rounded hover:bg-slate-100 text-slate-500"><span class="material-icons-round text-sm">add</span></button>
+                            </div>
+                         </div>
+                     </div>
                 </div>
 
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Свойства</label>
-                    <button 
-                        @click="openTagSelector"
-                        class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center justify-between group tap-effect hover:bg-slate-100 transition-colors"
-                    >
-                        <div class="flex flex-wrap gap-1.5 items-center">
-                            <template v-if="formData.tags.length > 0">
-                                <span v-for="tag in formData.tags" :key="tag.id" class="text-[11px] font-bold bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg shadow-sm">
-                                    {{ tag.icon }} {{ tag.name }}
-                                </span>
-                            </template>
-                            <span v-else class="text-sm font-bold text-slate-400">Добавить теги...</span>
-                        </div>
-                        <span class="material-icons-round text-slate-300 group-hover:text-slate-500 transition-colors">chevron_right</span>
-                    </button>
+                <!-- Описание -->
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Заметки / Рецепт</label>
+                    <textarea v-model="formData.description" placeholder="..." class="w-full p-3 bg-slate-50 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[100px] text-sm"></textarea>
                 </div>
 
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">КБЖУ (на порцию)</label>
-                    <div class="grid grid-cols-4 gap-2">
-                        <input v-model.number="formData.kcal" type="number" placeholder="Ккал" class="w-full p-3 bg-orange-50 text-orange-600 font-bold rounded-xl text-center outline-none border border-orange-100 placeholder:text-orange-200">
-                        <input v-model.number="formData.protein" type="number" placeholder="Бел" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
-                        <input v-model.number="formData.fat" type="number" placeholder="Жир" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
-                        <input v-model.number="formData.carbs" type="number" placeholder="Угл" class="w-full p-3 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 placeholder:text-slate-300">
-                    </div>
-                </div>
-
-                <div class="h-[1px] bg-slate-100 w-full"></div>
-
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Рецепт / Описание</label>
-                    <textarea v-model="formData.description" placeholder="Опишите процесс приготовления..." class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[120px] text-sm"></textarea>
-                </div>
-
-                <div v-if="formData.id" class="pt-4 mt-4 border-t border-slate-100">
-                    <button @click="handleDelete" class="w-full py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                        <span class="material-icons-round">delete</span> Удалить блюдо
+                <div v-if="formData.id" class="pt-4 flex justify-center">
+                    <button @click="handleDelete" class="text-red-400 hover:text-red-500 text-xs font-bold flex items-center gap-1 py-2 px-4 rounded-lg hover:bg-red-50 transition-colors">
+                        <span class="material-icons-round text-sm">delete_outline</span> Удалить блюдо
                     </button>
                 </div>
             </div>
