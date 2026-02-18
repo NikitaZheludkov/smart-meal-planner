@@ -92,6 +92,8 @@ const closeTagSelector = () => {
     showTagSelection.value = false
 }
 
+const direction = ref('next')
+
 // --- ЛОГИКА ШАГОВ ---
 const nextStep = () => {
     if (currentStep.value < totalSteps) {
@@ -108,6 +110,7 @@ const nextStep = () => {
                 return
             }
         }
+        direction.value = 'next'
         currentStep.value++
         telegram.haptic.impact('light')
     }
@@ -115,6 +118,7 @@ const nextStep = () => {
 
 const prevStep = () => {
     if (currentStep.value > 1) {
+        direction.value = 'prev'
         currentStep.value--
         telegram.haptic.impact('light')
     }
@@ -124,6 +128,7 @@ const goToStep = (step) => {
     // Можно переходить только назад или на следующий (если валидно)
     // Но для простоты разрешим кликать назад
     if (step < currentStep.value) {
+        direction.value = 'prev'
         currentStep.value = step
         telegram.haptic.impact('light')
     }
@@ -390,7 +395,7 @@ const toggleMealType = (id) => {
     <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-40px)] sm:h-[85vh] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
         
         <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
         
@@ -516,10 +521,11 @@ const toggleMealType = (id) => {
                 </div>
             </div>
 
-            <div v-else class="space-y-4 pb-20">
+            <div v-else class="space-y-4 pb-20 relative overflow-hidden min-h-[400px]">
                 
+                <Transition :name="direction === 'next' ? 'slide-left' : 'slide-right'" mode="out-in">
                 <!-- STEP 1: Basic Info -->
-                <div v-if="currentStep === 1" class="space-y-6 animate-fade-in">
+                <div v-if="currentStep === 1" key="step1" class="space-y-6">
                     <div class="space-y-4">
                         <label class="block text-sm font-black text-slate-700 ml-1">Название блюда</label>
                         <input 
@@ -567,7 +573,7 @@ const toggleMealType = (id) => {
                 </div>
 
                 <!-- STEP 2: Ingredients & Batch -->
-                <div v-if="currentStep === 2" class="space-y-4 animate-fade-in">
+                <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
                     <!-- Batch Switch -->
                     <div class="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100 flex items-center justify-between">
@@ -681,7 +687,7 @@ const toggleMealType = (id) => {
                 </div>
 
                 <!-- STEP 3: Details -->
-                <div v-if="currentStep === 3" class="space-y-6 animate-fade-in">
+                <div v-else-if="currentStep === 3" key="step3" class="space-y-6">
                     
                     <!-- КБЖУ -->
                     <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
@@ -737,6 +743,7 @@ const toggleMealType = (id) => {
                         </button>
                     </div>
                 </div>
+                </Transition>
 
             </div>
         </div>
@@ -791,6 +798,33 @@ const toggleMealType = (id) => {
 .slide-fade-leave-to {
   opacity: 0;
   transform: translateX(-20px);
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.25s ease-out;
+}
+
+.slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
