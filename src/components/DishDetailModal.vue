@@ -26,6 +26,8 @@ const isSaving = ref(false)
 const showTagSelection = ref(false) // Переключатель экранов
 const currentStep = ref(1)
 const totalSteps = 3
+const editingIngredientIndex = ref(null)
+const tempAmount = ref('')
 
 const formData = ref({
     id: null,
@@ -37,6 +39,7 @@ const formData = ref({
     is_batch: false,
     batch_yield: 1,
     tags: [],
+    ingredients: []// Ингредиенты
     ingredients: []
 })
 
@@ -182,6 +185,27 @@ const removeIngredient = (index) => {
     telegram.haptic.impact('light')
 }
 
+const startEditingIngredient = (index, amount) => {
+    editingIngredientIndex.value = index
+    tempAmount.value = amount
+    telegram.haptic.selection()
+    
+    nextTick(() => {
+        // Фокус на инпут (он будет единственным с классом ing-edit-input)
+        const input = document.querySelector('.ing-edit-input')
+        if (input) input.focus()
+    })
+}
+
+const saveIngredientAmount = (index) => {
+    if (tempAmount.value) {
+        formData.value.ingredients[index].amount = parseFloat(tempAmount.value)
+    }
+    editingIngredientIndex.value = null
+    tempAmount.value = ''
+    telegram.haptic.notification('success')
+}
+
 
 
 // --- ИНИЦИАЛИЗАЦИЯ ---
@@ -242,6 +266,8 @@ const initForm = (dishData) => {
     }
     
     currentStep.value = 1
+    editingIngredientIndex.value = null
+    tempAmount.value = ''
 }
 
 watch(() => props.isOpen, (newVal) => {
@@ -365,7 +391,7 @@ const toggleMealType = (id) => {
     <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-[90vh] sm:h-[85vh] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-40px)] sm:h-[85vh] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
         
         <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
         
@@ -509,14 +535,14 @@ const toggleMealType = (id) => {
                     <div class="space-y-4">
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Тип блюда</label>
-                            <div class="flex flex-wrap gap-2">
+                            <div class="grid grid-cols-2 gap-2">
                                 <button 
                                     v-for="t in dictionaries.dishTypes" 
                                     :key="t.id" 
                                     @click="formData.dish_type_id = t.id"
                                     type="button"
-                                    class="px-3 py-2 rounded-xl text-sm font-bold transition-all border tap-effect flex-1 text-center"
-                                    :class="formData.dish_type_id === t.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                    class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border tap-effect text-center"
+                                    :class="formData.dish_type_id === t.id ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                                 >
                                     {{ t.name }}
                                 </button>
@@ -525,13 +551,13 @@ const toggleMealType = (id) => {
 
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Прием пищи</label>
-                            <div class="flex flex-wrap gap-2">
+                            <div class="grid grid-cols-2 gap-2">
                                 <button 
                                     v-for="t in dictionaries.mealTypes" 
                                     :key="t.id" 
                                     @click="toggleMealType(t.id)"
                                     type="button"
-                                    class="px-3 py-2 rounded-xl text-sm font-bold transition-all border tap-effect flex-1 text-center"
+                                    class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border tap-effect text-center"
                                     :class="formData.meal_type_ids.includes(t.id) ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'"
                                 >
                                     {{ t.name }}
@@ -624,7 +650,26 @@ const toggleMealType = (id) => {
                             <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
                                 <div class="w-2 h-2 rounded-full bg-indigo-300"></div>
                                 <div class="flex-1 font-bold text-slate-700 text-sm">{{ ing.name }}</div>
-                                <div class="font-bold text-slate-400 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">{{ ing.amount }} {{ ing.unit }}</div>
+                                
+                                <div v-if="editingIngredientIndex === idx" class="flex items-center gap-1">
+                                    <input 
+                                        v-model="tempAmount" 
+                                        type="number" 
+                                        inputmode="decimal"
+                                        class="ing-edit-input w-16 p-1 bg-slate-50 rounded-lg font-bold text-center outline-none border border-indigo-200 focus:border-indigo-400 text-xs"
+                                        @keydown.enter="saveIngredientAmount(idx)"
+                                        @blur="saveIngredientAmount(idx)"
+                                    >
+                                    <span class="text-xs font-bold text-slate-400">{{ ing.unit }}</span>
+                                </div>
+                                <button 
+                                    v-else
+                                    @click="startEditingIngredient(idx, ing.amount)"
+                                    class="font-bold text-slate-500 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
+                                >
+                                    {{ ing.amount }} {{ ing.unit }}
+                                </button>
+
                                 <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
                                     <span class="material-icons-round text-base">close</span>
                                 </button>
