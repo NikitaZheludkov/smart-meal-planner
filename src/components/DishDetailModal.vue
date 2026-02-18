@@ -583,9 +583,10 @@ const toggleMealType = (id) => {
                         </div>
                     </div>
                     
-                    <div v-if="formData.id" class="pt-8 flex justify-center">
-                        <button @click="handleDelete" class="text-red-400 hover:text-red-500 text-xs font-bold flex items-center gap-1 py-2 px-4 rounded-lg hover:bg-red-50 transition-colors">
-                            <span class="material-icons-round text-sm">delete_outline</span> Удалить блюдо
+                    <div v-if="formData.id" class="pt-8">
+                        <button @click="handleDelete" class="w-full py-3.5 rounded-2xl bg-red-50 text-red-500 font-bold text-sm flex items-center justify-center gap-2 tap-effect active:bg-red-100 transition-colors">
+                            <span class="material-icons-round">delete_outline</span>
+                            Удалить блюдо
                         </button>
                     </div>
                 </div>
@@ -761,11 +762,6 @@ const toggleMealType = (id) => {
                         <textarea v-model="formData.description" placeholder="Опишите процесс приготовления..." class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[150px] text-sm leading-relaxed"></textarea>
                     </div>
 
-                    <div v-if="formData.id" class="pt-4 flex justify-center">
-                        <button @click="handleDelete" class="text-red-400 hover:text-red-500 text-xs font-bold flex items-center gap-1 py-2 px-4 rounded-lg hover:bg-red-50 transition-colors">
-                            <span class="material-icons-round text-sm">delete_outline</span> Удалить блюдо
-                        </button>
-                    </div>
                 </div>
                 </Transition>
 
