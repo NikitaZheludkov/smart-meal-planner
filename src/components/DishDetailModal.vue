@@ -546,10 +546,16 @@ const toggleMealType = (id) => {
                                     :key="t.id" 
                                     @click="formData.dish_type_id = t.id"
                                     type="button"
-                                    class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border tap-effect text-center"
-                                    :class="formData.dish_type_id === t.id ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                    class="px-4 py-3 rounded-2xl text-sm font-bold transition-all border tap-effect text-left flex items-center justify-between group"
+                                    :class="formData.dish_type_id === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
                                 >
-                                    {{ t.name }}
+                                    <span>{{ t.name }}</span>
+                                    <div 
+                                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
+                                        :class="formData.dish_type_id === t.id ? 'border-white' : 'border-slate-200 group-hover:border-slate-300'"
+                                    >
+                                        <div v-if="formData.dish_type_id === t.id" class="w-2.5 h-2.5 rounded-full bg-white"></div>
+                                    </div>
                                 </button>
                             </div>
                         </div>
@@ -562,13 +568,25 @@ const toggleMealType = (id) => {
                                     :key="t.id" 
                                     @click="toggleMealType(t.id)"
                                     type="button"
-                                    class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border tap-effect text-center"
-                                    :class="formData.meal_type_ids.includes(t.id) ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'"
+                                    class="px-4 py-3 rounded-2xl text-sm font-bold transition-all border tap-effect text-left flex items-center justify-between group"
+                                    :class="formData.meal_type_ids.includes(t.id) ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
                                 >
-                                    {{ t.name }}
+                                    <span>{{ t.name }}</span>
+                                    <div 
+                                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
+                                        :class="formData.meal_type_ids.includes(t.id) ? 'border-white' : 'border-slate-200 group-hover:border-slate-300'"
+                                    >
+                                        <span v-if="formData.meal_type_ids.includes(t.id)" class="material-icons-round text-sm">check</span>
+                                    </div>
                                 </button>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div v-if="formData.id" class="pt-8 flex justify-center">
+                        <button @click="handleDelete" class="text-red-400 hover:text-red-500 text-xs font-bold flex items-center gap-1 py-2 px-4 rounded-lg hover:bg-red-50 transition-colors">
+                            <span class="material-icons-round text-sm">delete_outline</span> Удалить блюдо
+                        </button>
                     </div>
                 </div>
 
@@ -576,32 +594,26 @@ const toggleMealType = (id) => {
                 <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
                     <!-- Batch Switch -->
-                    <div class="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100 flex items-center justify-between">
-                        <div class="flex flex-col">
-                            <span class="text-sm font-black text-indigo-900">Многопорционное блюдо</span>
-                            <span class="text-[10px] font-bold text-indigo-400">Готовка впрок (на несколько раз)</span>
-                        </div>
-                        <div class="flex items-center bg-white rounded-lg border border-indigo-100 p-0.5 shadow-sm">
-                            <button 
-                                @click="formData.is_batch = false" 
-                                class="px-3 py-1.5 rounded-md text-[10px] font-bold transition-all"
-                                :class="!formData.is_batch ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
-                            >Нет</button>
-                            <button 
-                                @click="formData.is_batch = true" 
-                                class="px-3 py-1.5 rounded-md text-[10px] font-bold transition-all"
-                                :class="formData.is_batch ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'"
-                            >Да</button>
-                        </div>
-                    </div>
-
-                    <div v-if="formData.is_batch" class="bg-white p-3 rounded-2xl border border-slate-200 flex items-center gap-4 shadow-sm">
-                        <div class="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-lg">{{ formData.batch_yield }}</div>
-                        <div class="flex-1 text-xs font-bold text-slate-600">Количество порций на выходе</div>
-                        <div class="flex gap-2">
-                            <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-600 tap-effect"><span class="material-icons-round">remove</span></button>
-                            <button @click="formData.batch_yield++" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-600 tap-effect"><span class="material-icons-round">add</span></button>
-                        </div>
+                    <div class="bg-indigo-50/50 p-1 rounded-full flex font-bold text-xs relative">
+                        <button 
+                            @click="formData.is_batch = false" 
+                            class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2"
+                            :class="!formData.is_batch ? 'bg-white text-indigo-900 shadow-md' : 'text-indigo-400 hover:text-indigo-600'"
+                        >
+                            <span>Обычное блюдо</span>
+                        </button>
+                        <button 
+                            @click="formData.is_batch = true" 
+                            class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2"
+                            :class="formData.is_batch ? 'bg-white text-indigo-900 shadow-md' : 'text-indigo-400 hover:text-indigo-600'"
+                        >
+                            <span>Многопорционное</span>
+                            <div v-if="formData.is_batch" class="flex items-center bg-indigo-50 rounded-lg px-1.5 py-0.5 ml-1" @click.stop>
+                                <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-5 h-5 flex items-center justify-center text-indigo-400 hover:text-indigo-700"><span class="material-icons-round text-sm">remove</span></button>
+                                <span class="text-xs font-black text-indigo-700 w-4 text-center mx-0.5">{{ formData.batch_yield }}</span>
+                                <button @click="formData.batch_yield++" class="w-5 h-5 flex items-center justify-center text-indigo-400 hover:text-indigo-700"><span class="material-icons-round text-sm">add</span></button>
+                            </div>
+                        </button>
                     </div>
 
                     <div class="h-px bg-slate-100 w-full my-2"></div>
@@ -652,31 +664,31 @@ const toggleMealType = (id) => {
 
                         <!-- List -->
                         <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1 mt-2">
-                            <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                                <div class="w-2 h-2 rounded-full bg-indigo-300"></div>
-                                <div class="flex-1 font-bold text-slate-700 text-sm">{{ ing.name }}</div>
+                            <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
+                                <div class="w-1.5 h-1.5 rounded-full bg-indigo-300 ml-1"></div>
+                                <div class="flex-1 font-bold text-slate-700 text-xs">{{ ing.name }}</div>
                                 
                                 <div v-if="editingIngredientIndex === idx" class="flex items-center gap-1">
                                     <input 
                                         v-model="tempAmount" 
                                         type="number" 
                                         inputmode="decimal"
-                                        class="ing-edit-input w-16 p-1 bg-slate-50 rounded-lg font-bold text-center outline-none border border-indigo-200 focus:border-indigo-400 text-xs"
+                                        class="ing-edit-input w-12 p-0.5 bg-slate-50 rounded-lg font-bold text-center outline-none border border-indigo-200 focus:border-indigo-400 text-[10px]"
                                         @keydown.enter="saveIngredientAmount(idx)"
                                         @blur="saveIngredientAmount(idx)"
                                     >
-                                    <span class="text-xs font-bold text-slate-400">{{ ing.unit }}</span>
+                                    <span class="text-[10px] font-bold text-slate-400">{{ ing.unit }}</span>
                                 </div>
                                 <button 
                                     v-else
                                     @click="startEditingIngredient(idx, ing.amount)"
-                                    class="font-bold text-slate-500 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
+                                    class="font-bold text-slate-500 text-[10px] bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
                                 >
                                     {{ ing.amount }} {{ ing.unit }}
                                 </button>
 
-                                <button @click="removeIngredient(idx)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
-                                    <span class="material-icons-round text-base">close</span>
+                                <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
+                                    <span class="material-icons-round text-sm">close</span>
                                 </button>
                             </div>
                         </div>
