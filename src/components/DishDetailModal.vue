@@ -594,26 +594,38 @@ const toggleMealType = (id) => {
                 <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
                     <!-- Batch Switch -->
-                    <div class="bg-indigo-50/50 p-1 rounded-full flex font-bold text-xs relative">
-                        <button 
-                            @click="formData.is_batch = false" 
-                            class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2"
-                            :class="!formData.is_batch ? 'bg-white text-indigo-900 shadow-md' : 'text-indigo-400 hover:text-indigo-600'"
-                        >
-                            <span>Обычное блюдо</span>
-                        </button>
-                        <button 
-                            @click="formData.is_batch = true" 
-                            class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2"
-                            :class="formData.is_batch ? 'bg-white text-indigo-900 shadow-md' : 'text-indigo-400 hover:text-indigo-600'"
-                        >
-                            <span>Многопорционное</span>
-                            <div v-if="formData.is_batch" class="flex items-center bg-indigo-50 rounded-lg px-1.5 py-0.5 ml-1" @click.stop>
-                                <button @click="formData.batch_yield = Math.max(1, formData.batch_yield - 1)" class="w-5 h-5 flex items-center justify-center text-indigo-400 hover:text-indigo-700"><span class="material-icons-round text-sm">remove</span></button>
-                                <span class="text-xs font-black text-indigo-700 w-4 text-center mx-0.5">{{ formData.batch_yield }}</span>
-                                <button @click="formData.batch_yield++" class="w-5 h-5 flex items-center justify-center text-indigo-400 hover:text-indigo-700"><span class="material-icons-round text-sm">add</span></button>
-                            </div>
-                        </button>
+                    <div class="flex items-center gap-3">
+                        <div class="bg-slate-100 p-1 rounded-full flex font-bold text-xs relative flex-1 overflow-hidden">
+                            <button 
+                                @click="formData.is_batch = false" 
+                                class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2 tap-effect"
+                                :class="!formData.is_batch ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
+                            >
+                                <span>Обычное блюдо</span>
+                            </button>
+                            <button 
+                                @click="formData.is_batch = true" 
+                                class="flex-1 py-2.5 rounded-full transition-all duration-300 z-10 relative flex items-center justify-center gap-2 tap-effect"
+                                :class="formData.is_batch ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
+                            >
+                                <span>Многопорционное</span>
+                            </button>
+                        </div>
+
+                        <!-- Quantity Input -->
+                        <div class="w-16 shrink-0 h-[42px] flex items-center justify-end">
+                             <Transition name="pop">
+                                <input 
+                                    v-if="formData.is_batch"
+                                    v-model.number="formData.batch_yield" 
+                                    type="number" 
+                                    inputmode="numeric"
+                                    placeholder="1"
+                                    class="w-full h-full bg-slate-100 text-slate-900 font-black rounded-xl text-center outline-none border border-transparent focus:bg-white focus:border-slate-200 transition-all text-sm"
+                                    @focus="$event.target.select()"
+                                >
+                            </Transition>
+                        </div>
                     </div>
 
                     <div class="h-px bg-slate-100 w-full my-2"></div>
@@ -840,4 +852,15 @@ const toggleMealType = (id) => {
 }
 
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.pop-enter-active,
+.pop-leave-active {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
 </style>
