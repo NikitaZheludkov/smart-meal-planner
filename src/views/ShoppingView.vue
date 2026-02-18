@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
 import { useTelegramStore } from '../stores/telegram' // <-- Импорт
-import { startOfWeek, addDays, format, isWithinInterval, parseISO } from 'date-fns'
+import { startOfWeek, addDays, format, isWithinInterval, parseISO, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 const planStore = usePlanStore()
@@ -26,6 +26,18 @@ const periodLabel = computed(() => {
 const changePeriod = (dir) => {
     telegram.haptic.selection() // <-- Вибрация "барабан" при смене дат
     currentWeekStart.value = addDays(currentWeekStart.value, dir * periodLength.value)
+}
+
+const showTodayBtn = computed(() => {
+    const userStartDay = settingsStore.startDay !== null ? settingsStore.startDay : 1
+    const realCurrentWeekStart = startOfWeek(new Date(), { weekStartsOn: userStartDay })
+    return !isSameDay(currentWeekStart.value, realCurrentWeekStart)
+})
+
+const goToToday = () => {
+    const day = settingsStore.startDay !== null ? settingsStore.startDay : 1
+    currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: day })
+    telegram.haptic.selection()
 }
 
 // --- 2. ЛОГИКА ГАЛОЧЕК ---
@@ -224,13 +236,22 @@ const formatAmount = (val) => {
       
       <div class="px-5 pt-app-header pb-4 flex items-center gap-2">
           
-        <div class="flex-1 flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-2xl h-12">
-            <button @click="changePeriod(-1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-lg transition-colors">
-                <span class="material-icons-round text-sm">chevron_left</span>
+        <div class="flex-1 flex items-center justify-between px-2">
+            <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <span class="material-icons-round">chevron_left</span>
             </button>
-            <span class="text-xs font-black text-slate-800 uppercase tracking-widest">{{ periodLabel }}</span>
-            <button @click="changePeriod(1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-lg transition-colors">
-                <span class="material-icons-round text-sm">chevron_right</span>
+            
+            <div class="flex flex-col items-center tap-effect" @click="goToToday">
+                <div class="text-sm font-black text-slate-900 flex items-center gap-2">
+                    {{ periodLabel }}
+                </div>
+                <div v-if="showTodayBtn" class="text-[10px] font-bold text-orange-500 mt-0.5">
+                    Вернуться
+                </div>
+            </div>
+
+            <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <span class="material-icons-round">chevron_right</span>
             </button>
         </div>
 
