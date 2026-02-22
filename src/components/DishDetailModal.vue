@@ -29,6 +29,9 @@ const totalSteps = 3
 const editingIngredientIndex = ref(null)
 const tempAmount = ref('')
 
+const stepTitles = ['Основное', 'Состав', 'Детали']
+const currentStepTitle = computed(() => stepTitles[currentStep.value - 1])
+
 const formData = ref({
     id: null,
     name: '',
@@ -125,12 +128,20 @@ const prevStep = () => {
 }
 
 const goToStep = (step) => {
-    // Можно переходить только назад или на следующий (если валидно)
-    // Но для простоты разрешим кликать назад
     if (step < currentStep.value) {
         direction.value = 'prev'
         currentStep.value = step
         telegram.haptic.impact('light')
+    } else if (step > currentStep.value) {
+         // Prevent jumping forward without validation
+         if (currentStep.value === 1) {
+            if (!formData.value.name || !formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) {
+                return
+            }
+         }
+         direction.value = 'next'
+         currentStep.value = step
+         telegram.haptic.impact('light')
     }
 }
 
@@ -334,30 +345,10 @@ const handleDelete = async () => {
     }
 }
 
-// Универсальная функция "Отмены / Закрытия"
+// Универсальная функция "Закрытия"
 const handleCancel = () => {
     telegram.haptic.impact('light')
-    
-    // 0. Если есть шаги и мы не на первом, возвращаемся назад
-    if (isEditing.value && currentStep.value > 1) {
-        prevStep()
-        return
-    }
-    
-    // 1. Если это новое блюдо - просто закрываем модалку
-    if (!formData.value.id) {
-        emit('close')
-        return
-    }
-
-    // 2. Если редактируем существующее - сбрасываем и выходим из режима правки
-    if (isEditing.value) {
-        isEditing.value = false
-        formData.value = JSON.parse(JSON.stringify(props.dish))
-        return
-    }
-
-    // 3. Если просто смотрим - закрываем модалку
+    // Просто закрываем модалку, не сохраняя
     emit('close')
 }
 
@@ -395,72 +386,98 @@ const toggleMealType = (id) => {
     <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-20px)] sm:max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
         
-        <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
+        <!-- HEADER -->
+        <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 bg-white z-20 min-h-[70px]">
         
-        <div class="w-20 flex justify-start">
-            <button 
-                v-if="showTagSelection" 
-                @click="closeTagSelector" 
-                class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 tap-effect active:scale-95 transition-transform"
-            >
-                <span class="material-icons-round text-xl">arrow_back</span>
-            </button>
-
-            <button 
-                v-else 
-                @click="handleCancel" 
-                class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
-            >
-                <span class="material-icons-round text-xl">{{ (isEditing && currentStep > 1) ? 'arrow_back' : 'close' }}</span>
-            </button>
-        </div>
-        
-        <div class="flex-1 flex flex-col items-center justify-center px-2">
-            <h3 class="text-lg font-bold text-slate-900 truncate text-center leading-tight">
-                {{ showTagSelection ? 'Свойства' : (isEditing ? (formData.id ? 'Редактирование' : 'Новое блюдо') : '') }}
-            </h3>
-            
-            <!-- Индикатор шагов -->
-            <div v-if="isEditing && !showTagSelection" class="flex items-center gap-1.5 mt-1">
+            <!-- Left Button: Back (TagSelector) or Close (Main) -->
+            <div class="w-20 flex justify-start">
                 <button 
-                    v-for="step in totalSteps" 
-                    :key="step"
-                    @click="goToStep(step)"
-                    class="h-1.5 rounded-full transition-all duration-300"
-                    :class="step <= currentStep ? 'w-6 bg-slate-900' : 'w-1.5 bg-slate-200'"
-                    :disabled="step > currentStep"
-                ></button>
+                    v-if="showTagSelection" 
+                    @click="closeTagSelector" 
+                    class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 tap-effect active:scale-95 transition-transform"
+                >
+                    <span class="material-icons-round text-xl">arrow_back</span>
+                </button>
+
+                <button 
+                    v-else 
+                    @click="handleCancel" 
+                    class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
+                >
+                    <span class="material-icons-round text-xl">close</span>
+                </button>
+            </div>
+            
+            <!-- Title -->
+            <div class="flex-1 flex flex-col items-center justify-center px-2">
+                <h3 class="text-lg font-bold text-slate-900 truncate text-center leading-tight">
+                    {{ showTagSelection ? 'Свойства' : (isEditing ? (formData.id ? 'Редактирование' : 'Новое блюдо') : 'Просмотр') }}
+                </h3>
+            </div>
+
+            <!-- Right Button: Done (TagSelector/Edit) or Edit (View) -->
+            <div class="w-20 flex justify-end items-center gap-2">
+                <button v-if="showTagSelection" @click="closeTagSelector" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect">Готово</button>
+                
+                <template v-else>
+                    <!-- Кнопка сохранения для редактирования (всегда доступна, если валидно) -->
+                    <button 
+                        v-if="isEditing" 
+                        @click="handleSave" 
+                        class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
+                        :class="(formData.name && formData.meal_type_ids.length > 0 && !isSaving) ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
+                        :disabled="(!formData.name || formData.meal_type_ids.length === 0) || isSaving"
+                    >
+                        <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
+                        {{ isSaving ? '...' : 'Готово' }}
+                    </button>
+                    
+                    <button 
+                        v-if="!isEditing" 
+                        @click="isEditing = true; currentStep = 1" 
+                        class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center tap-effect hover:bg-indigo-100 active:scale-95 transition-transform"
+                    >
+                        <span class="material-icons-round text-xl">edit</span>
+                    </button>
+                </template>
             </div>
         </div>
 
-        <div class="w-20 flex justify-end items-center gap-2">
-            <button v-if="showTagSelection" @click="closeTagSelector" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect">Готово</button>
-            
-            <template v-else>
-                <!-- Кнопка сохранения/далее для редактирования -->
-                <button 
-                    v-if="isEditing" 
-                    @click="currentStep === totalSteps ? handleSave() : nextStep()" 
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
-                    :class="(formData.name && formData.meal_type_ids.length > 0 && !isSaving) ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
-                    :disabled="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) || isSaving"
-                >
-                    <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                    {{ isSaving ? '...' : (currentStep === totalSteps ? 'Готово' : 'Далее') }}
-                </button>
-                
-                <button 
-                    v-if="!isEditing" 
-                    @click="isEditing = true; currentStep = 1" 
-                    class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center tap-effect hover:bg-indigo-100 active:scale-95 transition-transform"
-                >
-                    <span class="material-icons-round text-xl">edit</span>
-                </button>
-            </template>
+        <!-- STEPPER NAV (New) -->
+        <div v-if="isEditing && !showTagSelection" class="px-4 pb-4 pt-1 bg-white border-b border-slate-50 z-20 flex items-center justify-between gap-2">
+            <button 
+                @click="prevStep"
+                :disabled="currentStep === 1"
+                class="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                :class="currentStep === 1 ? 'text-slate-200' : 'text-slate-900 bg-slate-50 hover:bg-slate-100 tap-effect'"
+            >
+                <span class="material-icons-round">chevron_left</span>
+            </button>
+
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ currentStepTitle }}</span>
+                <div class="flex gap-1.5">
+                    <button 
+                        v-for="step in totalSteps" 
+                        :key="step"
+                        @click="goToStep(step)"
+                        class="h-1.5 rounded-full transition-all duration-300"
+                        :class="step === currentStep ? 'w-6 bg-slate-900' : 'w-1.5 bg-slate-200'"
+                    ></button>
+                </div>
+            </div>
+
+            <button 
+                @click="nextStep"
+                :disabled="currentStep === totalSteps"
+                class="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                :class="currentStep === totalSteps ? 'text-slate-200' : 'text-slate-900 bg-slate-50 hover:bg-slate-100 tap-effect'"
+            >
+                <span class="material-icons-round">chevron_right</span>
+            </button>
         </div>
-      </div>
 
       <div class="flex-1 overflow-hidden relative bg-white">
         
