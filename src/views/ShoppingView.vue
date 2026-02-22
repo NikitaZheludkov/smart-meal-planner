@@ -232,6 +232,24 @@ const switchViewTab = (mode) => {
         activeTab.value = mode
     }
 }
+const resetChecks = () => {
+    if (confirm('Снять все отметки?')) {
+        checkedIds.value.clear()
+        telegram.haptic.impact('medium')
+    }
+}
+
+const copyList = () => {
+    const text = shoppingList.value
+        .map(item => `${item.name} - ${formatAmount(item.amount)} ${item.unit}`)
+        .join('\n')
+    
+    navigator.clipboard.writeText(text).then(() => {
+        telegram.haptic.notification('success')
+        alert('Список скопирован!')
+    })
+}
+
 const formatAmount = (val) => {
     // Если число целое, возвращаем как есть
     if (Number.isInteger(val)) return val
@@ -250,9 +268,10 @@ const formatAmount = (val) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100">
       
-      <div class="px-5 pt-app-header pb-4 flex items-center gap-2">
+      <div class="px-5 pt-app-header pb-4 flex flex-col gap-4">
           
-        <div class="flex-1 flex items-center justify-between px-2">
+        <!-- Date Switcher Full Width -->
+        <div class="flex items-center justify-between px-2 w-full">
             <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
                 <span class="material-icons-round">chevron_left</span>
             </button>
@@ -271,18 +290,28 @@ const formatAmount = (val) => {
             </button>
         </div>
 
-        <div class="flex gap-2">
-            <button @click="planStore.fetchPlan(); telegram.haptic.impact('light')" class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect">
-                <span class="material-icons-round" :class="planStore.loading ? 'animate-spin' : ''">refresh</span>
-            </button>
-            <div class="bg-slate-50 border border-slate-100 p-1 rounded-2xl flex h-12 items-center">
-                <button @click="switchViewTab('list')" class="w-10 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+        <!-- Controls Row -->
+        <div class="flex items-center gap-2 w-full">
+            <!-- View Switcher (25%) -->
+            <div class="bg-slate-50 border border-slate-100 p-1 rounded-2xl flex h-12 items-center w-1/4 min-w-[80px]">
+                <button @click="switchViewTab('list')" class="flex-1 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">format_list_bulleted</span>
                 </button>
-                <button @click="switchViewTab('departments')" class="w-10 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('departments')" class="flex-1 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">grid_view</span>
                 </button>
             </div>
+
+            <!-- Reset Checks Button (25%) -->
+             <button @click="resetChecks" class="h-12 w-1/4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors">
+                <span class="material-icons-round text-xl">remove_done</span>
+            </button>
+
+            <!-- Copy List Button (Flexible) -->
+            <button @click="copyList" class="h-12 flex-1 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 font-bold text-sm tap-effect gap-2 px-2">
+                <span class="material-icons-round text-lg">content_copy</span>
+                <span class="truncate">Копировать</span>
+            </button>
         </div>
       </div>
 
