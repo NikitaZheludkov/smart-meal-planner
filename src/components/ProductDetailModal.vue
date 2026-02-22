@@ -27,6 +27,21 @@ const formData = ref({
     category: ''
 })
 
+const categoryIcons = {
+    'Овощи и фрукты': '🥦',
+    'Молочные продукты': '🥛',
+    'Мясо, птица, рыба': '🥩',
+    'Бакалея и хлеб': '🍞',
+    'Заморозка': '🧊',
+    'Напитки': '🥤',
+    'Бытовая химия': '🧼',
+    'Разное': '📦'
+}
+
+const getCategoryIcon = (categoryName) => {
+    return categoryIcons[categoryName] || '📦'
+}
+
 const units = ['Кг', 'Л', 'Шт', 'Упак']
 
 watch(() => props.product, (newVal) => {
@@ -156,7 +171,7 @@ const handleCancel = () => {
         
         <div v-if="!isEditing" class="flex flex-col space-y-6 items-center pt-6">
             <div class="w-24 h-24 bg-white rounded-3xl flex items-center justify-center text-5xl shadow-sm border border-slate-100">
-                🥦
+                {{ getCategoryIcon(formData.category) }}
             </div>
             
             <div class="text-center">

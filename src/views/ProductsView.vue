@@ -16,6 +16,21 @@ const selectedCategory = ref('Все')
 const showProductModal = ref(false)
 const selectedProduct = ref(null)
 
+const categoryIcons = {
+    'Овощи и фрукты': '🥦',
+    'Молочные продукты': '🥛',
+    'Мясо, птица, рыба': '🥩',
+    'Бакалея и хлеб': '🍞',
+    'Заморозка': '🧊',
+    'Напитки': '🥤',
+    'Бытовая химия': '🧼',
+    'Разное': '📦'
+}
+
+const getCategoryIcon = (categoryName) => {
+    return categoryIcons[categoryName] || '📦'
+}
+
 const createProduct = () => {
     telegram.haptic.impact('light')
     selectedProduct.value = {} 
@@ -90,7 +105,7 @@ onMounted(async () => {
         </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 scroll-area">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
         <div v-if="productStore.loading" class="flex justify-center py-10">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
         </div>
@@ -100,21 +115,24 @@ onMounted(async () => {
             <p class="text-sm font-bold">Список пуст</p>
         </div>
 
-        <div 
-            v-for="product in filteredProducts" 
-            :key="product.id" 
-            @click="openProduct(product)"
-            class="bg-white p-3 rounded-[20px] shadow-sm border border-slate-100 flex items-center gap-3 tap-effect active:scale-[0.98] transition-transform"
-        >
-            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
-                🥦
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="font-bold text-slate-900 truncate">{{ product.name }}</div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">{{ product.category || 'Разное' }}</div>
-            </div>
-            <div class="px-3 py-1 bg-slate-50 rounded-lg text-xs font-bold text-slate-500">
-                {{ product.unit }}
+        <div v-else class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative">
+            <div 
+                v-for="product in filteredProducts" 
+                :key="product.id" 
+                @click="openProduct(product)"
+                class="flex items-center px-4 py-2 w-full min-h-[44px] border-b border-slate-50 last:border-0 tap-effect active:bg-slate-50 transition-colors"
+            >
+                <div class="w-8 h-8 flex items-center justify-center text-lg mr-3 bg-slate-50 rounded-lg shrink-0">
+                    {{ getCategoryIcon(product.category) }}
+                </div>
+                
+                <div class="flex-1 min-w-0 font-bold text-slate-700 text-xs truncate pr-2 leading-tight">
+                    {{ product.name }}
+                </div>
+                
+                <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0">
+                    {{ product.unit }}
+                </div>
             </div>
         </div>
     </div>
