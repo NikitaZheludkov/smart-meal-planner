@@ -319,14 +319,15 @@ const formatAmount = (val) => {
           <div 
             v-for="dish in dishStats" 
             :key="dish.id"
-            class="relative w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect"
+            class="relative w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect flex items-center justify-center p-0.5"
           >
-              <!-- Background Image -->
-              <img v-if="dish.image_url" :src="dish.image_url" class="absolute inset-0 w-full h-full object-cover">
-              <div v-else class="absolute inset-0 flex items-center justify-center bg-slate-50 text-xl">🥘</div>
+              <!-- Dish Name -->
+              <div class="text-[7px] font-bold text-center leading-tight text-slate-700 line-clamp-4 break-words w-full pb-1">
+                  {{ dish.name }}
+              </div>
               
               <!-- Progress Overlay (Bottom Bar) -->
-              <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/20 backdrop-blur-sm">
+              <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-100">
                   <div 
                     class="h-full transition-all duration-500" 
                     :class="dish.percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
@@ -335,7 +336,7 @@ const formatAmount = (val) => {
               </div>
 
               <!-- Count Badge -->
-              <div v-if="dish.count > 1" class="absolute top-1 right-1 bg-indigo-500 text-white text-[9px] font-black px-1 rounded-md shadow-sm border border-white/20 leading-tight">
+              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-indigo-500 text-white text-[7px] font-black px-1 rounded-bl-md shadow-sm leading-tight">
                   x{{ dish.count }}
               </div>
           </div>
