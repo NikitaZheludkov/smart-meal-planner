@@ -90,6 +90,5 @@ const dishesWithProgress = computed(() => {
 </template>
 
 <style scoped>
-.animate-fade-in { animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* animate-fade-in is now global in style.css */
 </style>

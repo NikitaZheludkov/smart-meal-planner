@@ -338,9 +338,9 @@ const getDishSlotName = (id) => {
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <style scoped>
-.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+/* Removed animate-slide-up as it is handled by global modal transition */
 </style>

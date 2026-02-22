@@ -53,12 +53,12 @@ html, body { overscroll-behavior-y: none; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Анимации перехода страниц (Soft Fade Slide) */
+/* Анимации перехода страниц (Soft Fade Slide - Tab Switch) */
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,
 .slide-right-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); /* iOS-like easing */
   position: absolute;
   width: 100%;
   height: 100%;
@@ -68,33 +68,60 @@ html, body { overscroll-behavior-y: none; }
   transform: translateZ(0);
   overflow: hidden;
   will-change: transform, opacity;
-  background-color: #F8FAFC; /* Fix for transparent background overlap */
+  background-color: #F8FAFC; 
 }
 
-/* Slide Left (Новая страница появляется с небольшим смещением справа) */
+/* Slide Left (Next Tab) */
 .slide-left-enter-from {
   opacity: 0;
-  transform: translateX(10px);
+  transform: translateX(20px);
 }
 .slide-left-leave-to {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-20px);
 }
 
-/* Slide Right (Новая страница появляется с небольшим смещением слева) */
+/* Slide Right (Prev Tab) */
 .slide-right-enter-from {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-20px);
 }
 .slide-right-leave-to {
   opacity: 0;
-  transform: translateX(10px);
+  transform: translateX(20px);
 }
 
-/* Slide Fade (Для внутренних табов) */
+/* Wizard / Step Transitions (Full Width Slide) */
+.step-next-enter-active,
+.step-next-leave-active,
+.step-prev-enter-active,
+.step-prev-leave-active {
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: absolute;
+  width: 100%;
+}
+
+.step-next-enter-from { opacity: 0; transform: translateX(50px); }
+.step-next-leave-to { opacity: 0; transform: translateX(-50px); }
+
+.step-prev-enter-from { opacity: 0; transform: translateX(-50px); }
+.step-prev-leave-to { opacity: 0; transform: translateX(50px); }
+
+/* Pop / Scale Transition (For small elements) */
+.pop-enter-active,
+.pop-leave-active {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+/* Slide Fade (General purpose) */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
-  transition: all 0.2s ease-out;
+  transition: all 0.25s ease-out;
 }
 .slide-fade-enter-from {
   opacity: 0;
@@ -103,6 +130,26 @@ html, body { overscroll-behavior-y: none; }
 .slide-fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Toast Transition */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.9);
+}
+
+/* Fade In Animation (Simple) */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* List Transitions (для списков) */

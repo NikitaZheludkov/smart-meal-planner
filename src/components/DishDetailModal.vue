@@ -560,7 +560,7 @@ const onProductCreated = (product) => {
 
             <div v-else class="space-y-4 pb-20 relative overflow-hidden min-h-[400px]">
                 
-                <Transition :name="direction === 'next' ? 'slide-left' : 'slide-right'" mode="out-in">
+                <Transition :name="direction === 'next' ? 'step-next' : 'step-prev'" mode="out-in">
                 <!-- STEP 1: Basic Info -->
                 <div v-if="currentStep === 1" key="step1" class="space-y-4">
                     <div class="space-y-2">
@@ -842,58 +842,5 @@ const onProductCreated = (product) => {
 .animate-fade-in { animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.25s ease-out;
-}
-
-.slide-fade-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-left-enter-active,
-.slide-left-leave-active,
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: all 0.25s ease-out;
-}
-
-.slide-left-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-.slide-left-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-right-enter-from {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-right-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-
-.pop-enter-active,
-.pop-leave-active {
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.pop-enter-from,
-.pop-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
-}
 </style>

@@ -207,6 +207,7 @@ const showDishModal = ref(false)
 const viewingDish = ref(null)
 
 const openDishDetails = async (item) => {
+  telegram.haptic.impact('light')
   if (item.dish_id) {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
     const fullDish = dishStore.dishes.find(d => d.id === item.dish_id)
@@ -521,28 +522,21 @@ onMounted(() => { if (auth.isAuth) loadData() })
         </transition>
     </div>
 
-    <transition name="fade">
-        <DishSelector 
-            v-if="showSelector" 
-            :is-open="showSelector"
-            :selected-date="targetSlot.dateObj"
-            :slot-id="targetSlot.slotId"
-            :existing-items="targetSlot.dateObj ? getSlotItems(targetSlot.dateObj, targetSlot.slotId) : []"
-            :yesterday-items="targetSlot.yesterdayItems"
-            @close="showSelector = false" 
-            @select="onDishSelected" 
-        />
-    </transition>
+    <DishSelector 
+        v-if="showSelector" 
+        :is-open="showSelector"
+        :selected-date="targetSlot.dateObj"
+        :slot-id="targetSlot.slotId"
+        :existing-items="targetSlot.dateObj ? getSlotItems(targetSlot.dateObj, targetSlot.slotId) : []"
+        :yesterday-items="targetSlot.yesterdayItems"
+        @close="showSelector = false" 
+        @select="onDishSelected" 
+    />
 
     <DishDetailModal :is-open="showDishModal" :dish="viewingDish" @close="showDishModal = false" />
   </div>
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.pop-enter-active { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-.pop-leave-active { animation: popOut 0.2s ease-in; }
-@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes popOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.5); opacity: 0; } }
+/* Scoped styles removed, using global transitions */
 </style>
