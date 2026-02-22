@@ -44,9 +44,16 @@ export const useTelegramStore = defineStore('telegram', () => {
     platform.value = tg.platform || 'unknown'
     
     console.log('🦁 Telegram Store initialized on', platform.value)
+    
+    // Проверка версии для избежания ошибок на старых клиентах
+    const isVersionSupported = (minVersion) => {
+        return tg.isVersionAtLeast ? tg.isVersionAtLeast(minVersion) : false
+    }
 
     try {
-      tg.enableClosingConfirmation(true)
+      if (isVersionSupported('6.2')) {
+        tg.enableClosingConfirmation(true)
+      }
     } catch (e) {}
 
     // 5. Отслеживаем открытие клавиатуры по фокусу на полях ввода

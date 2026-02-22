@@ -112,7 +112,47 @@ export const useDishStore = defineStore('dishes', () => {
         await supabase.from('ingredients').insert(ingRows)
     }
 
-    await fetchDishes()
+    // ОПТИМИЗАЦИЯ: Не делаем полный fetchDishes, а добавляем в локальный массив
+    // Но нам нужно подтянуть связи (имена продуктов и т.д.), поэтому пока оставим fetchDishes
+    // или сделаем "умное" добавление, если критична скорость.
+    // Для надежности сейчас лучше fetch, но для скорости - локальный пуш.
+    // Выбираем компромисс: fetch только одного нового блюда и добавление в список.
+    
+    const { data: fullDish, error: fetchError } = await supabase
+        .from('dishes')
+        .select(`
+            *,
+            dish_meal_type_links ( meal_types (id, name) ),
+            dish_types (id, name),
+            dish_tag_links ( dish_tags ( * ) ),
+            ingredients (
+                product_id, amount,
+                products ( name, unit )
+            )
+        `)
+        .eq('id', newDish.id)
+        .single()
+
+    if (!fetchError && fullDish) {
+        const formattedDish = {
+            ...fullDish,
+            meal_types: fullDish.dish_meal_type_links?.map(link => link.meal_types).filter(Boolean) || [],
+            meal_type_name: fullDish.dish_meal_type_links?.map(link => link.meal_types?.name).join(', '),
+            dish_type_name: fullDish.dish_types?.name,
+            tags: fullDish.dish_tag_links?.map(link => link.dish_tags).filter(t => t) || [],
+            ingredients: fullDish.ingredients?.map(ing => ({
+                product_id: ing.product_id,
+                name: ing.products?.name || 'Неизвестно',
+                amount: ing.amount,
+                unit: ing.products?.unit || ''
+            })) || []
+        }
+        dishes.value.unshift(formattedDish) // Добавляем в начало списка
+    } else {
+        // Fallback если не удалось загрузить одно блюдо
+        await fetchDishes()
+    }
+
     ui.showToast('Блюдо создано', 'success')
   }
 

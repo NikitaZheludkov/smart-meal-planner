@@ -25,7 +25,10 @@ export const useUIStore = defineStore('ui', () => {
   })
 
   // --- ЛОГИ ---
-  const logs = ref([])
+  // Пытаемся восстановить логи из localStorage
+  const storedLogs = localStorage.getItem('app_logs')
+  const logs = ref(storedLogs ? JSON.parse(storedLogs) : [])
+  
   const toasts = ref([]) // Очередь уведомлений
   const isLogOpen = ref(false)
   const isOffline = ref(!navigator.onLine)
@@ -48,6 +51,12 @@ export const useUIStore = defineStore('ui', () => {
         showToast('Связь восстановлена', 'success')
     }
   }
+  
+  // Инициализация слушателей сети
+  const initNetworkListeners = () => {
+      window.addEventListener('online', () => setOffline(false))
+      window.addEventListener('offline', () => setOffline(true))
+  }
 
   const addLog = (message, type = 'info', data = null) => {
     // Авто-добавление версии при первом логировании
@@ -56,7 +65,7 @@ export const useUIStore = defineStore('ui', () => {
         id: 'version',
         time: new Date().toLocaleTimeString(),
         type: 'info',
-        message: 'App Version: 1.0.5 (Logging Update)',
+        message: 'App Version: 1.0.6 (Optimized)',
         data: { build: new Date().toISOString() }
       })
     }
@@ -69,8 +78,20 @@ export const useUIStore = defineStore('ui', () => {
     }
     logs.value.unshift(logEntry)
     console[type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'log'](`[${type.toUpperCase()}] ${message}`, data || '')
+    
     if (logs.value.length > 100) logs.value.pop()
+    
+    // Сохраняем в localStorage (debounce не помешал бы, но пока так)
+    try {
+        localStorage.setItem('app_logs', JSON.stringify(logs.value))
+    } catch (e) {
+        console.error('Ошибка сохранения логов', e)
+    }
   }
 
-  return { plan, dishes, shopping, logs, toasts, isLogOpen, isOffline, setOffline, addLog, showToast }
+  return { 
+      plan, dishes, shopping, 
+      logs, toasts, isLogOpen, isOffline, 
+      setOffline, addLog, showToast, initNetworkListeners 
+  }
 })

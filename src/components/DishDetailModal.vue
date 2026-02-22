@@ -320,7 +320,10 @@ const handleSave = async () => {
     if (formData.value.id) {
       await dishStore.updateDish(formData.value.id, formData.value)
       ui.addLog('Блюдо успешно обновлено', 'info')
-      await planStore.fetchPlan() 
+      // ОПТИМИЗАЦИЯ: Не обновляем весь план при каждом чихе, это дорого.
+      // План обновится сам через Realtime, если нужно, или при следующем заходе.
+      // Если критично - лучше обновлять локально в сторе.
+      // await planStore.fetchPlan() 
     } else {
       await dishStore.addDish(formData.value)
       ui.addLog('Блюдо успешно добавлено', 'info')

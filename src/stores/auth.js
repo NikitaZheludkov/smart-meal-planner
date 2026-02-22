@@ -278,6 +278,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const loginAsTestUser = async () => {
+    // В продакшене этот метод должен быть недоступен или защищен
+    if (import.meta.env.PROD && !import.meta.env.VITE_ENABLE_TEST_USER) {
+        ui.showToast('Тестовый вход недоступен в PROD', 'error')
+        return
+    }
+
     loading.value = true
     try {
         // Попытка входа
