@@ -113,6 +113,9 @@ const nextStep = () => {
         direction.value = 'next'
         currentStep.value++
         telegram.haptic.impact('light')
+    } else if (currentStep.value === totalSteps) {
+        // На последнем шаге - сохраняем
+        handleSave()
     }
 }
 
@@ -590,15 +593,42 @@ const toggleMealType = (id) => {
                 <!-- STEP 2: Ingredients & Batch -->
                 <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
-                    <!-- Compact Search & Batch Toggle -->
-                    <div class="flex items-center gap-2">
-                         <div class="relative bg-white rounded-xl flex-1 border border-slate-200 focus-within:border-indigo-300 transition-colors shadow-sm z-30 flex items-center pl-2">
+                    <!-- Compact Batch Toggle MOVED UP -->
+                     <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                         <span class="text-xs font-bold text-slate-500 ml-2">Многопорционное блюдо?</span>
+                         
+                         <div class="flex items-center gap-2">
+                            <button 
+                                @click="formData.is_batch = !formData.is_batch"
+                                class="h-8 px-3 rounded-lg border flex items-center gap-1.5 transition-all tap-effect"
+                                :class="formData.is_batch ? 'bg-white border-indigo-200 text-indigo-600 shadow-sm' : 'bg-slate-200 border-transparent text-slate-400'"
+                            >
+                                <span class="material-icons-round text-base" :class="formData.is_batch ? 'text-indigo-500' : 'text-slate-400'">{{ formData.is_batch ? 'check_box' : 'check_box_outline_blank' }}</span>
+                                <span class="text-[10px] font-bold">{{ formData.is_batch ? 'Да' : 'Нет' }}</span>
+                            </button>
+                             
+                             <Transition name="pop">
+                                <input 
+                                    v-if="formData.is_batch"
+                                    v-model.number="formData.batch_yield" 
+                                    type="number" 
+                                    inputmode="numeric"
+                                    placeholder="1"
+                                    class="w-10 h-8 bg-white text-indigo-900 font-bold rounded-lg text-center outline-none border border-indigo-100 focus:border-indigo-300 transition-all text-xs shadow-sm"
+                                    @focus="$event.target.select()"
+                                >
+                            </Transition>
+                         </div>
+                    </div>
+
+                    <!-- Compact Search -->
+                    <div class="relative bg-white rounded-xl border border-slate-200 focus-within:border-indigo-300 transition-colors shadow-sm z-30 flex items-center pl-2">
                              <span class="material-icons-round text-slate-300 text-lg">search</span>
                              <div v-if="!selectedProductToAdd" class="flex-1">
                                 <input 
                                     v-model="productSearchQuery" 
                                     @blur="setTimeout(() => showProductDropdown = false, 200)"
-                                    placeholder="Ингредиент..." 
+                                    placeholder="Найти и добавить ингредиент..." 
                                     class="w-full p-2.5 bg-transparent font-bold text-slate-700 outline-none text-xs placeholder:text-slate-300"
                                 >
                              </div>
@@ -631,28 +661,6 @@ const toggleMealType = (id) => {
                             </div>
                          </div>
                          
-                         <!-- Compact Batch Toggle -->
-                         <button 
-                            @click="formData.is_batch = !formData.is_batch"
-                            class="h-10 px-3 rounded-xl border flex items-center gap-1.5 transition-colors"
-                            :class="formData.is_batch ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400'"
-                         >
-                            <span class="material-icons-round text-lg">restaurant</span>
-                            <span class="text-[10px] font-bold">{{ formData.is_batch ? 'Batch' : '1x' }}</span>
-                         </button>
-                         
-                         <Transition name="pop">
-                            <input 
-                                v-if="formData.is_batch"
-                                v-model.number="formData.batch_yield" 
-                                type="number" 
-                                inputmode="numeric"
-                                placeholder="1"
-                                class="w-12 h-10 bg-indigo-50 text-indigo-900 font-bold rounded-xl text-center outline-none border border-indigo-100 focus:bg-white focus:border-indigo-300 transition-all text-xs"
-                                @focus="$event.target.select()"
-                            >
-                        </Transition>
-                    </div>
 
                     <!-- Compact Ingredients List -->
                     <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-xl p-1.5 space-y-1">
@@ -741,6 +749,19 @@ const toggleMealType = (id) => {
                 </div>
                 </Transition>
 
+            </div>
+            
+             <!-- Floating Next Button -->
+            <div v-if="isEditing && !showTagSelection" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <button 
+                    @click="nextStep"
+                    @keydown.enter.prevent="nextStep"
+                    class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-all focus:ring-4 focus:ring-slate-200 outline-none"
+                    :disabled="currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)"
+                    :class="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) ? 'opacity-50 cursor-not-allowed' : ''"
+                >
+                    <span class="material-icons-round text-2xl">{{ currentStep === totalSteps ? 'check' : 'arrow_forward' }}</span>
+                </button>
             </div>
         </div>
 
