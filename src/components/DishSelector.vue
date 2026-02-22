@@ -142,6 +142,7 @@ const getDishSlotName = (id) => {
 </script>
 
 <template>
+  <Transition name="modal">
   <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
     
