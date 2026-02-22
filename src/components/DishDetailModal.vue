@@ -544,7 +544,7 @@ const toggleMealType = (id) => {
                         <input 
                             v-model="formData.name" 
                             placeholder="Название блюда" 
-                            class="w-full text-lg font-bold text-slate-900 bg-slate-50 rounded-xl px-4 py-3 placeholder:text-slate-300 outline-none border-2 border-transparent focus:border-indigo-100 transition-colors"
+                            class="w-full text-lg font-bold text-slate-900 bg-slate-50 rounded-2xl px-4 py-3.5 placeholder:text-slate-300 outline-none border-2 border-transparent focus:border-indigo-100 transition-colors"
                             autofocus
                         >
                     </div>
@@ -558,7 +558,7 @@ const toggleMealType = (id) => {
                                 :key="t.id" 
                                 @click="formData.dish_type_id = t.id"
                                 type="button"
-                                class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
                                 :class="formData.dish_type_id === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                             >
                                 {{ t.name }}
@@ -573,7 +573,7 @@ const toggleMealType = (id) => {
                                 :key="t.id" 
                                 @click="toggleMealType(t.id)"
                                 type="button"
-                                class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
                                 :class="formData.meal_type_ids.includes(t.id) ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                             >
                                 {{ t.name }}
@@ -583,7 +583,7 @@ const toggleMealType = (id) => {
                     </div>
                     
                     <div v-if="formData.id" class="pt-4">
-                        <button @click="handleDelete" class="w-full py-2.5 rounded-xl bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center gap-2 tap-effect active:bg-red-100 transition-colors">
+                        <button @click="handleDelete" class="w-full py-3 rounded-2xl bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center gap-2 tap-effect active:bg-red-100 transition-colors">
                             <span class="material-icons-round text-sm">delete_outline</span>
                             Удалить блюдо
                         </button>
@@ -594,86 +594,84 @@ const toggleMealType = (id) => {
                 <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
                     <!-- Compact Batch Toggle MOVED UP -->
-                     <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                         <span class="text-xs font-bold text-slate-500 ml-2">Многопорционное блюдо?</span>
-                         
-                         <div class="flex items-center gap-2">
-                            <button 
-                                @click="formData.is_batch = !formData.is_batch"
-                                class="h-8 px-3 rounded-lg border flex items-center gap-1.5 transition-all tap-effect"
-                                :class="formData.is_batch ? 'bg-white border-indigo-200 text-indigo-600 shadow-sm' : 'bg-slate-200 border-transparent text-slate-400'"
+                     <div class="flex items-center justify-between bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                         <div class="flex items-center gap-2" @click="formData.is_batch = !formData.is_batch">
+                            <div class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all"
+                                :class="formData.is_batch ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 bg-white'"
                             >
-                                <span class="material-icons-round text-base" :class="formData.is_batch ? 'text-indigo-500' : 'text-slate-400'">{{ formData.is_batch ? 'check_box' : 'check_box_outline_blank' }}</span>
-                                <span class="text-[10px] font-bold">{{ formData.is_batch ? 'Да' : 'Нет' }}</span>
-                            </button>
-                             
-                             <Transition name="pop">
+                                <span v-if="formData.is_batch" class="material-icons-round text-white text-sm">check</span>
+                            </div>
+                            <span class="text-xs font-bold text-slate-700">Многопорционное блюдо</span>
+                         </div>
+                         
+                         <Transition name="pop">
+                            <div v-if="formData.is_batch" class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase">Порций:</span>
                                 <input 
-                                    v-if="formData.is_batch"
                                     v-model.number="formData.batch_yield" 
                                     type="number" 
                                     inputmode="numeric"
                                     placeholder="1"
-                                    class="w-10 h-8 bg-white text-indigo-900 font-bold rounded-lg text-center outline-none border border-indigo-100 focus:border-indigo-300 transition-all text-xs shadow-sm"
+                                    class="w-12 h-8 bg-white text-indigo-900 font-black rounded-xl text-center outline-none border border-indigo-100 focus:border-indigo-300 transition-all text-sm shadow-sm"
                                     @focus="$event.target.select()"
                                 >
-                            </Transition>
-                         </div>
+                            </div>
+                        </Transition>
                     </div>
 
                     <!-- Compact Search -->
-                    <div class="relative bg-white rounded-xl border border-slate-200 focus-within:border-indigo-300 transition-colors shadow-sm z-30 flex items-center pl-2">
-                             <span class="material-icons-round text-slate-300 text-lg">search</span>
+                    <div class="relative bg-white rounded-2xl border border-slate-200 focus-within:border-indigo-300 transition-colors shadow-sm z-30 flex items-center pl-3">
+                             <span class="material-icons-round text-slate-300 text-xl">search</span>
                              <div v-if="!selectedProductToAdd" class="flex-1">
                                 <input 
                                     v-model="productSearchQuery" 
                                     @blur="setTimeout(() => showProductDropdown = false, 200)"
                                     placeholder="Найти и добавить ингредиент..." 
-                                    class="w-full p-2.5 bg-transparent font-bold text-slate-700 outline-none text-xs placeholder:text-slate-300"
+                                    class="w-full p-3.5 bg-transparent font-bold text-slate-700 outline-none text-sm placeholder:text-slate-300"
                                 >
                              </div>
                              <div v-else class="flex gap-2 items-center flex-1 px-1 py-1">
-                                <div class="flex-1 font-bold text-slate-800 text-xs truncate">{{ selectedProductToAdd.name }}</div>
+                                <div class="flex-1 font-bold text-slate-800 text-sm truncate pl-2">{{ selectedProductToAdd.name }}</div>
                                 <input 
                                     ref="quantityInput"
                                     v-model="amountToAdd" 
                                     type="number" 
                                     inputmode="decimal"
                                     :placeholder="selectedProductToAdd.unit" 
-                                    class="w-14 p-1.5 bg-slate-50 rounded-lg font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-xs" 
+                                    class="w-16 p-2 bg-slate-50 rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-sm" 
                                     @keydown.enter="addIngredientToForm"
                                 >
-                                <button @click="addIngredientToForm" class="w-7 h-7 bg-slate-900 text-white rounded-lg flex items-center justify-center shadow-md tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round text-xs">check</span></button>
-                                <button @click="selectedProductToAdd = null" class="w-7 h-7 text-slate-400 flex items-center justify-center hover:text-slate-600"><span class="material-icons-round text-xs">close</span></button>
+                                <button @click="addIngredientToForm" class="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-md tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round text-sm">check</span></button>
+                                <button @click="selectedProductToAdd = null" class="w-9 h-9 text-slate-400 flex items-center justify-center hover:text-slate-600"><span class="material-icons-round text-sm">close</span></button>
                             </div>
 
                              <!-- Dropdown -->
-                            <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-y-auto max-h-48 z-40">
+                            <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-y-auto max-h-48 z-40">
                                 <button 
                                     v-for="prod in filteredProducts" 
                                     :key="prod.id"
                                     @click="selectProductFromSearch(prod)"
-                                    class="w-full text-left px-3 py-2.5 hover:bg-slate-50 font-bold text-slate-700 text-xs border-b border-slate-50 last:border-0 flex justify-between items-center group"
+                                    class="w-full text-left px-4 py-3 hover:bg-slate-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between items-center group"
                                 >
                                     <span class="group-hover:text-indigo-600 transition-colors">{{ prod.name }}</span> 
-                                    <span class="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{{ prod.unit }}</span>
+                                    <span class="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{{ prod.unit }}</span>
                                 </button>
                             </div>
                          </div>
                          
 
                     <!-- Compact Ingredients List -->
-                    <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-xl p-1.5 space-y-1">
-                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-2 p-1.5 bg-white rounded-lg border border-slate-100 shadow-sm">
-                            <div class="w-1 h-1 rounded-full bg-indigo-300 ml-1"></div>
-                            <div class="flex-1 font-bold text-slate-700 text-xs truncate">{{ ing.name }}</div>
+                    <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1">
+                        <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
+                            <div class="w-1.5 h-1.5 rounded-full bg-indigo-300 ml-1"></div>
+                            <div class="flex-1 font-bold text-slate-700 text-sm truncate">{{ ing.name }}</div>
                             
                             <div v-if="editingIngredientIndex === idx" class="flex items-center gap-1">
                                 <input 
                                     v-model="tempAmount" 
                                     type="number" 
                                     inputmode="decimal"
-                                    class="ing-edit-input w-10 p-0.5 bg-slate-50 rounded font-bold text-center outline-none border border-indigo-200 focus:border-indigo-400 text-[10px]"
+                                    class="ing-edit-input w-14 p-1 bg-slate-50 rounded-lg font-bold text-center outline-none border border-indigo-200 focus:border-indigo-400 text-xs"
                                     @keydown.enter="saveIngredientAmount(idx)"
                                     @blur="saveIngredientAmount(idx)"
                                 >
@@ -682,17 +680,17 @@ const toggleMealType = (id) => {
                             <button 
                                 v-else
                                 @click="startEditingIngredient(idx, ing.amount)"
-                                class="font-bold text-slate-500 text-[10px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 hover:bg-slate-100 transition-colors"
+                                class="font-bold text-slate-500 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
                             >
                                 {{ ing.amount }} {{ ing.unit }}
                             </button>
 
-                            <button @click="removeIngredient(idx)" class="w-5 h-5 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded hover:bg-red-50">
-                                <span class="material-icons-round text-xs">close</span>
+                            <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
+                                <span class="material-icons-round text-sm">close</span>
                             </button>
                         </div>
                     </div>
-                    <div v-else class="text-center py-6 text-slate-400 text-[10px] font-bold bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                    <div v-else class="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                         Ингредиентов нет
                     </div>
                 </div>
@@ -701,40 +699,40 @@ const toggleMealType = (id) => {
                 <div v-else-if="currentStep === 3" key="step3" class="space-y-4">
                     
                     <!-- Compact Macros -->
-                    <div class="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
                         <div class="flex gap-2">
                             <div class="flex-1">
-                                <div class="text-[9px] font-bold text-slate-400 text-center mb-0.5">Ккал</div>
-                                <input v-model.number="formData.kcal" type="number" placeholder="0" class="w-full py-1.5 px-1 bg-orange-50 text-orange-600 font-black rounded-lg text-center outline-none border border-orange-100 text-sm focus:border-orange-300">
+                                <div class="text-[10px] font-bold text-slate-400 text-center mb-1">Ккал</div>
+                                <input v-model.number="formData.kcal" type="number" placeholder="0" class="w-full py-2 px-1 bg-orange-50 text-orange-600 font-black rounded-xl text-center outline-none border border-orange-100 text-sm focus:border-orange-300">
                             </div>
                             <div class="flex-1">
-                                <div class="text-[9px] font-bold text-slate-400 text-center mb-0.5">Белки</div>
-                                <input v-model.number="formData.protein" type="number" placeholder="0" class="w-full py-1.5 px-1 bg-slate-50 text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
+                                <div class="text-[10px] font-bold text-slate-400 text-center mb-1">Белки</div>
+                                <input v-model.number="formData.protein" type="number" placeholder="0" class="w-full py-2 px-1 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
                             </div>
                             <div class="flex-1">
-                                <div class="text-[9px] font-bold text-slate-400 text-center mb-0.5">Жиры</div>
-                                <input v-model.number="formData.fat" type="number" placeholder="0" class="w-full py-1.5 px-1 bg-slate-50 text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
+                                <div class="text-[10px] font-bold text-slate-400 text-center mb-1">Жиры</div>
+                                <input v-model.number="formData.fat" type="number" placeholder="0" class="w-full py-2 px-1 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
                             </div>
                             <div class="flex-1">
-                                <div class="text-[9px] font-bold text-slate-400 text-center mb-0.5">Угл</div>
-                                <input v-model.number="formData.carbs" type="number" placeholder="0" class="w-full py-1.5 px-1 bg-slate-50 text-slate-700 font-bold rounded-lg text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
+                                <div class="text-[10px] font-bold text-slate-400 text-center mb-1">Угл</div>
+                                <input v-model.number="formData.carbs" type="number" placeholder="0" class="w-full py-2 px-1 bg-slate-50 text-slate-700 font-bold rounded-xl text-center outline-none border border-slate-200 text-xs focus:border-indigo-300">
                             </div>
                         </div>
                     </div>
 
                     <!-- Compact Tags -->
                     <div class="space-y-1">
-                         <div class="flex flex-wrap gap-1.5 min-h-[32px]">
+                         <div class="flex flex-wrap gap-2 min-h-[36px]">
                             <button 
                                 @click="openTagSelector"
-                                class="h-8 px-3 rounded-lg bg-slate-900 text-white shadow-md flex items-center justify-center gap-1 text-[10px] font-bold hover:bg-slate-800 transition-colors tap-effect"
+                                class="h-9 px-3 rounded-xl bg-slate-900 text-white shadow-md flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-slate-800 transition-colors tap-effect"
                             >
-                                <span class="material-icons-round text-xs">add</span> Тег
+                                <span class="material-icons-round text-sm">add</span> Тег
                             </button>
-                            <span v-for="tag in formData.tags" :key="tag.id" class="h-8 px-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1 text-[10px] font-bold text-slate-600 shadow-sm">
+                            <span v-for="tag in formData.tags" :key="tag.id" class="h-9 px-3 rounded-xl bg-white border border-slate-200 flex items-center gap-1.5 text-xs font-bold text-slate-600 shadow-sm">
                                 <span>{{ tag.icon }}</span>
                                 <span>{{ tag.name }}</span>
-                                <button @click="toggleTag(tag)" class="ml-1 text-slate-300 hover:text-red-500"><span class="material-icons-round text-xs">close</span></button>
+                                <button @click="toggleTag(tag)" class="ml-1 text-slate-300 hover:text-red-500"><span class="material-icons-round text-sm">close</span></button>
                             </span>
                         </div>
                     </div>
@@ -743,7 +741,7 @@ const toggleMealType = (id) => {
                     <textarea 
                         v-model="formData.description" 
                         placeholder="Заметки / Рецепт..." 
-                        class="w-full p-3 bg-slate-50 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[100px] text-xs leading-relaxed"
+                        class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[120px] text-sm leading-relaxed"
                     ></textarea>
 
                 </div>
@@ -751,8 +749,8 @@ const toggleMealType = (id) => {
 
             </div>
             
-             <!-- Floating Next Button -->
-            <div v-if="isEditing && !showTagSelection" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+             <!-- Floating Next Button - Fixed at bottom right -->
+            <div v-if="isEditing && !showTagSelection" class="absolute bottom-6 right-5 z-50">
                 <button 
                     @click="nextStep"
                     @keydown.enter.prevent="nextStep"
