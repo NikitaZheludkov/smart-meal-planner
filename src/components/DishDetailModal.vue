@@ -811,6 +811,7 @@ const toggleMealType = (id) => {
 
       </div>
     </div>
+    </div>
   </Transition>
 </template>
 
