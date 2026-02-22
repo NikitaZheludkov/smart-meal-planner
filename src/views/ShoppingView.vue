@@ -291,26 +291,25 @@ const formatAmount = (val) => {
         </div>
 
         <!-- Controls Row -->
-        <div class="flex items-center gap-2 w-full">
-            <!-- View Switcher (25%) -->
-            <div class="bg-slate-50 border border-slate-100 p-1 rounded-2xl flex h-12 items-center w-1/4 min-w-[80px]">
-                <button @click="switchViewTab('list')" class="flex-1 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+        <div class="flex items-center gap-2 w-full h-10">
+            <!-- View Switcher -->
+            <div class="flex-1 bg-slate-50 border border-slate-100 p-0.5 rounded-xl flex items-center h-full">
+                <button @click="switchViewTab('list')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">format_list_bulleted</span>
                 </button>
-                <button @click="switchViewTab('departments')" class="flex-1 h-10 rounded-xl flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('departments')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-lg">grid_view</span>
                 </button>
             </div>
 
-            <!-- Reset Checks Button (25%) -->
-             <button @click="resetChecks" class="h-12 w-1/4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors">
+            <!-- Reset Checks Button -->
+             <button @click="resetChecks" class="h-full flex-1 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors">
                 <span class="material-icons-round text-xl">remove_done</span>
             </button>
 
-            <!-- Copy List Button (Flexible) -->
-            <button @click="copyList" class="h-12 flex-1 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 font-bold text-sm tap-effect gap-2 px-2">
+            <!-- Copy List Button -->
+            <button @click="copyList" class="h-full flex-1 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 font-bold text-sm tap-effect">
                 <span class="material-icons-round text-lg">content_copy</span>
-                <span class="truncate">Копировать</span>
             </button>
         </div>
       </div>
@@ -336,7 +335,7 @@ const formatAmount = (val) => {
               </div>
 
               <!-- Count Badge -->
-              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-indigo-500 text-white text-[7px] font-black px-1 rounded-bl-md shadow-sm leading-tight">
+              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-indigo-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm leading-none z-10">
                   x{{ dish.count }}
               </div>
           </div>
@@ -368,36 +367,36 @@ const formatAmount = (val) => {
                                 class="flex flex-col border-b border-slate-50 last:border-0 w-full bg-white transition-colors duration-200"
                                 :class="expandedProductIds.has(item.id) ? 'bg-slate-50/50' : ''"
                             >
-                                <div class="flex items-center p-4 w-full">
+                                <div class="flex items-center px-4 py-2 w-full min-h-[44px]">
                                     <!-- Checkbox Area -->
                                     <div 
-                                        class="w-10 h-10 -ml-2 flex items-center justify-center cursor-pointer tap-effect rounded-full active:bg-slate-100 transition-colors"
+                                        class="w-8 h-8 -ml-1.5 flex items-center justify-center cursor-pointer tap-effect rounded-full active:bg-slate-100 transition-colors flex-shrink-0"
                                         @click.stop="toggleCheck(item.id)"
                                     >
                                         <div 
-                                            class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200" 
+                                            class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200" 
                                             :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
                                         >
-                                            <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-xs font-bold">check</span>
+                                            <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-[10px] font-bold">check</span>
                                         </div>
                                     </div>
                                     
                                     <!-- Content Area (Expandable) -->
-                                    <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-2" @click="toggleExpand(item.id)">
-                                         <div class="flex-1 font-bold text-slate-700 text-sm transition-all duration-200 truncate pr-2" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                    <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
+                                         <div class="flex-1 font-bold text-slate-700 text-xs transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
                                             {{ item.name }}
                                         </div>
                                         
-                                        <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 whitespace-nowrap" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
+                                        <div class="text-[10px] font-black text-slate-900 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
                                             {{ formatAmount(item.amount) }} {{ item.unit }}
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Expansion Content -->
-                                <div v-if="expandedProductIds.has(item.id) && item.dishes.length > 0" class="px-4 pb-4 pl-12">
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <div v-for="dishName in item.dishes" :key="dishName" class="text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">
+                                <div v-if="expandedProductIds.has(item.id) && item.dishes.length > 0" class="px-4 pb-3 pl-10">
+                                    <div class="flex flex-wrap gap-1">
+                                        <div v-for="dishName in item.dishes" :key="dishName" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
                                             {{ dishName }}
                                         </div>
                                     </div>
