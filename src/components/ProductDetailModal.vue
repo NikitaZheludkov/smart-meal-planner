@@ -78,9 +78,11 @@ const handleSave = async () => {
       if (formData.value.id) {
         await productStore.updateProduct(formData.value.id, formData.value)
         ui.addLog('Продукт успешно обновлен', 'info')
+        emit('saved', formData.value)
       } else {
-        await productStore.addProduct(formData.value)
+        const newProduct = await productStore.addProduct(formData.value)
         ui.addLog('Продукт успешно добавлен', 'info')
+        emit('saved', newProduct)
       }
       // Закрываем только после успешного сохранения
       isEditing.value = false

@@ -30,6 +30,7 @@ const totalSteps = 3
 const editingIngredientIndex = ref(null)
 const tempAmount = ref('')
 const showCreateProductModal = ref(false)
+const newProductTarget = ref(null)
 
 const formData = ref({
     id: null,
@@ -403,6 +404,23 @@ const toggleMealType = (id) => {
         formData.value.meal_type_ids.push(id)
     }
 }
+
+const openCreateProduct = () => {
+    newProductTarget.value = {}
+    showCreateProductModal.value = true
+}
+
+const onProductCreated = (product) => {
+    showCreateProductModal.value = false
+    selectedProductToAdd.value = product
+    productSearchQuery.value = ''
+    amountToAdd.value = ''
+    
+    // Focus on amount input
+    nextTick(() => {
+        quantityInput.value?.focus()
+    })
+}
 </script>
 
 <template>
@@ -665,7 +683,7 @@ const toggleMealType = (id) => {
                          </div>
 
                         <button 
-                            @click="showCreateProductModal = true"
+                            @click="openCreateProduct"
                             class="w-full py-3 rounded-2xl bg-indigo-50 text-indigo-500 font-bold text-xs flex items-center justify-center gap-2 tap-effect active:bg-indigo-100 transition-colors mt-2 mb-4"
                         >
                             <span class="material-icons-round text-sm">add_circle_outline</span>
@@ -810,7 +828,9 @@ const toggleMealType = (id) => {
     </div>
   </Transition>
     <ProductDetailModal 
-        :is-open="showCreateProductModal" 
+        :is-open="showCreateProductModal"
+        :product="newProductTarget"
+        @saved="onProductCreated"
         @close="showCreateProductModal = false"
     />
 </template>
