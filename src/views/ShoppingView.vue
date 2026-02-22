@@ -69,6 +69,15 @@ const toggleCheck = (id) => {
     else checkedIds.value.add(id)
 }
 
+const expandedProductIds = ref(new Set())
+const toggleExpand = (id) => {
+    if (expandedProductIds.value.has(id)) expandedProductIds.value.delete(id)
+    else {
+        expandedProductIds.value.add(id)
+        telegram.haptic.selection()
+    }
+}
+
 // --- 3. РАСЧЕТ ДАННЫХ ---
 const activePlanItems = computed(() => {
     const start = currentWeekStart.value
@@ -98,6 +107,7 @@ const shoppingList = computed(() => {
           const dishId = planItem.dish_id
           if (!dishesMap[dishId]) {
               dishesMap[dishId] = {
+                  name: planItem.dishes?.name,
                   is_batch: planItem.dishes?.is_batch,
                   batch_yield: planItem.dishes?.batch_yield || 1,
                   ingredients: planItem.dishes?.ingredients || [],
@@ -107,7 +117,7 @@ const shoppingList = computed(() => {
           dishesMap[dishId].totalPortions += portions
       } 
       else if (planItem.product_id) {
-           addToAggregatedList(finalList, planItem.products, portions)
+           addToAggregatedList(finalList, planItem.products, portions, 'Отдельно')
       }
   })
 
@@ -123,24 +133,29 @@ const shoppingList = computed(() => {
       
       dish.ingredients.forEach(ing => {
           if (!ing.products) return 
-          addToAggregatedList(finalList, ing.products, (ing.amount || 0) * multiplier)
+          addToAggregatedList(finalList, ing.products, (ing.amount || 0) * multiplier, dish.name)
       })
   })
 
-  return Object.values(finalList)
+  return Object.values(finalList).map(item => ({
+      ...item,
+      dishes: Array.from(item.dishes)
+  }))
 })
 
-const addToAggregatedList = (list, product, amount) => {
+const addToAggregatedList = (list, product, amount, dishName) => {
     if (!list[product.id]) {
         list[product.id] = {
             id: product.id,
             name: product.name,
             unit: product.unit,
             category: product.category || 'Разное',
-            amount: 0
+            amount: 0,
+            dishes: new Set()
         }
     }
     list[product.id].amount += amount
+    if (dishName) list[product.id].dishes.add(dishName)
 }
 
 const dishStats = computed(() => {
@@ -171,6 +186,7 @@ const dishStats = computed(() => {
             dishesMap.set(dishId, {
                 id: dishId,
                 name: item.dishes.name,
+                image_url: item.dishes.image_url,
                 count: 1, 
                 percent: percent
             })
@@ -274,23 +290,24 @@ const formatAmount = (val) => {
           <div 
             v-for="dish in dishStats" 
             :key="dish.id"
-            class="min-w-[130px] max-w-[130px] bg-white border border-slate-100 rounded-xl px-3 py-2 shadow-sm flex flex-col justify-center gap-1.5 h-14"
+            class="relative w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect"
           >
-              <div class="flex items-center justify-between w-full">
-                  <div class="text-xs font-bold text-slate-700 truncate leading-tight pr-1">
-                      {{ dish.name }}
-                  </div>
-                  <div v-if="dish.count > 1" class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-1.5 rounded-md whitespace-nowrap">
-                      x{{ dish.count }}
-                  </div>
-              </div>
-
-              <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <!-- Background Image -->
+              <img v-if="dish.image_url" :src="dish.image_url" class="absolute inset-0 w-full h-full object-cover">
+              <div v-else class="absolute inset-0 flex items-center justify-center bg-slate-50 text-xl">🥘</div>
+              
+              <!-- Progress Overlay (Bottom Bar) -->
+              <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/20 backdrop-blur-sm">
                   <div 
-                    class="h-full rounded-full transition-all duration-500" 
+                    class="h-full transition-all duration-500" 
                     :class="dish.percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
                     :style="{ width: dish.percent + '%' }"
                   ></div>
+              </div>
+
+              <!-- Count Badge -->
+              <div v-if="dish.count > 1" class="absolute top-1 right-1 bg-indigo-500 text-white text-[9px] font-black px-1 rounded-md shadow-sm border border-white/20 leading-tight">
+                  x{{ dish.count }}
               </div>
           </div>
       </div>
@@ -318,22 +335,42 @@ const formatAmount = (val) => {
                             <div 
                                 v-for="item in items" 
                                 :key="item.id" 
-                                class="flex items-center p-4 border-b border-slate-50 last:border-0 group cursor-pointer tap-effect w-full" 
-                                @click="toggleCheck(item.id)"
+                                class="flex flex-col border-b border-slate-50 last:border-0 w-full bg-white transition-colors duration-200"
+                                :class="expandedProductIds.has(item.id) ? 'bg-slate-50/50' : ''"
                             >
-                                <div 
-                                    class="w-6 h-6 rounded-lg border-2 mr-4 flex items-center justify-center transition-all duration-200" 
-                                    :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
-                                >
-                                    <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-xs font-bold">check</span>
+                                <div class="flex items-center p-4 w-full">
+                                    <!-- Checkbox Area -->
+                                    <div 
+                                        class="w-10 h-10 -ml-2 flex items-center justify-center cursor-pointer tap-effect rounded-full active:bg-slate-100 transition-colors"
+                                        @click.stop="toggleCheck(item.id)"
+                                    >
+                                        <div 
+                                            class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200" 
+                                            :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
+                                        >
+                                            <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-xs font-bold">check</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Content Area (Expandable) -->
+                                    <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-2" @click="toggleExpand(item.id)">
+                                         <div class="flex-1 font-bold text-slate-700 text-sm transition-all duration-200 truncate pr-2" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                            {{ item.name }}
+                                        </div>
+                                        
+                                        <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 whitespace-nowrap" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
+                                            {{ formatAmount(item.amount) }} {{ item.unit }}
+                                        </div>
+                                    </div>
                                 </div>
-                                
-                                <div class="flex-1 font-bold text-slate-700 text-sm transition-all duration-200" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
-                                    {{ item.name }}
-                                </div>
-                                
-                                <div class="text-xs font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
-                                    {{ formatAmount(item.amount) }} {{ item.unit }}
+
+                                <!-- Expansion Content -->
+                                <div v-if="expandedProductIds.has(item.id) && item.dishes.length > 0" class="px-4 pb-4 pl-12">
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <div v-for="dishName in item.dishes" :key="dishName" class="text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">
+                                            {{ dishName }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </TransitionGroup>
