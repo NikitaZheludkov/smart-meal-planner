@@ -7,10 +7,14 @@ import { useUIStore } from '../stores/ui'
 
 const props = defineProps({
   isOpen: Boolean,
-  product: Object 
+  product: Object,
+  zIndex: {
+    type: [Number, String],
+    default: 60
+  }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved', 'deleted'])
 
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
@@ -124,7 +128,7 @@ const handleCancel = () => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       

@@ -6,6 +6,7 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
 import { useTelegramStore } from '../stores/telegram'
 import { useUIStore } from '../stores/ui'
+import ProductDetailModal from './ProductDetailModal.vue'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -28,6 +29,7 @@ const currentStep = ref(1)
 const totalSteps = 3
 const editingIngredientIndex = ref(null)
 const tempAmount = ref('')
+const showCreateProductModal = ref(false)
 
 const formData = ref({
     id: null,
@@ -610,8 +612,7 @@ const toggleMealType = (id) => {
                          
                          <Transition name="pop">
                             <div v-if="formData.is_batch" class="flex items-center gap-2 ml-auto">
-                                <span class="text-xs font-bold text-slate-400">Порций:</span>
-                                <input 
+                                <input
                                     v-model.number="formData.batch_yield" 
                                     type="number" 
                                     inputmode="numeric"
@@ -662,6 +663,14 @@ const toggleMealType = (id) => {
                                 </button>
                             </div>
                          </div>
+
+                        <button 
+                            @click="showCreateProductModal = true"
+                            class="w-full py-3 rounded-2xl bg-indigo-50 text-indigo-500 font-bold text-xs flex items-center justify-center gap-2 tap-effect active:bg-indigo-100 transition-colors mt-2 mb-4"
+                        >
+                            <span class="material-icons-round text-sm">add_circle_outline</span>
+                            Добавить новый продукт
+                        </button>
                          
 
                     <!-- Compact Ingredients List -->
@@ -800,6 +809,10 @@ const toggleMealType = (id) => {
     </div>
     </div>
   </Transition>
+    <ProductDetailModal 
+        :is-open="showCreateProductModal" 
+        @close="showCreateProductModal = false"
+    />
 </template>
 
 <style scoped>
