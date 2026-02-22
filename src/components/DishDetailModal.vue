@@ -125,13 +125,23 @@ const prevStep = () => {
 }
 
 const goToStep = (step) => {
-    // Можно переходить только назад или на следующий (если валидно)
-    // Но для простоты разрешим кликать назад
-    if (step < currentStep.value) {
-        direction.value = 'prev'
-        currentStep.value = step
-        telegram.haptic.impact('light')
+    // Валидация для 1 шага если мы пытаемся уйти с него или перепрыгнуть через него (хотя тут перепрыгнуть нельзя, всегда с 1 начинаем)
+    if (step > 1) {
+         if (!formData.value.name) {
+            ui.showToast('Введите название блюда', 'error')
+            telegram.haptic.notification('error')
+            return
+        }
+         if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) {
+            ui.showToast('Выберите прием пищи', 'error')
+            telegram.haptic.notification('error')
+            return
+        }
     }
+
+    direction.value = step > currentStep.value ? 'next' : 'prev'
+    currentStep.value = step
+    telegram.haptic.impact('light')
 }
 
 
@@ -339,10 +349,10 @@ const handleCancel = () => {
     telegram.haptic.impact('light')
     
     // 0. Если есть шаги и мы не на первом, возвращаемся назад
-    if (isEditing.value && currentStep.value > 1) {
-        prevStep()
-        return
-    }
+    // if (isEditing.value && currentStep.value > 1) {
+    //     prevStep()
+    //     return
+    // }
     
     // 1. Если это новое блюдо - просто закрываем модалку
     if (!formData.value.id) {
@@ -395,7 +405,7 @@ const toggleMealType = (id) => {
     <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="bg-white w-full max-w-sm h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
         
         <div class="px-5 pt-5 pt-tg-overlay pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
         
@@ -421,18 +431,6 @@ const toggleMealType = (id) => {
             <h3 class="text-lg font-bold text-slate-900 truncate text-center leading-tight">
                 {{ showTagSelection ? 'Свойства' : (isEditing ? (formData.id ? 'Редактирование' : 'Новое блюдо') : '') }}
             </h3>
-            
-            <!-- Индикатор шагов -->
-            <div v-if="isEditing && !showTagSelection" class="flex items-center gap-1.5 mt-1">
-                <button 
-                    v-for="step in totalSteps" 
-                    :key="step"
-                    @click="goToStep(step)"
-                    class="h-1.5 rounded-full transition-all duration-300"
-                    :class="step <= currentStep ? 'w-6 bg-slate-900' : 'w-1.5 bg-slate-200'"
-                    :disabled="step > currentStep"
-                ></button>
-            </div>
         </div>
 
         <div class="w-20 flex justify-end items-center gap-2">
@@ -442,13 +440,13 @@ const toggleMealType = (id) => {
                 <!-- Кнопка сохранения/далее для редактирования -->
                 <button 
                     v-if="isEditing" 
-                    @click="currentStep === totalSteps ? handleSave() : nextStep()" 
+                    @click="handleSave" 
                     class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
                     :class="(formData.name && formData.meal_type_ids.length > 0 && !isSaving) ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
-                    :disabled="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) || isSaving"
+                    :disabled="(!formData.name || formData.meal_type_ids.length === 0) || isSaving"
                 >
                     <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                    {{ isSaving ? '...' : (currentStep === totalSteps ? 'Готово' : 'Далее') }}
+                    {{ isSaving ? '...' : 'Готово' }}
                 </button>
                 
                 <button 
@@ -793,10 +791,25 @@ const toggleMealType = (id) => {
             </div>
             <div class="h-10"></div>
         </div>
-
+        
         </transition>
+
+        <!-- Footer with Step Switchers -->
+        <div v-if="isEditing && !showTagSelection" class="px-4 py-3 bg-white border-t border-slate-50 shrink-0 safe-area-bottom z-30 relative">
+            <div class="flex bg-slate-100 p-1 rounded-2xl">
+                <button 
+                    v-for="(label, idx) in ['Инфо', 'Состав', 'Детали']" 
+                    :key="idx"
+                    @click="goToStep(idx + 1)"
+                    class="flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 tap-effect"
+                    :class="currentStep === (idx + 1) ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
+                >
+                    {{ label }}
+                </button>
+            </div>
+        </div>
+
       </div>
-    </div>
     </div>
   </Transition>
 </template>
