@@ -84,15 +84,39 @@ export const usePlanStore = defineStore('plan', () => {
       payload.product_id = item.id
     }
 
-    const { error } = await supabase
+    // Оптимистичное добавление
+    const tempId = 'temp-' + Date.now() + Math.random()
+    const optimisticItem = {
+        ...payload,
+        id: tempId,
+        slot_id: slotId,
+        // Сохраняем вложенные объекты для UI
+        dishes: item.type === 'dish' ? item : null,
+        products: item.type === 'product' ? item : null
+    }
+    
+    plan.value.push(optimisticItem)
+
+    const { data, error } = await supabase
         .from('plan')
         .insert(payload)
+        .select()
+        .single()
         
     if (error) {
         console.error('Ошибка сохранения:', error)
         ui.showToast('Не удалось сохранить в план', 'error')
+        // Откат
+        plan.value = plan.value.filter(p => p.id !== tempId)
     } else {
-        await fetchPlan()
+        // Обновляем временный ID на реальный
+        const index = plan.value.findIndex(p => p.id === tempId)
+        if (index !== -1) {
+             plan.value[index] = {
+                 ...plan.value[index],
+                 ...data // Подменяем ID и другие поля из базы
+             }
+        }
         ui.showToast('Добавлено в план', 'success')
     }
   }
