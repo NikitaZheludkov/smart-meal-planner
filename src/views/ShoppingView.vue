@@ -3,19 +3,42 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
 import { useTelegramStore } from '../stores/telegram' // <-- Импорт
+import { useUIStore } from '../stores/ui'
 import { startOfWeek, addDays, format, isWithinInterval, parseISO, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 const planStore = usePlanStore()
 const settingsStore = useSettingsStore()
-const telegram = useTelegramStore() // <-- Инит
+const telegram = useTelegramStore()
+const uiStore = useUIStore()
 
 const activeTab = ref('list') 
 const transitionName = ref('slide-left')
 
 // --- 1. УПРАВЛЕНИЕ ПЕРИОДОМ ---
-const currentWeekStart = ref(new Date())
+// Инициализируем дату из uiStore, если она там есть и валидна, иначе берем текущую
+const getInitialDate = () => {
+    if (uiStore.plan.currentWeekStart) {
+        return new Date(uiStore.plan.currentWeekStart)
+    }
+    return new Date()
+}
+
+const currentWeekStart = ref(getInitialDate())
 const periodLength = computed(() => settingsStore.periodLength || 7)
+
+// Синхронизация с UI Store
+watch(currentWeekStart, (newVal) => {
+    uiStore.plan.currentWeekStart = new Date(newVal)
+})
+
+// Реакция на изменение дня начала недели в настройках
+watch(() => settingsStore.startDay, (newStartDay) => {
+    if (newStartDay !== undefined && newStartDay !== null) {
+        // Пересчитываем начало недели, сохраняя текущую "неделю" пользователя
+        currentWeekStart.value = startOfWeek(currentWeekStart.value, { weekStartsOn: newStartDay })
+    }
+})
 
 const periodLabel = computed(() => {
     const start = currentWeekStart.value
@@ -51,8 +74,8 @@ onMounted(() => {
         } catch (e) { console.error(e) }
     }
     
-    const day = settingsStore.startDay !== null ? settingsStore.startDay : 1
-    currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: day })
+    // Убираем принудительный сброс даты, так как теперь она берется из uiStore
+    // или вычисляется через watcher settingsStore
     
     if (planStore.plan.length === 0) planStore.fetchPlan()
 })
@@ -80,7 +103,7 @@ const toggleExpand = (id) => {
 
 // --- 3. РАСЧЕТ ДАННЫХ ---
 const activePlanItems = computed(() => {
-    const start = currentWeekStart.value
+    const start = new Date(currentWeekStart.value)
     const end = addDays(start, periodLength.value - 1)
     start.setHours(0,0,0,0)
     end.setHours(23,59,59,999)

@@ -40,10 +40,24 @@ const getStartOfWeekFromSettings = () => {
     return startOfWeek(new Date(), { weekStartsOn: day })
 }
 
-const currentWeekStart = ref(getStartOfWeekFromSettings())
+// Инициализируем дату из uiStore, чтобы сохранить состояние при навигации
+const getInitialDate = () => {
+    if (uiStore.plan.currentWeekStart) {
+        // Проверка на валидность даты (не Invalid Date)
+        const d = new Date(uiStore.plan.currentWeekStart)
+        if (!isNaN(d.getTime())) return d
+    }
+    return getStartOfWeekFromSettings()
+}
+
+const currentWeekStart = ref(getInitialDate())
 const selectedDate = ref(new Date())
 
-uiStore.plan.currentWeekStart = currentWeekStart.value
+// Синхронизация с UI Store
+watch(currentWeekStart, (newVal) => {
+    uiStore.plan.currentWeekStart = newVal
+}, { immediate: true })
+
 uiStore.plan.selectedDate = selectedDate.value
 
 // --- НАСТРОЙКИ (ПОРЦИИ) ---
