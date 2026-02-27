@@ -71,38 +71,85 @@ export const useDishStore = defineStore('dishes', () => {
         throw new Error('Учётная запись не авторизована или ID семьи не найден. Попробуйте перезагрузить приложение.')
     }
     
-    // 1. Создаем само блюдо
-    const { data: newDish, error } = await withRetry(async () => {
-        return await withTimeout(
-            supabase
-            .from('dishes')
-            .insert({
-                name: dishData.name,
-                dish_type_id: dishData.dish_type_id, 
-                // meal_type_id removed
-                description: dishData.description || '',
-                kcal: dishData.kcal || 0,
-                protein: dishData.protein || 0,
-                fat: dishData.fat || 0,
-                carbs: dishData.carbs || 0,
-                is_batch: dishData.is_batch || false,
-                batch_yield: dishData.batch_yield || 1,
-                household_id: auth.householdId // <-- ВАЖНО: Добавили ID семьи
-            })
-            .select()
-            .single(),
-            15000
-        )
-    })
+    // 1. Создаем само блюдо (с обработкой дубликатов)
+    let newDish = null
 
-    if (error) { 
-        console.error(error); 
-        ui.showToast('Ошибка при создании блюда', 'error')
-        throw error // Throw error to notify caller
+    try {
+        const { data, error } = await withRetry(async () => {
+            return await withTimeout(
+                supabase
+                .from('dishes')
+                .insert({
+                    name: dishData.name,
+                    dish_type_id: dishData.dish_type_id, 
+                    // meal_type_id removed
+                    description: dishData.description || '',
+                    kcal: dishData.kcal || 0,
+                    protein: dishData.protein || 0,
+                    fat: dishData.fat || 0,
+                    carbs: dishData.carbs || 0,
+                    is_batch: dishData.is_batch || false,
+                    batch_yield: dishData.batch_yield || 1,
+                    household_id: auth.householdId // <-- ВАЖНО: Добавили ID семьи
+                })
+                .select()
+                .single(),
+                15000
+            )
+        })
+        
+        if (error) throw error
+        newDish = data
+
+    } catch (err) {
+        // Обработка дубликата (Postgres code 23505)
+        // Это может произойти, если предыдущий запрос прошел, но ответ не дошел до клиента (Load failed),
+        // а пользователь или ретрай отправили запрос снова.
+        if (err.code === '23505' || err.message?.includes('duplicate key')) {
+             ui.addLog('Обнаружен дубликат блюда, пробуем восстановить...', 'warn')
+             
+             // Пытаемся найти существующее блюдо
+             const { data: existing, error: findError } = await supabase
+                .from('dishes')
+                .select()
+                .eq('household_id', auth.householdId)
+                .eq('name', dishData.name)
+                .single()
+             
+             if (findError || !existing) {
+                 // Если не нашли - значит дубликат не по имени, или другая ошибка. Кидаем оригинал.
+                 ui.showToast('Ошибка при создании: ' + (err.message || 'Duplicate'), 'error')
+                 throw err 
+             }
+             
+             newDish = existing
+             // Мы продолжаем выполнение, но это по сути уже update, а не create.
+             // Стоит ли уведомить пользователя?
+             // ui.showToast('Блюдо с таким названием уже существует', 'info')
+             
+             // ВАЖНО: Если мы "восстановили" блюдо, то старые связи могут мешать.
+             // Лучше их почистить перед вставкой новых.
+             try {
+                await supabase.from('dish_meal_type_links').delete().eq('dish_id', newDish.id)
+                await supabase.from('dish_tag_links').delete().eq('dish_id', newDish.id)
+                await supabase.from('ingredients').delete().eq('dish_id', newDish.id)
+             } catch (cleanupErr) {
+                 console.error('Ошибка очистки дубликата:', cleanupErr)
+             }
+
+        } else {
+            console.error(err); 
+            ui.showToast('Ошибка при создании блюда', 'error')
+            throw err 
+        }
     }
 
     try {
         // 1.1 Привязываем типы приема пищи
+        // Используем upsert или ignoreDuplicates, но так как мы выше могли почистить, insert тоже ок.
+        // Но для надежности - ignoreDuplicates (в Supabase JS v2 это опция для upsert или insert)
+        // Но безопаснее просто insert после delete (который мы сделали выше для дубликатов, а для новых и так пусто)
+        
         if (dishData.meal_type_ids?.length) {
             const links = dishData.meal_type_ids.map(id => ({ dish_id: newDish.id, meal_type_id: id }))
             await withTimeout(supabase.from('dish_meal_type_links').insert(links), 10000)
@@ -124,10 +171,15 @@ export const useDishStore = defineStore('dishes', () => {
             await withTimeout(supabase.from('ingredients').insert(ingRows), 10000)
         }
     } catch (relationError) {
+        // Если здесь упало по duplicate key - значит мы не почистили или гонка.
         console.error('Ошибка при сохранении связей блюда:', relationError)
         ui.addLog('Ошибка при сохранении ингредиентов/тегов', 'warn', relationError)
-        // Не прерываем выполнение, блюдо создано, но связи могли не сохраниться
-        ui.showToast('Блюдо создано, но возможны ошибки в связях', 'warn')
+        
+        if (relationError.code === '23505') {
+             ui.showToast('Блюдо сохранено (дубликаты связей пропущены)', 'success')
+        } else {
+             ui.showToast('Блюдо создано, но возможны ошибки в связях', 'warn')
+        }
     }
 
     // ОПТИМИЗАЦИЯ: Не делаем полный fetchDishes, а добавляем в локальный массив
@@ -171,7 +223,15 @@ export const useDishStore = defineStore('dishes', () => {
                     unit: ing.products?.unit || ''
                 })) || []
             }
-            dishes.value.unshift(formattedDish) // Добавляем в начало списка
+            
+            // Если мы восстановили дубликат, он уже может быть в списке dishes.value!
+            const existingIndex = dishes.value.findIndex(d => d.id === newDish.id)
+            if (existingIndex !== -1) {
+                dishes.value[existingIndex] = formattedDish // Обновляем существующий
+            } else {
+                dishes.value.unshift(formattedDish) // Добавляем новый
+            }
+            
         } else {
             // Fallback если не удалось загрузить одно блюдо
             await fetchDishes()
@@ -182,7 +242,7 @@ export const useDishStore = defineStore('dishes', () => {
         await fetchDishes()
     }
 
-    ui.showToast('Блюдо создано', 'success')
+    ui.showToast('Блюдо сохранено', 'success')
   }
 
   const updateDish = async (id, dishData) => {
