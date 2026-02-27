@@ -48,6 +48,12 @@ const getCategoryIcon = (categoryName) => {
 
 const units = ['Кг', 'Л', 'Шт', 'Упак']
 
+watch(() => props.isOpen, (newVal) => {
+    if (newVal) {
+        isSaving.value = false // Reset loading state
+    }
+}, { immediate: true })
+
 watch(() => props.product, (newVal) => {
   if (newVal) {
     formData.value = JSON.parse(JSON.stringify(newVal))

@@ -291,8 +291,11 @@ const initForm = (dishData) => {
 }
 
 watch(() => props.isOpen, (newVal) => {
-    if (newVal && props.dish) {
-        initForm(props.dish)
+    if (newVal) {
+        isSaving.value = false // Reset loading state
+        if (props.dish) {
+            initForm(props.dish)
+        }
     }
 })
 
