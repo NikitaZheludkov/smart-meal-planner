@@ -2,13 +2,15 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
-import { useTelegramStore } from '../stores/telegram' // <-- Импорт
+import { useShoppingStore } from '../stores/shopping' // <-- Added
+import { useTelegramStore } from '../stores/telegram'
 import { useUIStore } from '../stores/ui'
-import { startOfWeek, addDays, format, isWithinInterval, parseISO, isSameDay } from 'date-fns'
+import { startOfWeek, addDays, format, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 const planStore = usePlanStore()
 const settingsStore = useSettingsStore()
+const shoppingStore = useShoppingStore() // <-- Added
 const telegram = useTelegramStore()
 const uiStore = useUIStore()
 
@@ -16,7 +18,6 @@ const activeTab = ref('list')
 const transitionName = ref('slide-left')
 
 // --- 1. УПРАВЛЕНИЕ ПЕРИОДОМ ---
-// Инициализируем дату из uiStore, если она там есть и валидна, иначе берем текущую
 const getInitialDate = () => {
     if (uiStore.plan.currentWeekStart) {
         return new Date(uiStore.plan.currentWeekStart)
@@ -35,7 +36,6 @@ watch(currentWeekStart, (newVal) => {
 // Реакция на изменение дня начала недели в настройках
 watch(() => settingsStore.startDay, (newStartDay) => {
     if (newStartDay !== undefined && newStartDay !== null) {
-        // Пересчитываем начало недели, сохраняя текущую "неделю" пользователя
         currentWeekStart.value = startOfWeek(currentWeekStart.value, { weekStartsOn: newStartDay })
     }
 })
@@ -47,8 +47,9 @@ const periodLabel = computed(() => {
 })
 
 const changePeriod = (dir) => {
-    telegram.haptic.selection() // <-- Вибрация "барабан" при смене дат
-    currentWeekStart.value = addDays(currentWeekStart.value, dir * periodLength.value)
+    telegram.haptic.selection()
+    // Changed to 1 day shift to allow "changing 1 day in the period"
+    currentWeekStart.value = addDays(currentWeekStart.value, dir)
 }
 
 const showTodayBtn = computed(() => {
@@ -64,32 +65,18 @@ const goToToday = () => {
 }
 
 // --- 2. ЛОГИКА ГАЛОЧЕК ---
-const checkedIds = ref(new Set())
+// Используем Store вместо локального состояния
+const checkedIds = computed(() => shoppingStore.checkedIds)
 
 onMounted(() => {
-    const saved = localStorage.getItem('shopping_checked_v1')
-    if (saved) {
-        try {
-            checkedIds.value = new Set(JSON.parse(saved))
-        } catch (e) { console.error(e) }
-    }
-    
-    // Убираем принудительный сброс даты, так как теперь она берется из uiStore
-    // или вычисляется через watcher settingsStore
-    
+    shoppingStore.fetchChecklist()
     if (planStore.plan.length === 0) planStore.fetchPlan()
 })
 
-watch(checkedIds, (newVal) => {
-    localStorage.setItem('shopping_checked_v1', JSON.stringify([...newVal]))
-}, { deep: true })
-
 const toggleCheck = (id) => {
-    // Средний удар - как щелчок выключателя
     telegram.haptic.impact('medium')
-    
-    if (checkedIds.value.has(id)) checkedIds.value.delete(id)
-    else checkedIds.value.add(id)
+    const newState = !shoppingStore.isChecked(id)
+    shoppingStore.toggleProduct(id, newState)
 }
 
 const expandedProductIds = ref(new Set())
@@ -101,123 +88,9 @@ const toggleExpand = (id) => {
     }
 }
 
-// --- 3. РАСЧЕТ ДАННЫХ ---
-const activePlanItems = computed(() => {
-    const start = new Date(currentWeekStart.value)
-    const end = addDays(start, periodLength.value - 1)
-    start.setHours(0,0,0,0)
-    end.setHours(23,59,59,999)
-
-    return planStore.plan.filter(item => {
-        const planDate = parseISO(item.date)
-        planDate.setHours(0,0,0,0)
-        if (!isWithinInterval(planDate, { start, end })) return false
-        if (item.ignore_shopping) return false
-        if (item.dish_id && !item.dishes) return false
-        if (item.product_id && !item.products) return false
-        return true
-    })
-})
-
-const shoppingList = computed(() => {
-  const dishesMap = {} // Группировка по блюдам для расчета батчей
-  const finalList = {} // Итоговый список продуктов
-  
-  activePlanItems.value.forEach(planItem => {
-      const portions = planItem.portions || 1
-
-      if (planItem.dish_id) {
-          const dishId = planItem.dish_id
-          if (!dishesMap[dishId]) {
-              dishesMap[dishId] = {
-                  name: planItem.dishes?.name,
-                  is_batch: planItem.dishes?.is_batch,
-                  batch_yield: planItem.dishes?.batch_yield || 1,
-                  ingredients: planItem.dishes?.ingredients || [],
-                  totalPortions: 0
-              }
-          }
-          dishesMap[dishId].totalPortions += portions
-      } 
-      else if (planItem.product_id) {
-           addToAggregatedList(finalList, planItem.products, portions, 'Отдельно')
-      }
-  })
-
-  // Обрабатываем сгруппированные блюда
-  Object.values(dishesMap).forEach(dish => {
-      let multiplier = dish.totalPortions
-      
-      if (dish.is_batch && dish.batch_yield > 0) {
-          // Для пакетных блюд: кол-во готовок = ceil(всего порций / выход с одной готовки)
-          // Ингредиенты берем на одну готовку (они так хранятся в базе для batch блюд)
-          multiplier = Math.ceil(dish.totalPortions / dish.batch_yield)
-      }
-      
-      dish.ingredients.forEach(ing => {
-          if (!ing.products) return 
-          addToAggregatedList(finalList, ing.products, (ing.amount || 0) * multiplier, dish.name)
-      })
-  })
-
-  return Object.values(finalList).map(item => ({
-      ...item,
-      dishes: Array.from(item.dishes)
-  }))
-})
-
-const addToAggregatedList = (list, product, amount, dishName) => {
-    if (!list[product.id]) {
-        list[product.id] = {
-            id: product.id,
-            name: product.name,
-            unit: product.unit,
-            category: product.category || 'Разное',
-            amount: 0,
-            dishes: new Set()
-        }
-    }
-    list[product.id].amount += amount
-    if (dishName) list[product.id].dishes.add(dishName)
-}
-
-const dishStats = computed(() => {
-    const dishesMap = new Map()
-    
-    activePlanItems.value.forEach(item => {
-        if (!item.dish_id) return 
-        
-        const dishId = item.dishes.id
-        
-        if (dishesMap.has(dishId)) {
-            dishesMap.get(dishId).count++
-        } else {
-            const ingredients = item.dishes.ingredients || []
-            let totalIngs = 0
-            let foundIngs = 0
-            
-            ingredients.forEach(ing => {
-                if (!ing.products) return
-                totalIngs++
-                if (checkedIds.value.has(ing.product_id)) {
-                    foundIngs++
-                }
-            })
-            
-            const percent = totalIngs > 0 ? (foundIngs / totalIngs) * 100 : 100
-            
-            dishesMap.set(dishId, {
-                id: dishId,
-                name: item.dishes.name,
-                image_url: item.dishes.image_url,
-                count: 1, 
-                percent: percent
-            })
-        }
-    })
-    
-    return Array.from(dishesMap.values())
-})
+// --- 3. ДАННЫЕ ИЗ STORE ---
+const shoppingList = computed(() => shoppingStore.shoppingList)
+const dishStats = computed(() => shoppingStore.dishStats)
 
 const groupedList = computed(() => {
     const items = [...shoppingList.value]
@@ -257,7 +130,7 @@ const switchViewTab = (mode) => {
 }
 const resetChecks = () => {
     if (confirm('Снять все отметки?')) {
-        checkedIds.value.clear()
+        shoppingStore.clearList() // Use store action
         telegram.haptic.impact('medium')
     }
 }
@@ -274,14 +147,7 @@ const copyList = () => {
 }
 
 const formatAmount = (val) => {
-    // Если число целое, возвращаем как есть
     if (Number.isInteger(val)) return val
-    
-    // Если число меньше 0.001 (но не 0), то покажем <0.001 (или просто 0.001)
-    // Но по условию задачи нам нужно до 3 знаков
-    
-    // Преобразуем в строку с 3 знаками, потом убираем лишние нули
-    // parseFloat(val.toFixed(3)) автоматически уберет "хвосты" типа 1.500 -> 1.5
     return parseFloat(val.toFixed(3))
 }
 </script>
