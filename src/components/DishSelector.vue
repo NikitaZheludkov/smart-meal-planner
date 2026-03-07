@@ -167,7 +167,7 @@ const getDishSlotName = (id) => {
 
       <div v-if="existingItems.length > 0" class="shrink-0 bg-slate-50/50 border-b border-slate-100 max-h-[40vh] overflow-y-auto no-scrollbar">
           <div class="px-4 py-4 space-y-3">
-              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Выбрано ({{ existingItems.length }})</div>
+              <div class="text-[10px] font-bold text-slate-400 px-1">Выбрано ({{ existingItems.length }})</div>
               
               <div v-for="item in existingItems" :key="item.id" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 relative overflow-hidden">
                   <div class="flex justify-between items-start mb-3">
@@ -321,7 +321,7 @@ const getDishSlotName = (id) => {
 
           <div v-else key="product" class="space-y-4 pt-3">
               <div v-for="(products, catName) in groupedProducts" :key="catName">
-                  <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{{ catName }}</h3>
+                  <h3 class="text-[10px] font-black text-slate-400 mb-2 ml-1">{{ catName }}</h3>
                   <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                       <div 
                         v-for="prod in products" 

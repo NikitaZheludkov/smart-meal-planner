@@ -391,20 +391,20 @@ onMounted(() => { if (auth.isAuth) loadData() })
                 <div v-if="dailyTotals.kcal > 0" class="card-accent-inverse p-4 rounded-[24px] mb-4 flex justify-around items-center mx-1 mt-2">
                     <div class="text-center">
                         <div class="text-lg font-black text-white">{{ Math.round(dailyTotals.kcal) }}</div>
-                        <div class="text-[9px] font-bold text-white/60 uppercase tracking-widest">ккал</div>
+                        <div class="text-[9px] font-bold text-white/60">ккал</div>
                     </div>
                     <div class="h-8 w-[1px] bg-white/10"></div>
                     <div class="text-center">
                         <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.protein) }}</div>
-                        <div class="text-[9px] font-bold text-white/60 uppercase">Белки</div>
+                        <div class="text-[9px] font-bold text-white/60">Белки</div>
                     </div>
                     <div class="text-center">
                         <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.fat) }}</div>
-                        <div class="text-[9px] font-bold text-white/60 uppercase">Жиры</div>
+                        <div class="text-[9px] font-bold text-white/60">Жиры</div>
                     </div>
                     <div class="text-center">
                         <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.carbs) }}</div>
-                        <div class="text-[9px] font-bold text-white/60 uppercase">Угле</div>
+                        <div class="text-[9px] font-bold text-white/60">Угле</div>
                     </div>
                 </div>
                 
@@ -472,26 +472,26 @@ onMounted(() => { if (auth.isAuth) loadData() })
                     <div class="flex items-center justify-between pb-1.5 border-b" :class="isToday(day) ? 'border-slate-200' : 'border-slate-50'">
                         <div class="flex items-center gap-2">
                             <span class="text-base font-black" :class="isToday(day) ? 'text-slate-900' : 'text-slate-800'">{{ format(day, 'd') }}</span>
-                            <span class="text-[10px] font-bold uppercase" :class="isToday(day) ? 'text-slate-900' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
+                            <span class="text-[10px] font-bold" :class="isToday(day) ? 'text-slate-900' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
                         </div>
 
                         <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-2">
                             <div class="flex flex-col items-center">
                                 <span class="text-[9px] font-black text-slate-800">{{ Math.round(getDailyTotals(day).kcal) }}</span>
-                                <span class="text-[7px] font-bold text-slate-400 uppercase leading-none">ккал</span>
+                                <span class="text-[7px] font-bold text-slate-400 leading-none">ккал</span>
                             </div>
                             <div class="h-3 w-[1px] bg-slate-100"></div>
                             <div class="flex flex-col items-center">
                                 <span class="text-[8px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).protein) }}</span>
-                                <span class="text-[6px] font-bold text-slate-400 uppercase leading-none">Б</span>
+                                <span class="text-[6px] font-bold text-slate-400 leading-none">Б</span>
                             </div>
                             <div class="flex flex-col items-center">
                                 <span class="text-[8px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).fat) }}</span>
-                                <span class="text-[6px] font-bold text-slate-400 uppercase leading-none">Ж</span>
+                                <span class="text-[6px] font-bold text-slate-400 leading-none">Ж</span>
                             </div>
                             <div class="flex flex-col items-center">
                                 <span class="text-[8px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).carbs) }}</span>
-                                <span class="text-[6px] font-bold text-slate-400 uppercase leading-none">У</span>
+                                <span class="text-[6px] font-bold text-slate-400 leading-none">У</span>
                             </div>
                         </div>
                     </div>
@@ -505,7 +505,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
             class="w-full h-20 rounded-xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-all bg-white shadow-sm border-slate-100" 
             :class="getSlotItems(day, slot.id).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
           >
-            <span v-if="getSlotItems(day, slot.id).length === 0" class="text-[7px] font-bold text-slate-300 uppercase text-center break-all px-1">
+            <span v-if="getSlotItems(day, slot.id).length === 0" class="text-[7px] font-bold text-slate-300 text-center break-all px-1">
                 {{ slot.name.substring(0, 3) }}
             </span>
 

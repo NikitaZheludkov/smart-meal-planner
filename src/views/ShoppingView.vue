@@ -272,7 +272,7 @@ const formatAmount = (val) => {
 
                 <div v-else class="space-y-6">
                     <div v-for="(items, category) in groupedList" :key="category">
-                        <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{{ category }}</h3>
+                        <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 mb-3 ml-2">{{ category }}</h3>
                         
                         <TransitionGroup name="list" tag="div" class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative p-1 space-y-1">
                             <div 

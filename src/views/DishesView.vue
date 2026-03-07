@@ -142,7 +142,7 @@ const setMealType = (id) => {
       <div class="flex overflow-x-auto gap-2 no-scrollbar pb-3 mb-1">
         <button 
           @click="setMealType(null)" 
-          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
+          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black transition-all tap-effect border" 
           :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-200'"
         >
           Все
@@ -152,7 +152,7 @@ const setMealType = (id) => {
           v-for="type in mealTypes" 
           :key="type.id" 
           @click="setMealType(type.id)" 
-          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black uppercase transition-all tap-effect border" 
+          class="whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-black transition-all tap-effect border" 
           :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'"
         >
             {{ type.name }}

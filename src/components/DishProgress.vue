@@ -57,7 +57,7 @@ const dishesWithProgress = computed(() => {
 
 <template>
   <div v-if="dishesWithProgress.length > 0" class="mb-6 animate-fade-in">
-      <h3 class="font-black text-slate-300 uppercase tracking-widest text-xs mb-3 pl-2">Готовность блюд</h3>
+      <h3 class="font-black text-slate-300 text-xs mb-3 pl-2">Готовность блюд</h3>
       
       <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
           <div 

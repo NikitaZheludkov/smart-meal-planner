@@ -88,8 +88,11 @@ const close = () => {
 
       <div class="flex-1 overflow-y-auto px-5 pt-4 pb-20 no-scrollbar">
           <div class="space-y-6">
-             <div v-for="group in groupedTags" :key="group.code">
-                <div class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">{{ group.label }}</div>
+             <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
+                <div class="flex items-center gap-2 px-1">
+                   <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
+                   <div class="h-[1px] bg-slate-200 flex-1"></div>
+                </div>
                 <div class="flex flex-wrap gap-2">
                      <button 
                         v-for="tag in group.tags" 

@@ -163,12 +163,12 @@ const periods = [
             
             <div class="flex items-center justify-between">
                 <div>
-                    <div class="text-[10px] font-normal text-secondary uppercase">Вы находитесь в:</div>
+                    <div class="text-[10px] font-normal text-secondary">Вы находитесь в:</div>
                     <div class="text-lg card-title leading-tight">
                         {{ settingsStore.household?.name || 'Загрузка......' }}
                     </div>
                 </div>
-                <div v-if="isOwner" class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide">
+                <div v-if="isOwner" class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-bold">
                     👑 Владелец
                 </div>
             </div>
@@ -196,13 +196,13 @@ const periods = [
 
             <div v-if="isOwner">
                 <div v-if="settingsStore.household?.invite_code">
-                    <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код для приглашения</div>
+                    <div class="text-[10px] font-bold text-slate-400 mb-1 text-center">Код для приглашения</div>
                     
                     <button @click="copyCode" class="w-full bg-slate-900 rounded-[20px] p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
                         <div class="text-3xl font-black text-white tracking-[0.2em] text-center font-mono">
                             {{ settingsStore.household.invite_code }}
                         </div>
-                        <div class="text-[9px] text-slate-400 text-center mt-1 font-bold uppercase tracking-widest">
+                        <div class="text-[9px] text-slate-400 text-center mt-1 font-bold">
                             Нажми, чтобы скопировать
                         </div>
                     </button>

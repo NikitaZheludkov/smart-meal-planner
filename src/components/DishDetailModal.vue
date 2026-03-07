@@ -520,13 +520,13 @@ const onProductCreated = (product) => {
                 <div class="text-center">
                     <h2 class="text-2xl card-title leading-tight mb-2">{{ formData.name }}</h2>
                     <div class="flex flex-wrap justify-center gap-1.5">
-                        <span class="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                        <span class="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold">
                             {{ getMealTypeName }}
                         </span>
-                        <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-slate-200">
+                        <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200">
                             {{ getDishTypeName }}
                         </span>
-                        <span v-for="tag in formData.tags" :key="tag.id" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <span v-for="tag in formData.tags" :key="tag.id" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold flex items-center gap-1">
                              {{ tag.icon }} {{ tag.name }}
                         </span>
                     </div>
@@ -535,25 +535,25 @@ const onProductCreated = (product) => {
                 <div class="grid grid-cols-4 gap-2">
                     <div class="bg-slate-100 p-2 rounded-2xl border border-slate-200 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-900">{{ formData.kcal || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase">Ккал</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Ккал</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.protein || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase">Белки</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Белки</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.fat || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase">Жиры</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Жиры</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.carbs || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase">Угле</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Угле</span>
                     </div>
                 </div>
 
                 <div v-if="formData.ingredients?.length" class="w-full">
                     <h4 class="card-title text-sm mb-3 ml-1">
-                        Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary lowercase opacity-70">(на {{ formData.batch_yield }} порц.)</span>
+                        Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary opacity-70">(На {{ formData.batch_yield }} порц.)</span>
                     </h4>
                     <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                         <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm">
@@ -735,7 +735,7 @@ const onProductCreated = (product) => {
 
                     <!-- Compact Ingredients List -->
                     <div v-if="formData.ingredients.length > 0" class="space-y-2">
-                        <div class="text-[10px] font-bold text-slate-400 pl-2 uppercase tracking-wide">Состав на {{ formData.batch_yield || 1 }} порц.</div>
+                        <div class="text-[10px] font-bold text-slate-400 pl-2">Состав на {{ formData.batch_yield || 1 }} порц.</div>
                         <div class="bg-slate-50 rounded-2xl p-2 space-y-1">
                         <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
                             <div class="w-1.5 h-1.5 rounded-full bg-slate-900 ml-1"></div>
@@ -831,7 +831,7 @@ const onProductCreated = (product) => {
             <div class="space-y-6">
                  <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
                     <div class="flex items-center gap-2 px-1">
-                        <div class="text-xs font-black text-slate-400 uppercase tracking-widest">{{ group.label }}</div>
+                        <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
                         <div class="h-[1px] bg-slate-200 flex-1"></div>
                     </div>
                     

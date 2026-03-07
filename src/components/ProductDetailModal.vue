@@ -193,20 +193,20 @@ const handleCancel = () => {
             
             <div class="text-center">
                 <h2 class="text-2xl font-black text-slate-900 leading-tight mb-2">{{ formData.name }}</h2>
-                <span class="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                <span class="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold">
                     {{ formData.category }}
                 </span>
             </div>
 
             <div class="bg-white p-4 rounded-2xl w-full border border-slate-100 shadow-sm flex justify-between items-center">
-                <span class="text-xs font-bold text-slate-400 uppercase">Единица измерения</span>
+                <span class="text-xs font-bold text-slate-400">Единица измерения</span>
                 <span class="font-black text-slate-900 text-lg">{{ formData.unit }}</span>
             </div>
         </div>
 
         <div v-else class="space-y-6">
             <div class="space-y-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Название</label>
+                <label class="text-[10px] font-bold text-slate-400 ml-1">Название</label>
                 <input 
                     v-model="formData.name" 
                     placeholder="Например: Молоко" 
@@ -217,7 +217,7 @@ const handleCancel = () => {
 
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Категория</label>
+                    <label class="text-[10px] font-bold text-slate-400 ml-1">Категория</label>
                     <div class="relative">
                         <select v-model="formData.category" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
                             <option v-for="cat in dictionaries.productCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
@@ -228,7 +228,7 @@ const handleCancel = () => {
                 </div>
 
                 <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Единица</label>
+                    <label class="text-[10px] font-bold text-slate-400 ml-1">Единица</label>
                     <div class="relative">
                         <select v-model="formData.unit" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
                             <option v-for="u in units" :key="u" :value="u">{{ u }}</option>

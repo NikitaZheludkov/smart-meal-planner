@@ -31,11 +31,6 @@ body {
   color: #000000;
   letter-spacing: -0.04em;
   line-height: 1.1;
-  text-transform: lowercase;
-}
-
-.app-title::after {
-  content: ".";
 }
 
 .card-title {
@@ -209,10 +204,6 @@ html, body { overscroll-behavior-y: none; }
   font-size: 18px;
   color: #000000;
   margin-bottom: 8px;
-  text-transform: lowercase;
-}
-.empty-state-title::after {
-  content: ".";
 }
 
 .empty-state-desc {
