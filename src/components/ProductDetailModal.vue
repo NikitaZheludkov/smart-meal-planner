@@ -140,9 +140,14 @@ const handleCancel = () => {
       
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-[60vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="bg-white w-full max-w-sm h-[60vh] sm:h-[600px] rounded-t-[40px] sm:rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
         
-        <div class="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[70px]">
+        <!-- Handle -->
+        <div class="w-full bg-white pt-2 pb-1 shrink-0 z-20 rounded-t-[40px]">
+            <div class="modal-handle"></div>
+        </div>
+
+        <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
         <div class="w-20 flex justify-start">
             <button 
                 @click="handleCancel" 

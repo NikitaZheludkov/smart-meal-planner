@@ -146,9 +146,14 @@ const getDishSlotName = (id) => {
   <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
     
-    <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[32px] sm:rounded-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-slide-up">
+    <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[40px] sm:rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
       
-      <div class="px-5 pt-5 pb-3 flex justify-between items-center shrink-0 bg-white z-20 shadow-sm border-b border-slate-50">
+      <!-- Handle -->
+      <div class="w-full bg-white pt-2 pb-1 shrink-0 z-20 rounded-t-[40px]">
+          <div class="modal-handle"></div>
+      </div>
+
+      <div class="px-5 pb-3 flex justify-between items-center shrink-0 bg-white z-20 shadow-sm border-b border-slate-50">
           <div>
               <h2 class="text-xl card-title">{{ getSlotName }}</h2>
               <p class="text-[11px] font-bold text-slate-400">

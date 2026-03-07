@@ -193,7 +193,7 @@ const formatAmount = (val) => {
                 <div class="text-sm font-black text-slate-900 flex items-center gap-2">
                     {{ periodLabel }}
                 </div>
-                <div v-if="showTodayBtn" class="text-[10px] font-bold text-orange-500 mt-0.5">
+                <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-0.5">
                     Вернуться
                 </div>
             </div>
@@ -216,12 +216,12 @@ const formatAmount = (val) => {
             </div>
 
             <!-- Reset Checks Button -->
-             <button @click="resetChecks" class="h-full flex-1 btn-secondary flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors shadow-sm">
+             <button @click="resetChecks" class="h-full flex-1 btn-secondary flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors shadow-sm">
                 <span class="material-icons-round text-xl">remove_done</span>
             </button>
 
             <!-- Copy List Button -->
-            <button @click="copyList" class="h-full flex-1 btn-secondary text-indigo-500 font-bold text-sm tap-effect shadow-sm">
+            <button @click="copyList" class="h-full flex-1 btn-secondary text-slate-900 font-bold text-sm tap-effect shadow-sm">
                 <span class="material-icons-round text-lg">content_copy</span>
             </button>
         </div>
@@ -241,14 +241,13 @@ const formatAmount = (val) => {
               <!-- Progress Overlay (Bottom Bar) -->
               <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-100">
                   <div 
-                    class="h-full transition-all duration-500" 
-                    :class="dish.percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
+                    class="h-full transition-all duration-500 bg-slate-900" 
                     :style="{ width: dish.percent + '%' }"
                   ></div>
               </div>
 
               <!-- Count Badge -->
-              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-indigo-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm leading-none z-10">
+              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-slate-900 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm leading-none z-10">
                   x{{ dish.count }}
               </div>
           </div>
@@ -263,10 +262,12 @@ const formatAmount = (val) => {
         <transition :name="transitionName">
             <div :key="activeTab" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
                 
-                <div v-if="totalItems === 0" class="h-full flex flex-col items-center justify-center text-center opacity-40 -mt-10">
-                    <span class="text-5xl mb-4">🛒</span>
-                    <p class="font-bold text-slate-400">Список пуст</p>
-                    <p class="text-xs text-slate-300 mt-2 max-w-[200px]">Добавьте блюда в план или уберите галочки "Не покупать"</p>
+                <div v-if="totalItems === 0" class="empty-state-container -mt-10">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round" style="font-size: 64px;">shopping_basket</span>
+                    </div>
+                    <p class="empty-state-title">список пуст</p>
+                    <p class="empty-state-desc">Добавьте блюда в план или уберите галочки "Не покупать"</p>
                 </div>
 
                 <div v-else class="space-y-6">
@@ -287,10 +288,10 @@ const formatAmount = (val) => {
                                         @click.stop="toggleCheck(item.id)"
                                     >
                                         <div 
-                                            class="w-5 h-5 rounded-[8px] border-2 flex items-center justify-center transition-all duration-200" 
-                                            :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
+                                            class="checkbox-custom" 
+                                            :class="{ checked: checkedIds.has(item.id) }"
                                         >
-                                            <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-[10px] font-bold">check</span>
+                                            <span class="material-icons-round icon">check</span>
                                         </div>
                                     </div>
                                     

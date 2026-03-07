@@ -374,7 +374,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
               <div class="app-title !mb-0 text-2xl flex items-center gap-2">
                   {{ displayDateLabel }}
               </div>
-              <div v-if="showTodayBtn" class="text-[10px] font-bold text-orange-500 mt-0.5">
+              <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-0.5">
                   Вернуться
               </div>
           </div>
@@ -388,17 +388,31 @@ onMounted(() => { if (auth.isAuth) loadData() })
     <div class="flex-1 relative overflow-hidden">
         <transition :name="transitionName">
             <div v-if="uiStore.plan.activeTab === 'day'" :key="'day-' + selectedDate.toISOString()" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
-                <div v-if="dailyTotals.kcal > 0" class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm mb-4 flex justify-around items-center mx-1 mt-2">
-                    <div class="text-center"><div class="text-sm font-black text-slate-700">{{ Math.round(dailyTotals.kcal) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ккал</div></div>
-                    <div class="h-6 w-[1px] bg-slate-100"></div>
-                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.protein) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Белки</div></div>
-                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.fat) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Жиры</div></div>
-                    <div class="text-center"><div class="text-xs font-bold text-slate-700">{{ Math.round(dailyTotals.carbs) }}</div><div class="text-[9px] font-bold text-slate-400 uppercase">Угле</div></div>
+                <div v-if="dailyTotals.kcal > 0" class="card-accent-inverse p-4 rounded-[24px] mb-4 flex justify-around items-center mx-1 mt-2">
+                    <div class="text-center">
+                        <div class="text-lg font-black text-white">{{ Math.round(dailyTotals.kcal) }}</div>
+                        <div class="text-[9px] font-bold text-white/60 uppercase tracking-widest">ккал</div>
+                    </div>
+                    <div class="h-8 w-[1px] bg-white/10"></div>
+                    <div class="text-center">
+                        <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.protein) }}</div>
+                        <div class="text-[9px] font-bold text-white/60 uppercase">Белки</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.fat) }}</div>
+                        <div class="text-[9px] font-bold text-white/60 uppercase">Жиры</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-sm font-bold text-white">{{ Math.round(dailyTotals.carbs) }}</div>
+                        <div class="text-[9px] font-bold text-white/60 uppercase">Угле</div>
+                    </div>
                 </div>
                 
-                <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="text-center py-20 opacity-40">
-                    <div class="text-4xl mb-2">🍽️</div>
-                    <p class="text-sm font-bold text-slate-400">День свободен</p>
+                <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="empty-state-container">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round" style="font-size: 64px;">restaurant</span>
+                    </div>
+                    <p class="empty-state-title">день свободен.</p>
                     <button @click="switchTab('week')" class="mt-4 btn-secondary text-xs px-4 py-2">Перейти к сетке</button>
                 </div>
 
@@ -422,18 +436,18 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                                 <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
                                             </div>
                                             <!-- Batch Indicator List View -->
-                                            <div v-if="batchStatusMap.has(item.id)" class="inline-flex items-center gap-1 mt-0.5 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
-                                                <span class="text-[9px] font-black text-indigo-500">Партия {{ batchStatusMap.get(item.id).batch }}</span>
-                                                <span class="text-[9px] text-indigo-300">|</span>
-                                                <span class="text-[9px] font-black text-indigo-700">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</span>
+                                            <div v-if="batchStatusMap.has(item.id)" class="inline-flex items-center gap-1 mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
+                                                <span class="text-[9px] font-black text-slate-900">Партия {{ batchStatusMap.get(item.id).batch }}</span>
+                                                <span class="text-[9px] text-slate-400">|</span>
+                                                <span class="text-[9px] font-black text-slate-600">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</span>
                                             </div>
                                             <div class="mt-1.5 flex flex-wrap gap-2">
                                                 <template v-if="item.dish_id">
                                                     <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
-                                                    <span class="text-[10px] font-normal text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
+                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
                                                 </template>
                                                 <template v-else>
-                                                    <span class="text-[10px] font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
+                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
                                                 </template>
                                             </div>
                                         </div>
@@ -449,13 +463,13 @@ onMounted(() => { if (auth.isAuth) loadData() })
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area w-full">
                 <div v-for="day in weekDays" :key="day" 
                     class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-all duration-300"
-                    :class="isToday(day) ? 'shadow-md ring-2 ring-orange-500/10 border-orange-200' : 'shadow-sm border border-slate-100'"
+                    :class="isToday(day) ? 'shadow-md ring-2 ring-slate-900/5 border-slate-900' : 'shadow-sm border border-slate-100'"
                 >
                     
-                    <div class="flex items-center justify-between pb-1.5 border-b" :class="isToday(day) ? 'border-orange-100' : 'border-slate-50'">
+                    <div class="flex items-center justify-between pb-1.5 border-b" :class="isToday(day) ? 'border-slate-200' : 'border-slate-50'">
                         <div class="flex items-center gap-2">
-                            <span class="text-base font-black" :class="isToday(day) ? 'text-orange-500' : 'text-slate-800'">{{ format(day, 'd') }}</span>
-                            <span class="text-[10px] font-bold uppercase" :class="isToday(day) ? 'text-orange-400' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
+                            <span class="text-base font-black" :class="isToday(day) ? 'text-slate-900' : 'text-slate-800'">{{ format(day, 'd') }}</span>
+                            <span class="text-[10px] font-bold uppercase" :class="isToday(day) ? 'text-slate-900' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
                         </div>
 
                         <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-2">
@@ -495,7 +509,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
             <template v-else-if="getSlotItems(day, slot.id).length === 1">
                <template v-if="getSlotItems(day, slot.id)[0].dish_id && getSlotItems(day, slot.id)[0].dishes?.image_url">
                     <img :src="getSlotItems(day, slot.id)[0].dishes.image_url" class="absolute inset-0 w-full h-full object-cover">
-                    <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-500/30' : ''"></div>
+                    <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-slate-900/40 grayscale' : ''"></div>
                     <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent"></div>
                     <div class="absolute bottom-1.5 left-1.5 right-1.5 z-10 text-left">
                         <!-- Batch Indicator Grid View (Image) -->
@@ -504,26 +518,26 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         </div>
 
                         <div class="text-[9px] font-bold text-white leading-tight line-clamp-2 shadow-sm">
-                             <span v-if="getSlotItems(day, slot.id)[0].ignore_shopping" class="text-[8px] mr-1">🚫</span>
+                             <span v-if="getSlotItems(day, slot.id)[0].ignore_shopping" class="text-[8px] mr-1 opacity-70">🚫</span>
                             {{ getSlotItems(day, slot.id)[0].dishes?.name }}
-                            <span v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-yellow-300 ml-0.5">x{{ getSlotItems(day, slot.id)[0].portions }}</span>
+                            <span v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-white/80 ml-0.5">x{{ getSlotItems(day, slot.id)[0].portions }}</span>
                          </div>
                     </div>
                 </template>
                 <template v-else>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-red-50' : 'bg-white'">
+                    <div class="absolute inset-0 flex flex-col items-center justify-center p-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-slate-100' : 'bg-white'">
                         <!-- Batch Indicator Grid View (No Image) -->
-                        <div v-if="batchStatusMap.has(getSlotItems(day, slot.id)[0].id)" class="absolute top-1 right-1 bg-indigo-50 px-1 py-0.5 rounded-md border border-indigo-100">
-                             <span class="text-[7px] font-black text-indigo-600">{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).current }}/{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).total }}</span>
+                        <div v-if="batchStatusMap.has(getSlotItems(day, slot.id)[0].id)" class="absolute top-1 right-1 bg-slate-100 px-1 py-0.5 rounded-md border border-slate-200">
+                             <span class="text-[7px] font-black text-slate-900">{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).current }}/{{ batchStatusMap.get(getSlotItems(day, slot.id)[0].id).total }}</span>
                         </div>
                         
-                        <div class="text-xl mb-1">
+                        <div class="text-xl mb-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'opacity-30' : ''">
                             {{ getSlotItems(day, slot.id)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
                         </div>
-                        <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'text-red-500 line-through' : 'text-slate-800'">
+                        <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-800'">
                             {{ getSlotItems(day, slot.id)[0].dish_id ? getSlotItems(day, slot.id)[0].dishes?.name : getSlotItems(day, slot.id)[0].products?.name }}
                         </div>
-                        <div v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-[8px] font-black text-indigo-500">
+                        <div v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-[8px] font-black text-slate-900">
                               x{{ getSlotItems(day, slot.id)[0].portions }}
                         </div>
                     </div>
