@@ -496,7 +496,7 @@ const onProductCreated = (product) => {
                     :disabled="(!formData.name || formData.meal_type_ids.length === 0) || isSaving"
                 >
                     <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                    {{ isSaving ? '...' : 'Готово' }}
+                    {{ isSaving ? 'Сохранение' : 'Готово' }}
                 </button>
                 
                 <button 
@@ -816,7 +816,7 @@ const onProductCreated = (product) => {
                     <!-- Compact Description -->
                     <textarea 
                         v-model="formData.description" 
-                        placeholder="Заметки / Рецепт..." 
+                        placeholder="Заметки / Рецепт" 
                         class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-0 border-none min-h-[120px] text-base leading-relaxed"
                     ></textarea>
 

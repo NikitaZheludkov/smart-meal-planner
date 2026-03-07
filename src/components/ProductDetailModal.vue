@@ -170,7 +170,7 @@ const handleCancel = () => {
                     :disabled="!formData.name || isSaving"
                 >
                     <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                    {{ isSaving ? '...' : 'Готово' }}
+                    {{ isSaving ? 'Сохранение' : 'Готово' }}
                 </button>
             </template>
             <template v-else>
@@ -228,7 +228,7 @@ const handleCancel = () => {
                 </div>
 
                 <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ед. изм.</label>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Единица</label>
                     <div class="relative">
                         <select v-model="formData.unit" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
                             <option v-for="u in units" :key="u" :value="u">{{ u }}</option>

@@ -239,7 +239,7 @@ const getDishSlotName = (id) => {
              <span class="material-icons-round absolute left-3 top-3.5 text-slate-400 text-lg">search</span>
              <input 
                 v-model="searchQuery" 
-                placeholder="Поиск рецептов..." 
+                placeholder="Поиск рецептов" 
                 class="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300"
              >
              <button 

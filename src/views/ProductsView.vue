@@ -76,7 +76,7 @@ onMounted(async () => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative border-b border-slate-100 px-5 pt-app-header pb-4">
         
-        <h1 class="app-title mb-4">продукты</h1>
+        <h1 class="app-title mb-4">Продукты</h1>
 
         <div class="relative mb-4">
             <span class="material-icons-outlined absolute left-4 top-3.5 text-slate-400">search</span>

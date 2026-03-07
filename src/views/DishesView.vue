@@ -110,7 +110,7 @@ const setMealType = (id) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4">
         
-      <h1 class="app-title mb-4">рецепты</h1>
+      <h1 class="app-title mb-4">Рецепты</h1>
 
       <div class="flex gap-2 mb-4">
           <div class="relative flex-1">

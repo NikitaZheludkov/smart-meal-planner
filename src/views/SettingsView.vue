@@ -128,7 +128,7 @@ const periods = [
   <div class="h-full flex flex-col bg-slate-50 relative">
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-app-header pb-4">
-      <h1 class="app-title mb-4">настройки</h1>
+      <h1 class="app-title mb-4">Настройки</h1>
       <div class="flex items-center justify-between">
         <div>
           
@@ -165,7 +165,7 @@ const periods = [
                 <div>
                     <div class="text-[10px] font-normal text-secondary uppercase">Вы находитесь в:</div>
                     <div class="text-lg card-title leading-tight">
-                        {{ settingsStore.household?.name || 'Загрузка...' }}
+                        {{ settingsStore.household?.name || 'Загрузка......' }}
                     </div>
                 </div>
                 <div v-if="isOwner" class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide">
@@ -217,7 +217,7 @@ const periods = [
                     @click="handleGenerateCode"
                     class="btn-primary w-full text-xs shadow-lg"
                 >
-                    {{ isGenerating ? 'Создаем...' : 'Получить код доступа' }}
+                    {{ isGenerating ? 'Создаем' : 'Получить код доступа' }}
                 </button>
 
                 <button 
@@ -304,7 +304,7 @@ const periods = [
                 class="btn-primary w-full shadow-lg mb-2 flex items-center justify-center gap-2"
             >
                 <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
-                {{ isJoining ? 'Проверка...' : 'Войти' }}
+                {{ isJoining ? 'Проверка' : 'Войти' }}
             </button>
             
             <button @click="showJoinModal = false" class="btn-secondary w-full text-xs font-bold">Отмена</button>

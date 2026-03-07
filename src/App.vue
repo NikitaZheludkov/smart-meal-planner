@@ -36,7 +36,7 @@ const tabs = [
   { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu', component: DishesView },
   { id: 'shopping', label: 'Купить', icon: 'shopping_bag', component: ShoppingView },
   { id: 'products', label: 'Продукты', icon: 'kitchen', component: ProductsView },
-  { id: 'settings', label: 'Настр.', icon: 'tune', component: SettingsView }
+  { id: 'settings', label: 'Настройки', icon: 'tune', component: SettingsView }
 ]
 
 const activeComponent = computed(() => {

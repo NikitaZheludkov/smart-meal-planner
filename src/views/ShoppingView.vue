@@ -181,7 +181,7 @@ const formatAmount = (val) => {
       
       <div class="px-5 pt-app-header pb-4 flex flex-col gap-4">
           
-        <h1 class="app-title mb-0">купить</h1>
+        <h1 class="app-title mb-0">Купить</h1>
 
         <!-- Date Switcher Full Width -->
         <div class="flex items-center justify-between px-2 w-full">
@@ -266,7 +266,7 @@ const formatAmount = (val) => {
                     <div class="empty-state-icon">
                         <span class="material-icons-round" style="font-size: 64px;">shopping_basket</span>
                     </div>
-                    <p class="empty-state-title">список пуст</p>
+                    <p class="empty-state-title">Список пуст</p>
                     <p class="empty-state-desc">Добавьте блюда в план или уберите галочки "Не покупать"</p>
                 </div>
 

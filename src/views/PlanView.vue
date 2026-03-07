@@ -412,7 +412,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                     <div class="empty-state-icon">
                         <span class="material-icons-round" style="font-size: 64px;">restaurant</span>
                     </div>
-                    <p class="empty-state-title">день свободен.</p>
+                    <p class="empty-state-title">День свободен</p>
                     <button @click="switchTab('week')" class="mt-4 btn-secondary text-xs px-4 py-2">Перейти к сетке</button>
                 </div>
 
@@ -562,7 +562,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                     </div>
                    
                    <div v-if="getSlotItems(day, slot.id).length > 3" class="h-2 w-full bg-slate-100 rounded-sm flex items-center justify-center">
-                       <span class="text-[6px] font-bold text-slate-400">...</span>
+                       <span class="material-icons-round text-[10px] text-slate-300">more_horiz</span>
                     </div>
                </div>
             </template>
