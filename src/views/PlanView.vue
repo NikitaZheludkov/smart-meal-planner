@@ -422,6 +422,9 @@ onMounted(() => { if (auth.isAuth) loadData() })
                             <div v-if="group.hasItems">
                                 <div class="flex items-center justify-between px-2 mb-2">
                                     <h3 class="card-title text-lg">{{ group.slot.name }}</h3>
+                                    <button @click="openSelector(selectedDate, group.slot)" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 active:scale-90 transition-all tap-effect">
+                                        <span class="material-icons-round text-lg">add</span>
+                                    </button>
                                 </div>
                                 <TransitionGroup name="list" tag="div" class="space-y-3 relative">
                                     <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">

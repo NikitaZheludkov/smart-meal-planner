@@ -297,7 +297,7 @@ const formatAmount = (val) => {
                                     
                                     <!-- Content Area (Expandable) -->
                                     <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5 ml-2" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
-                                         <div class="flex-1 card-title text-xs transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                         <div class="flex-1 card-title transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
                                             {{ item.name }}
                                         </div>
                                         

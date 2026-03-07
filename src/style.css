@@ -41,6 +41,7 @@ body {
 .card-title {
   font-family: 'Montserrat', sans-serif;
   font-weight: 600; /* Semibold */
+  font-size: 14px; /* Standard size for list items */
   color: #000000;
   letter-spacing: -0.02em;
 }
@@ -48,6 +49,7 @@ body {
 .text-secondary {
   font-family: 'Inter', sans-serif;
   font-weight: 400; /* Regular */
+  font-size: 12px; /* Standard secondary text */
   color: #8E8E93 !important;
 }
 

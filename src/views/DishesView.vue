@@ -196,7 +196,7 @@ const setMealType = (id) => {
             class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
         >
             <div class="flex justify-between items-start">
-            <span class="card-title text-lg leading-tight pr-8">{{ dish.name }}</span>
+            <span class="card-title leading-tight pr-8">{{ dish.name }}</span>
             <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
                 {{ dish.dish_type_name }}
             </span>

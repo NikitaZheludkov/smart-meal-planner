@@ -128,7 +128,7 @@ onMounted(async () => {
                     {{ getCategoryIcon(product.category) }}
                 </div>
                 
-                <div class="flex-1 min-w-0 card-title text-xs truncate pr-2 leading-tight">
+                <div class="flex-1 min-w-0 card-title truncate pr-2 leading-tight">
                     {{ product.name }}
                 </div>
                 
