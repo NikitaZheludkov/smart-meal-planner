@@ -117,14 +117,14 @@ onMounted(async () => {
             <p class="text-sm font-bold">Список пуст</p>
         </div>
 
-        <div v-else class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative">
+        <div v-else class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative p-1">
             <div 
                 v-for="product in filteredProducts" 
                 :key="product.id" 
                 @click="openProduct(product)"
-                class="flex items-center px-4 py-2 w-full min-h-[44px] border-b border-slate-50 last:border-0 tap-effect active:bg-slate-50 transition-colors"
+                class="flex items-center px-4 py-3 w-full min-h-[52px] border-b border-slate-50 last:border-0 tap-effect active:bg-slate-50 transition-colors rounded-xl"
             >
-                <div class="w-8 h-8 flex items-center justify-center text-lg mr-3 bg-slate-50 rounded-lg shrink-0">
+                <div class="w-9 h-9 flex items-center justify-center text-lg mr-3 bg-slate-50 rounded-[14px] shrink-0">
                     {{ getCategoryIcon(product.category) }}
                 </div>
                 
@@ -132,7 +132,7 @@ onMounted(async () => {
                     {{ product.name }}
                 </div>
                 
-                <div class="text-[10px] font-normal text-secondary bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0">
+                <div class="text-[10px] font-normal text-secondary bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 whitespace-nowrap flex-shrink-0">
                     {{ product.unit }}
                 </div>
             </div>

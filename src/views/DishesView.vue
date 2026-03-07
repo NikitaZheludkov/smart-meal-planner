@@ -193,7 +193,7 @@ const setMealType = (id) => {
             v-for="dish in filteredDishes" 
             :key="dish.id" 
             @click="openDish(dish)" 
-            class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
+            class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
         >
             <div class="flex justify-between items-start">
             <span class="card-title text-lg leading-tight pr-8">{{ dish.name }}</span>

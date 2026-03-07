@@ -273,21 +273,21 @@ const formatAmount = (val) => {
                     <div v-for="(items, category) in groupedList" :key="category">
                         <h3 v-if="activeTab === 'departments'" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{{ category }}</h3>
                         
-                        <TransitionGroup name="list" tag="div" class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative">
+                        <TransitionGroup name="list" tag="div" class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative p-1 space-y-1">
                             <div 
                                 v-for="item in items" 
                                 :key="item.id" 
-                                class="flex flex-col border-b border-slate-50 last:border-0 w-full bg-white transition-colors duration-200"
+                                class="flex flex-col w-full bg-white transition-colors duration-200 rounded-xl"
                                 :class="expandedProductIds.has(item.id) ? 'bg-slate-50/50' : ''"
                             >
-                                <div class="flex items-center px-4 py-2 w-full min-h-[44px]">
+                                <div class="flex items-center px-3 py-2.5 w-full min-h-[48px]">
                                     <!-- Checkbox Area -->
                                     <div 
-                                        class="w-8 h-8 -ml-1.5 flex items-center justify-center cursor-pointer tap-effect rounded-full active:bg-slate-100 transition-colors flex-shrink-0"
+                                        class="w-8 h-8 -ml-1 flex items-center justify-center cursor-pointer tap-effect rounded-full active:bg-slate-100 transition-colors flex-shrink-0"
                                         @click.stop="toggleCheck(item.id)"
                                     >
                                         <div 
-                                            class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200" 
+                                            class="w-5 h-5 rounded-[8px] border-2 flex items-center justify-center transition-all duration-200" 
                                             :class="checkedIds.has(item.id) ? 'bg-slate-900 border-slate-900 scale-110' : 'border-slate-200 bg-slate-50'"
                                         >
                                             <span v-if="checkedIds.has(item.id)" class="material-icons-round text-white text-[10px] font-bold">check</span>
@@ -295,12 +295,12 @@ const formatAmount = (val) => {
                                     </div>
                                     
                                     <!-- Content Area (Expandable) -->
-                                    <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
+                                    <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5 ml-2" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
                                          <div class="flex-1 card-title text-xs transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
                                             {{ item.name }}
                                         </div>
                                         
-                                        <div class="text-[10px] font-normal text-secondary bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
+                                        <div class="text-[10px] font-normal text-secondary bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 whitespace-nowrap flex-shrink-0" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
                                             {{ formatAmount(item.amount) }} {{ item.unit }}
                                         </div>
                                     </div>

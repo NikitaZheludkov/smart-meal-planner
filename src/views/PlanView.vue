@@ -409,9 +409,9 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                 <div class="flex items-center justify-between px-2 mb-2">
                                     <h3 class="card-title text-lg">{{ group.slot.name }}</h3>
                                 </div>
-                                <TransitionGroup name="list" tag="div" class="space-y-2 relative">
-                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
-                                        <div class="w-16 h-16 bg-slate-50 rounded-[18px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
+                                <TransitionGroup name="list" tag="div" class="space-y-3 relative">
+                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
+                                        <div class="w-16 h-16 bg-slate-50 rounded-[20px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
                                             <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
                                             <span v-else-if="item.product_id">🥦</span>
                                             <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
