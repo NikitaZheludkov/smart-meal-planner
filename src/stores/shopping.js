@@ -166,12 +166,11 @@ export const useShoppingStore = defineStore('shopping', () => {
 
     // Обрабатываем сгруппированные блюда
     Object.values(dishesMap).forEach(dish => {
-        let multiplier = dish.totalPortions
-        
-        if (dish.is_batch && dish.batch_yield > 0) {
-            // Для пакетных блюд: кол-во готовок = ceil(всего порций / выход с одной готовки)
-            multiplier = Math.ceil(dish.totalPortions / dish.batch_yield)
-        }
+        // Унифицированная логика: считаем количество готовок (батчей)
+        // Если блюдо на 1 порцию (yield=1), то multiplier = totalPortions (кол-во порций)
+        // Если блюдо на 6 порций (yield=6), то multiplier = ceil(totalPortions / 6)
+        const yieldAmount = dish.batch_yield || 1
+        const multiplier = Math.ceil(dish.totalPortions / yieldAmount)
         
         dish.ingredients.forEach(ing => {
             if (!ing.products) return 

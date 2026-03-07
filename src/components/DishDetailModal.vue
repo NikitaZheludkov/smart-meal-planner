@@ -260,8 +260,8 @@ const initForm = (dishData) => {
     if (!formData.value.tags) formData.value.tags = []
     
     // Fix for batch fields defaults
-    if (formData.value.is_batch === undefined) formData.value.is_batch = false
     formData.value.batch_yield = Number(formData.value.batch_yield) || 1
+    formData.value.is_batch = formData.value.batch_yield > 1
     
     if (!formData.value.id) {
         if (!formData.value.dish_type_id && dictionaries.dishTypes.length) {
@@ -314,6 +314,9 @@ const handleSave = async () => {
       return
   }
   
+  // Ensure is_batch is synced with yield
+  formData.value.is_batch = (formData.value.batch_yield || 1) > 1
+
   isSaving.value = true
   ui.addLog(`Попытка сохранения блюда: ${formData.value.name}`, 'info', formData.value)
   
@@ -544,7 +547,9 @@ const onProductCreated = (product) => {
                 </div>
 
                 <div v-if="formData.ingredients?.length" class="w-full">
-                    <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">Состав</h4>
+                    <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">
+                        Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] lowercase opacity-70">(на {{ formData.batch_yield }} порц.)</span>
+                    </h4>
                     <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                         <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm">
                             <span class="font-bold text-slate-700">{{ ing.name }}</span>
@@ -619,33 +624,40 @@ const onProductCreated = (product) => {
                 <!-- STEP 2: Ingredients & Batch -->
                 <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
                     
-                    <!-- Batch Checkbox -->
-                     <div class="flex items-center gap-3 px-1">
-                        <button 
-                            @click="formData.is_batch = !formData.is_batch"
-                            class="flex items-center gap-3 group tap-effect"
-                        >
-                            <div 
-                                class="w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-200"
-                                :class="formData.is_batch ? 'bg-slate-900 border-slate-900' : 'border-slate-300 bg-white group-hover:border-slate-400'"
-                            >
-                                <span v-if="formData.is_batch" class="material-icons-round text-white text-sm">check</span>
+                    <!-- Yield / Portions Input -->
+                     <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                <span class="material-icons-round text-xl">restaurant_menu</span>
                             </div>
-                            <span class="text-sm font-bold text-slate-700">Многопорционное блюдо</span>
-                        </button>
+                            <div>
+                                <div class="text-sm font-black text-slate-900">Выход рецепта</div>
+                                <div class="text-[10px] font-bold text-slate-400">На сколько порций этот состав?</div>
+                            </div>
+                        </div>
                          
-                         <Transition name="pop">
-                            <div v-if="formData.is_batch" class="flex items-center gap-2 ml-auto">
-                                <input
-                                    v-model.number="formData.batch_yield" 
-                                    type="number" 
-                                    inputmode="numeric"
-                                    placeholder="1"
-                                    class="w-14 h-9 bg-slate-50 text-slate-900 font-black rounded-xl text-center outline-none border border-slate-200 focus:border-indigo-500 transition-all text-base"
-                                    @focus="$event.target.select()"
-                                >
-                            </div>
-                        </Transition>
+                        <div class="flex items-center gap-2">
+                            <button 
+                                @click="formData.batch_yield = Math.max(1, (formData.batch_yield || 1) - 1); telegram.haptic.selection()"
+                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-all"
+                            >
+                                <span class="material-icons-round text-base">remove</span>
+                            </button>
+                            <input
+                                v-model.number="formData.batch_yield" 
+                                type="number" 
+                                inputmode="numeric"
+                                placeholder="1"
+                                class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none text-lg"
+                                @focus="$event.target.select()"
+                            >
+                            <button 
+                                @click="formData.batch_yield = (formData.batch_yield || 1) + 1; telegram.haptic.selection()"
+                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-all"
+                            >
+                                <span class="material-icons-round text-base">add</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Compact Search -->
@@ -698,7 +710,9 @@ const onProductCreated = (product) => {
                          
 
                     <!-- Compact Ingredients List -->
-                    <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1">
+                    <div v-if="formData.ingredients.length > 0" class="space-y-2">
+                        <div class="text-[10px] font-bold text-slate-400 pl-2 uppercase tracking-wide">Состав на {{ formData.batch_yield || 1 }} порц.</div>
+                        <div class="bg-slate-50 rounded-2xl p-2 space-y-1">
                         <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
                             <div class="w-1.5 h-1.5 rounded-full bg-indigo-300 ml-1"></div>
                             <div class="flex-1 font-bold text-slate-700 text-sm truncate">{{ ing.name }}</div>
@@ -726,6 +740,7 @@ const onProductCreated = (product) => {
                                 <span class="material-icons-round text-sm">close</span>
                             </button>
                         </div>
+                    </div>
                     </div>
                     <div v-else class="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                         Ингредиентов нет

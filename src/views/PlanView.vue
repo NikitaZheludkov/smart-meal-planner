@@ -94,9 +94,13 @@ const batchStatusMap = computed(() => {
     const start = currentWeekStart.value
     const end = addDays(start, (settingsStore.periodLength || 7) - 1)
     
-    // Фильтруем по текущей неделе и только batch блюда
+    // Фильтруем по текущей неделе и только batch блюда (где yield > 1)
     const weekItems = plan.filter(p => {
-        if (!p.dish_id || !p.dishes?.is_batch) return false
+        if (!p.dish_id) return false
+        // Если yield > 1, считаем это batch-блюдом
+        const yieldAmount = p.dishes?.batch_yield || 1
+        if (yieldAmount <= 1) return false
+        
         const d = parseISO(p.date)
         return isWithinInterval(d, { start, end })
     })
@@ -186,9 +190,9 @@ const onDishSelected = async ({ item, type }) => {
 
   if (isDuplicate) return 
 
-  // Проверка для Batch-блюд
-  if (type === 'dish' && item.is_batch) {
-      const yieldAmount = item.batch_yield || 1
+  // Проверка для Batch-блюд (где yield > 1)
+  const yieldAmount = item.batch_yield || 1
+  if (type === 'dish' && yieldAmount > 1) {
       const start = currentWeekStart.value
       const end = addDays(start, (settingsStore.periodLength || 7) - 1)
       
