@@ -150,7 +150,7 @@ const getDishSlotName = (id) => {
       
       <div class="px-5 pt-5 pb-3 flex justify-between items-center shrink-0 bg-white z-20 shadow-sm border-b border-slate-50">
           <div>
-              <h2 class="text-xl font-black text-slate-900">{{ getSlotName }}</h2>
+              <h2 class="text-xl card-title">{{ getSlotName }}</h2>
               <p class="text-[11px] font-bold text-slate-400">
                   {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
               </p>
@@ -167,7 +167,7 @@ const getDishSlotName = (id) => {
               <div v-for="item in existingItems" :key="item.id" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 relative overflow-hidden">
                   <div class="flex justify-between items-start mb-3">
                       <div class="pr-8">
-                          <div class="font-black text-slate-900 text-base leading-tight line-clamp-2">
+                          <div class="card-title text-base leading-tight line-clamp-2">
                               {{ item.dishes ? item.dishes.name : item.products?.name }}
                           </div>
                           <div v-if="item.dishes" class="text-[10px] font-bold text-orange-400 mt-0.5">
@@ -295,11 +295,11 @@ const getDishSlotName = (id) => {
                            <span v-else-if="isSlotMatch(dish.meal_type_id)" class="text-[9px] font-black text-emerald-600 bg-white px-1.5 rounded border border-emerald-200 uppercase tracking-wide">
                                {{ getDishSlotName(dish.meal_type_id) }}
                            </span>
-                           <div class="font-bold text-slate-900 text-sm truncate">{{ dish.name }}</div>
+                           <div class="card-title text-sm truncate">{{ dish.name }}</div>
                       </div>
                       
                       <div class="flex items-center gap-2">
-                          <span class="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
+                          <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
                           <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
                       </div>
                   </div>
@@ -326,7 +326,7 @@ const getDishSlotName = (id) => {
                       >
                           <div class="flex items-center gap-3">
                               <div class="text-xl">🥦</div>
-                              <span class="font-bold text-slate-700 text-sm">{{ prod.name }}</span>
+                              <span class="card-title text-sm">{{ prod.name }}</span>
                           </div>
                           <button class="w-7 h-7 rounded-lg bg-slate-50 text-indigo-500 flex items-center justify-center">
                               <span class="material-icons-round text-sm">add</span>

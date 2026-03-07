@@ -110,6 +110,8 @@ const setMealType = (id) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4">
         
+      <h1 class="app-title mb-4">рецепты</h1>
+
       <div class="flex gap-2 mb-4">
           <div class="relative flex-1">
             <span class="material-icons-round absolute left-3.5 top-3.5 text-slate-400">search</span>
@@ -194,8 +196,8 @@ const setMealType = (id) => {
             class="bg-white p-4 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
         >
             <div class="flex justify-between items-start">
-            <span class="font-bold text-lg text-slate-900 leading-tight pr-8">{{ dish.name }}</span>
-            <span class="text-[9px] font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-slate-100">
+            <span class="card-title text-lg leading-tight pr-8">{{ dish.name }}</span>
+            <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
                 {{ dish.dish_type_name }}
             </span>
             </div>
@@ -205,25 +207,25 @@ const setMealType = (id) => {
                     <span 
                         v-for="mt in dish.meal_types" 
                         :key="mt.id"
-                        class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100"
+                        class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100"
                     >
                         {{ mt.name }}
                     </span>
                 </div>
-                <span v-else class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-indigo-600 bg-indigo-50 border-indigo-100">
+                <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100">
                     {{ dish.meal_type_name }}
                 </span>
                 <span 
                     v-for="tag in dish.tags.slice(0, 3)" 
                     :key="tag.id" 
-                    class="text-[9px] font-bold px-2 py-0.5 rounded-md border text-slate-500 bg-slate-50 border-slate-100 flex items-center gap-1" 
+                    class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-50 border-slate-100 flex items-center gap-1" 
                 >
                 {{ tag.icon }} {{ tag.name }}
                 </span>
-                <span v-if="dish.tags.length > 3" class="text-[9px] font-bold text-slate-300 px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+                <span v-if="dish.tags.length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
             </div>
             
-            <div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-1">
+            <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">
             <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
             <span>Б {{ dish.protein || 0 }}</span>
             <span>Ж {{ dish.fat || 0 }}</span>

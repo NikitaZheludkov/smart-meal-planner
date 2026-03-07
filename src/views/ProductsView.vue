@@ -76,6 +76,8 @@ onMounted(async () => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative border-b border-slate-100 px-5 pt-app-header pb-4">
         
+        <h1 class="app-title mb-4">продукты</h1>
+
         <div class="relative mb-4">
             <span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
             <input 
@@ -126,11 +128,11 @@ onMounted(async () => {
                     {{ getCategoryIcon(product.category) }}
                 </div>
                 
-                <div class="flex-1 min-w-0 font-bold text-slate-700 text-xs truncate pr-2 leading-tight">
+                <div class="flex-1 min-w-0 card-title text-xs truncate pr-2 leading-tight">
                     {{ product.name }}
                 </div>
                 
-                <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0">
+                <div class="text-[10px] font-normal text-secondary bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0">
                     {{ product.unit }}
                 </div>
             </div>

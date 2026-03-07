@@ -216,10 +216,10 @@ onUnmounted(() => {
             :key="tab.id" 
             @click="switchTab(tab.id)" 
             class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" 
-            :class="currentTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+            :class="currentTab === tab.id ? 'text-black' : 'text-secondary hover:text-slate-600'"
           >
             <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
-            <span class="text-[9px] font-bold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
+            <span class="text-[9px] font-semibold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
           </button>
         </div>
       </nav>

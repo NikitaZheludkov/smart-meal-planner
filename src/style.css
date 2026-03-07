@@ -9,12 +9,38 @@
 body {
   background-color: #F5F5F7; /* Global monochrome background */
   color: #000000;
+  line-height: 1.6; /* Increased line height for breathability */
 }
 
 /* Enforce flat design globally */
 * {
   box-shadow: none !important;
   text-shadow: none !important;
+}
+
+/* Typography System */
+.app-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 900; /* Heavy/Bold */
+  color: #000000;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-transform: lowercase;
+}
+
+.app-title::after {
+  content: ".";
+}
+
+.card-title {
+  font-weight: 600; /* Semibold */
+  color: #000000;
+}
+
+.text-secondary {
+  font-weight: 400; /* Regular */
+  color: #8E8E93 !important; /* Muted Gray */
 }
 
 /* Disable backdrop blur for flat feel */

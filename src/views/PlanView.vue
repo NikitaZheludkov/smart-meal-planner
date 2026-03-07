@@ -371,7 +371,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
           </button>
           
           <div class="flex flex-col items-center tap-effect" @click="goToToday">
-              <div class="text-sm font-black text-slate-900 flex items-center gap-2">
+              <div class="app-title !mb-0 text-2xl flex items-center gap-2">
                   {{ displayDateLabel }}
               </div>
               <div v-if="showTodayBtn" class="text-[10px] font-bold text-orange-500 mt-0.5">
@@ -407,7 +407,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         <transition name="fade">
                             <div v-if="group.hasItems">
                                 <div class="flex items-center justify-between px-2 mb-2">
-                                    <h3 class="font-black text-slate-900 text-sm uppercase tracking-wider">{{ group.slot.name }}</h3>
+                                    <h3 class="card-title text-lg">{{ group.slot.name }}</h3>
                                 </div>
                                 <TransitionGroup name="list" tag="div" class="space-y-2 relative">
                                     <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-3 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
@@ -417,7 +417,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                             <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
                                         </div>
                                         <div class="flex-1 min-w-0 py-1">
-                                            <div class="text-base font-bold text-slate-800 truncate leading-tight">
+                                            <div class="text-base card-title truncate leading-tight">
                                                 {{ item.dish_id ? item.dishes?.name : item.products?.name }}
                                                 <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
                                             </div>
@@ -429,11 +429,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                             </div>
                                             <div class="mt-1.5 flex flex-wrap gap-2">
                                                 <template v-if="item.dish_id">
-                                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
-                                                    <span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
+                                                    <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
+                                                    <span class="text-[10px] font-normal text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
                                                 </template>
                                                 <template v-else>
-                                                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
+                                                    <span class="text-[10px] font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
                                                 </template>
                                             </div>
                                         </div>

@@ -181,6 +181,8 @@ const formatAmount = (val) => {
       
       <div class="px-5 pt-app-header pb-4 flex flex-col gap-4">
           
+        <h1 class="app-title mb-0">купить</h1>
+
         <!-- Date Switcher Full Width -->
         <div class="flex items-center justify-between px-2 w-full">
             <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
@@ -232,7 +234,7 @@ const formatAmount = (val) => {
             class="relative w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect flex items-center justify-center p-0.5"
           >
               <!-- Dish Name -->
-              <div class="text-[7px] font-bold text-center leading-tight text-slate-700 line-clamp-4 break-words w-full pb-1">
+              <div class="text-[7px] font-normal text-center leading-tight text-secondary line-clamp-4 break-words w-full pb-1">
                   {{ dish.name }}
               </div>
               
@@ -294,11 +296,11 @@ const formatAmount = (val) => {
                                     
                                     <!-- Content Area (Expandable) -->
                                     <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
-                                         <div class="flex-1 font-bold text-slate-700 text-xs transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                         <div class="flex-1 card-title text-xs transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
                                             {{ item.name }}
                                         </div>
                                         
-                                        <div class="text-[10px] font-black text-slate-900 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
+                                        <div class="text-[10px] font-normal text-secondary bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0" :class="checkedIds.has(item.id) ? 'opacity-30' : ''">
                                             {{ formatAmount(item.amount) }} {{ item.unit }}
                                         </div>
                                     </div>

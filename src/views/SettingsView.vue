@@ -128,6 +128,7 @@ const periods = [
   <div class="h-full flex flex-col bg-slate-50 relative">
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-app-header pb-4">
+      <h1 class="app-title mb-4">настройки</h1>
       <div class="flex items-center justify-between">
         <div>
           
@@ -152,7 +153,7 @@ const periods = [
     <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-[76px]">
       
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Моя Семья</h3>
+        <h3 class="card-title text-sm ml-2 mb-2">Моя Семья</h3>
         
         <div v-if="settingsStore.loading" class="text-center py-6">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
@@ -162,8 +163,8 @@ const periods = [
             
             <div class="flex items-center justify-between">
                 <div>
-                    <div class="text-[10px] font-bold text-slate-400 uppercase">Вы находитесь в:</div>
-                    <div class="text-lg font-black text-slate-900 leading-tight">
+                    <div class="text-[10px] font-normal text-secondary uppercase">Вы находитесь в:</div>
+                    <div class="text-lg card-title leading-tight">
                         {{ settingsStore.household?.name || 'Загрузка...' }}
                     </div>
                 </div>
@@ -180,11 +181,11 @@ const periods = [
                     </div>
                     
                     <div class="flex-1 min-w-0">
-                        <div class="font-bold text-slate-700 text-sm truncate">
+                        <div class="card-title text-sm truncate">
                             {{ member.first_name || member.username }}
                             <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
                         </div>
-                        <div class="text-[10px] font-bold text-slate-400">
+                        <div class="text-[10px] font-normal text-secondary">
                             {{ member.id === settingsStore.household?.owner_id ? 'Администратор' : 'Участник' }}
                         </div>
                     </div>
@@ -241,17 +242,17 @@ const periods = [
       </div>
 
       <div>
-        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Предпочтения</h3>
+        <h3 class="card-title text-sm ml-2 mb-2">Предпочтения</h3>
         <div class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 space-y-3">
           <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Начало недели</span>
+            <span class="card-title text-sm">Начало недели</span>
             <select v-model="selectedStartDay" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
               <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
             </select>
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Порции (по умолч.)</span>
+            <span class="card-title text-sm">Порции (по умолч.)</span>
             <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
                 <button @click="selectedPortions = Math.max(1, selectedPortions - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
                   <span class="material-icons-round text-sm">remove</span>

@@ -513,7 +513,7 @@ const onProductCreated = (product) => {
             
             <div v-if="!isEditing" class="flex flex-col space-y-6">
                 <div class="text-center">
-                    <h2 class="text-2xl font-black text-slate-900 leading-tight mb-2">{{ formData.name }}</h2>
+                    <h2 class="text-2xl card-title leading-tight mb-2">{{ formData.name }}</h2>
                     <div class="flex flex-wrap justify-center gap-1.5">
                         <span class="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
                             {{ getMealTypeName }}
@@ -547,20 +547,20 @@ const onProductCreated = (product) => {
                 </div>
 
                 <div v-if="formData.ingredients?.length" class="w-full">
-                    <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">
-                        Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] lowercase opacity-70">(на {{ formData.batch_yield }} порц.)</span>
+                    <h4 class="card-title text-sm mb-3 ml-1">
+                        Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary lowercase opacity-70">(на {{ formData.batch_yield }} порц.)</span>
                     </h4>
                     <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                         <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm">
-                            <span class="font-bold text-slate-700">{{ ing.name }}</span>
-                            <span class="font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
+                            <span class="card-title text-sm">{{ ing.name }}</span>
+                            <span class="font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
                         </div>
                     </div>
                 </div>
 
                 <div v-if="formData.description" class="w-full">
-                    <h4 class="text-xs font-black text-slate-400 mb-3 uppercase tracking-widest ml-1">Приготовление</h4>
-                    <div class="bg-slate-50 p-4 rounded-2xl text-slate-700 text-sm leading-relaxed whitespace-pre-wrap border border-slate-100">
+                    <h4 class="card-title text-sm mb-3 ml-1">Приготовление</h4>
+                    <div class="bg-slate-50 p-4 rounded-2xl text-black text-sm leading-relaxed whitespace-pre-wrap border border-slate-100">
                         {{ formData.description }}
                     </div>
                 </div>
