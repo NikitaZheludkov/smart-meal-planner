@@ -76,7 +76,7 @@ const targetSlot = ref({
 
 watch(() => settingsStore.startDay, (newStartDay) => {
     if (newStartDay !== undefined && newStartDay !== null) {
-        currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: newStartDay })
+        currentWeekStart.value = startOfWeek(currentWeekStart.value, { weekStartsOn: newStartDay })
     }
 })
 

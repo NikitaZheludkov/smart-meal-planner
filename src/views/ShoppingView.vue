@@ -48,8 +48,9 @@ const periodLabel = computed(() => {
 
 const changePeriod = (dir) => {
     telegram.haptic.selection()
-    // Changed to 1 day shift to allow "changing 1 day in the period"
-    currentWeekStart.value = addDays(currentWeekStart.value, dir)
+    // Shift by periodLength
+    const length = settingsStore.periodLength || 7
+    currentWeekStart.value = addDays(currentWeekStart.value, dir * length)
 }
 
 const showTodayBtn = computed(() => {
