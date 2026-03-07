@@ -97,7 +97,8 @@ const handleLeave = async () => {
 const handleSave = async () => {
     try {
         telegram.haptic.notification('success')
-        await settingsStore.saveSettings(selectedStartDay.value, selectedPeriod.value, selectedPortions.value)
+        // Force period to 7 days
+        await settingsStore.saveSettings(selectedStartDay.value, 7, selectedPortions.value)
         alert('Настройки сохранены')
     } catch (e) {
         console.error('Settings save error:', e)
@@ -246,13 +247,6 @@ const periods = [
             <span class="font-bold text-slate-700 text-sm">Начало недели</span>
             <select v-model="selectedStartDay" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
               <option v-for="day in weekDays" :key="day.val" :value="day.val">{{ day.label }}</option>
-            </select>
-          </div>
-          
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-700 text-sm">Период планирования</span>
-            <select v-model="selectedPeriod" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 outline-none">
-              <option v-for="p in periods" :key="p.val" :value="p.val">{{ p.label }}</option>
             </select>
           </div>
 

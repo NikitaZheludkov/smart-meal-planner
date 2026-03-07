@@ -76,9 +76,9 @@ export const useSettingsStore = defineStore('settings', () => {
       
       if (!hhError && hhData) {
           household.value = hhData
-          startDay.value = hhData.start_day ?? 1
-          periodLength.value = hhData.period_length ?? 7
-          defaultPortions.value = hhData.default_portions ?? 1
+          startDay.value = Number(hhData.start_day ?? 1)
+          periodLength.value = Number(hhData.period_length ?? 7)
+          defaultPortions.value = Number(hhData.default_portions ?? 1)
           const ui = useUIStore()
           ui.addLog('Настройки семьи загружены')
       }
@@ -99,9 +99,9 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     // 1. Обновляем у себя локально
-    startDay.value = day
-    periodLength.value = period
-    defaultPortions.value = portions
+    startDay.value = Number(day)
+    periodLength.value = Number(period)
+    defaultPortions.value = Number(portions)
     
     if (household.value?.id) {
         // 2. Сохраняем в базу данных (чтобы не пропало при перезагрузке)

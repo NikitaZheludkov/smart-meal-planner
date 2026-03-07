@@ -42,12 +42,20 @@ const getStartOfWeekFromSettings = () => {
 
 // Инициализируем дату из uiStore, чтобы сохранить состояние при навигации
 const getInitialDate = () => {
+    let date
     if (uiStore.plan.currentWeekStart) {
         // Проверка на валидность даты (не Invalid Date)
         const d = new Date(uiStore.plan.currentWeekStart)
-        if (!isNaN(d.getTime())) return d
+        if (!isNaN(d.getTime())) date = d
     }
-    return getStartOfWeekFromSettings()
+    
+    // Always align to current startDay setting, even if we have a stored date
+    const day = settingsStore.startDay ?? 1
+    if (date) {
+         return startOfWeek(date, { weekStartsOn: day })
+    }
+    
+    return startOfWeek(new Date(), { weekStartsOn: day })
 }
 
 const currentWeekStart = ref(getInitialDate())
@@ -236,7 +244,16 @@ const loadData = async () => {
   // Грузим последовательно
   try { await planStore.fetchPlan() } catch(e) {}
   try { await dictionaries.fetchDictionaries() } catch(e) {}
-  try { await settingsStore.fetchSettings() } catch(e) {}
+  try { 
+      await settingsStore.fetchSettings()
+      // Force re-alignment after fetching settings to ensure grid matches user preference
+      const day = settingsStore.startDay ?? 1
+      const current = currentWeekStart.value
+      const aligned = startOfWeek(current, { weekStartsOn: day })
+      if (!isSameDay(current, aligned)) {
+          currentWeekStart.value = aligned
+      }
+  } catch(e) {}
   
   if (dishStore.dishes.length === 0) {
       try { await dishStore.fetchDishes() } catch(e) {}

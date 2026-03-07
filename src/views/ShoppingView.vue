@@ -19,10 +19,19 @@ const transitionName = ref('slide-left')
 
 // --- 1. УПРАВЛЕНИЕ ПЕРИОДОМ ---
 const getInitialDate = () => {
+    let date
     if (uiStore.plan.currentWeekStart) {
-        return new Date(uiStore.plan.currentWeekStart)
+        const d = new Date(uiStore.plan.currentWeekStart)
+        if (!isNaN(d.getTime())) date = d
     }
-    return new Date()
+    
+    // Always align to current startDay setting, even if we have a stored date
+    const day = settingsStore.startDay ?? 1
+    if (date) {
+         return startOfWeek(date, { weekStartsOn: day })
+    }
+    
+    return startOfWeek(new Date(), { weekStartsOn: day })
 }
 
 const currentWeekStart = ref(getInitialDate())
@@ -69,9 +78,21 @@ const goToToday = () => {
 // Используем Store вместо локального состояния
 const checkedIds = computed(() => shoppingStore.checkedIds)
 
-onMounted(() => {
+onMounted(async () => {
     shoppingStore.fetchChecklist()
     if (planStore.plan.length === 0) planStore.fetchPlan()
+    
+    // Ensure settings are loaded so startDay is correct
+    try {
+        await settingsStore.fetchSettings()
+        // Force re-alignment after fetching settings
+        const day = settingsStore.startDay ?? 1
+        const current = currentWeekStart.value
+        const aligned = startOfWeek(current, { weekStartsOn: day })
+        if (!isSameDay(current, aligned)) {
+            currentWeekStart.value = aligned
+        }
+    } catch(e) {}
 })
 
 const toggleCheck = (id) => {
