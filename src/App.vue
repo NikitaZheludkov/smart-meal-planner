@@ -208,18 +208,27 @@ onUnmounted(() => {
         </transition>
       </main>
 
-      <nav class="pb-safe bg-white/95 backdrop-blur-xl border-t border-slate-100/50 z-50 absolute bottom-0 w-full rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-transform duration-300"
+      <nav class="pb-safe bg-white z-50 absolute bottom-0 w-full rounded-t-[30px] border-t border-slate-100 transition-transform duration-300"
            :class="{ 'translate-y-full': telegram.isKeyboardOpen }">
-        <div class="h-[76px] grid grid-cols-5 items-center">
+        <div class="h-[76px] grid grid-cols-5 items-center px-2">
           <button 
             v-for="tab in tabs" 
             :key="tab.id" 
             @click="switchTab(tab.id)" 
-            class="flex flex-col items-center justify-center transition-colors duration-200 pb-2 active:scale-95 transition-transform" 
-            :class="currentTab === tab.id ? 'text-black' : 'text-secondary hover:text-slate-600'"
+            class="flex flex-col items-center justify-center transition-all duration-200 active:scale-95 group relative" 
           >
-            <span class="material-icons-round text-[26px] mb-1 transition-transform duration-200" :class="currentTab === tab.id ? '-translate-y-1' : ''">{{ tab.icon }}</span>
-            <span class="text-[9px] font-semibold tracking-wide" v-if="currentTab === tab.id">{{ tab.label }}</span>
+            <!-- Special styling for center button (Shopping) -->
+            <div v-if="tab.id === 'shopping'" class="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-lg shadow-slate-900/20 group-active:scale-95 transition-transform absolute -top-8 border-4 border-slate-50">
+                 <span class="material-icons-round text-[28px]">shopping_bag</span>
+            </div>
+            
+            <!-- Standard tabs -->
+            <div v-else class="flex flex-col items-center justify-center w-full h-full">
+                 <div class="w-12 h-8 flex items-center justify-center rounded-full transition-colors duration-200" :class="currentTab === tab.id ? 'bg-slate-100' : 'bg-transparent'">
+                    <span class="material-icons-outlined text-[28px] transition-colors duration-200" :class="currentTab === tab.id ? 'text-black' : 'text-slate-300 group-hover:text-slate-500'">{{ tab.icon }}</span>
+                 </div>
+            </div>
+            
           </button>
         </div>
       </nav>
