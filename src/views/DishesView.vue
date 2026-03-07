@@ -114,12 +114,12 @@ const setMealType = (id) => {
 
       <div class="flex gap-2 mb-4">
           <div class="relative flex-1">
-            <span class="material-icons-round absolute left-3.5 top-3.5 text-slate-400">search</span>
+            <span class="material-icons-outlined absolute left-3.5 top-3.5 text-slate-400">search</span>
             <input 
               v-model="uiStore.dishes.searchQuery" 
               type="text" 
               placeholder="Поиск" 
-              class="w-full pl-10 pr-10 p-3.5 bg-white rounded-2xl font-bold text-slate-800 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
+              class="w-full pl-10 pr-10 p-3.5 bg-white rounded-2xl font-bold text-slate-900 outline-none shadow-sm focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
             >
             <button 
                 v-if="uiStore.dishes.searchQuery" 
@@ -212,7 +212,7 @@ const setMealType = (id) => {
                         {{ mt.name }}
                     </span>
                 </div>
-                <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100">
+                <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
                     {{ dish.meal_type_name }}
                 </span>
                 <span 
@@ -226,7 +226,7 @@ const setMealType = (id) => {
             </div>
             
             <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">
-            <span class="text-orange-500">🔥 {{ dish.kcal || 0 }}</span>
+            <span class="text-slate-900 font-bold">🔥 {{ dish.kcal || 0 }}</span>
             <span>Б {{ dish.protein || 0 }}</span>
             <span>Ж {{ dish.fat || 0 }}</span>
             <span>У {{ dish.carbs || 0 }}</span>

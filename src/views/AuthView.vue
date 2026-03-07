@@ -30,7 +30,7 @@ onMounted(() => {
       <p class="text-slate-400 text-sm font-bold mb-8">Загрузка вашего профиля...</p>
 
       <div v-if="auth.loading || auth.authStatus === 'loading'" class="flex flex-col items-center gap-3">
-        <span class="material-icons-round animate-spin text-3xl text-indigo-500">donut_large</span>
+        <span class="material-icons-outlined animate-spin text-3xl text-indigo-500">donut_large</span>
         <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Синхронизация с Telegram</p>
       </div>
 

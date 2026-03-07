@@ -156,7 +156,7 @@ const periods = [
         <h3 class="card-title text-sm ml-2 mb-2">Моя Семья</h3>
         
         <div v-if="settingsStore.loading" class="text-center py-6">
-            <span class="material-icons-round animate-spin text-slate-300">sync</span>
+            <span class="material-icons-outlined animate-spin text-slate-300">sync</span>
         </div>
 
         <div v-else class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 space-y-4">
@@ -269,7 +269,7 @@ const periods = [
       <div>
         <button 
           @click="handleLogout" 
-          class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-red-500 font-bold text-sm"
+          class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-slate-900 font-bold text-sm"
         >
              <span class="material-icons-round">logout</span>
              <span>Выйти из аккаунта</span>
@@ -285,7 +285,7 @@ const periods = [
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
         <div class="bg-white w-full max-w-xs rounded-[32px] p-6 relative z-10 modal-content">
             <div class="text-center mb-6">
-                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
+                <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
                 <h3 class="text-xl font-black text-slate-900">Вход в семью</h3>
                 <p class="text-xs text-slate-400 font-bold mt-1">Введите 6-значный код приглашения</p>
             </div>

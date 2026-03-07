@@ -167,7 +167,7 @@ onUnmounted(() => {
   <div class="flex flex-col h-[100dvh] max-w-md mx-auto bg-slate-50 relative overflow-hidden text-slate-900 font-sans selection:bg-amber-100">
     
     <!-- Офлайн индикатор -->
-    <div v-if="ui.isOffline" class="fixed top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold text-center py-1 z-[2000] animate-slide-down">
+    <div v-if="ui.isOffline" class="fixed top-0 left-0 right-0 bg-slate-900 text-white text-[10px] font-bold text-center py-1 z-[2000] animate-slide-down">
         Нет соединения с интернетом
     </div>
 
@@ -176,7 +176,7 @@ onUnmounted(() => {
       @click="ui.isLogOpen = true" 
       class="fixed top-2 right-2 z-[200] w-12 h-12 flex items-center justify-center bg-slate-900/40 text-white rounded-full active:scale-95 shadow-lg backdrop-blur-sm"
     >
-      <span class="material-icons-round text-xl">bug_report</span>
+      <span class="material-icons-outlined text-xl">bug_report</span>
     </button>
 
     <AppLogs />
@@ -188,13 +188,13 @@ onUnmounted(() => {
       <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
     </div>
 
-    <div v-else-if="error" class="flex-1 flex flex-col items-center justify-center p-4 text-center bg-red-50 text-red-800">
-        <span class="material-icons-round text-4xl text-red-400 mb-2">error_outline</span>
+    <div v-else-if="error" class="flex-1 flex flex-col items-center justify-center p-4 text-center bg-slate-50 text-slate-800">
+        <span class="material-icons-outlined text-4xl text-slate-400 mb-2">error_outline</span>
         <p class="text-sm font-bold">Произошла ошибка</p>
         <div class="mt-4 p-2 bg-white rounded-lg text-left text-xs w-full overflow-auto" style="max-height: 50vh;">
           <pre>{{ error.stack || error }}</pre>
         </div>
-        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold">Обновить</button>
+        <button @click="window.location.reload()" class="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">Обновить</button>
     </div>
 
     <div v-else-if="!auth.isAuth" class="flex-1 bg-white">
@@ -219,7 +219,7 @@ onUnmounted(() => {
           >
             <!-- Special styling for center button (Shopping) -->
             <div v-if="tab.id === 'shopping'" class="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-lg shadow-slate-900/20 group-active:scale-95 transition-transform absolute -top-8 border-4 border-slate-50">
-                 <span class="material-icons-round text-[28px]">shopping_bag</span>
+                 <span class="material-icons-outlined text-[28px]">shopping_bag</span>
             </div>
             
             <!-- Standard tabs -->

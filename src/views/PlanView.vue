@@ -367,7 +367,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
       <!-- Date Navigation -->
       <div class="flex items-center justify-between">
           <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-              <span class="material-icons-round">chevron_left</span>
+              <span class="material-icons-outlined">chevron_left</span>
           </button>
           
           <div class="flex flex-col items-center tap-effect" @click="goToToday">
@@ -550,11 +550,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
                       v-for="(item, idx) in getSlotItems(day, slot.id).slice(0, 3)" 
                       :key="item.id" 
                       class="flex-1 w-full rounded-lg border flex items-center justify-center px-1 overflow-hidden"
-                      :class="item.ignore_shopping ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'"
+                      :class="item.ignore_shopping ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'"
                    >
-                      <span class="text-[7px] font-bold text-center leading-tight line-clamp-2 w-full break-words" :class="item.ignore_shopping ? 'text-red-500 line-through' : 'text-slate-700'">
+                      <span class="text-[7px] font-bold text-center leading-tight line-clamp-2 w-full break-words" :class="item.ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-700'">
                           {{ item.dish_id ? item.dishes?.name : item.products?.name }}
-                          <span v-if="item.portions > 1" class="text-indigo-500"> x{{ item.portions }}</span>
+                          <span v-if="item.portions > 1" class="text-slate-900"> x{{ item.portions }}</span>
                       </span>
                     </div>
                    

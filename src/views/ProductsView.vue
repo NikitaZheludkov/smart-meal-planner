@@ -79,11 +79,11 @@ onMounted(async () => {
         <h1 class="app-title mb-4">продукты</h1>
 
         <div class="relative mb-4">
-            <span class="material-icons-round absolute left-4 top-3.5 text-slate-400">search</span>
+            <span class="material-icons-outlined absolute left-4 top-3.5 text-slate-400">search</span>
             <input 
                 v-model="searchQuery" 
                 placeholder="Поиск" 
-                class="w-full pl-11 pr-10 py-3.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-indigo-500/10 transition-all border border-slate-100"
+                class="w-full pl-11 pr-10 py-3.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
             >
             <button 
                 v-if="searchQuery" 
@@ -109,7 +109,7 @@ onMounted(async () => {
 
     <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
         <div v-if="productStore.loading" class="flex justify-center py-10">
-            <span class="material-icons-round animate-spin text-slate-300">sync</span>
+            <span class="material-icons-round animate-spin text-slate-900">sync</span>
         </div>
 
         <div v-else-if="filteredProducts.length === 0" class="text-center py-10 opacity-50">

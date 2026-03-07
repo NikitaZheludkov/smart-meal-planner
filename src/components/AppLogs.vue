@@ -21,7 +21,7 @@ const copyLogs = () => {
     <div v-if="ui.isLogOpen" class="fixed inset-0 z-[100] bg-white flex flex-col">
       <header class="p-4 border-b flex items-center justify-between bg-slate-50">
         <h2 class="font-bold flex items-center gap-2">
-          <span class="material-icons-round text-slate-400">bug_report</span>
+          <span class="material-icons-outlined text-slate-400">bug_report</span>
           Логи приложения
         </h2>
         <div class="flex gap-2">

@@ -153,7 +153,7 @@ const handleCancel = () => {
                 @click="handleCancel" 
                 class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
             >
-                <span class="material-icons-round text-xl">close</span>
+                <span class="material-icons-outlined text-xl">close</span>
             </button>
         </div>
         

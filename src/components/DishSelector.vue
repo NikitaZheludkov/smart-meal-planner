@@ -179,8 +179,8 @@ const getDishSlotName = (id) => {
                               🔥 {{ item.dishes.kcal }} ккал
                           </div>
                       </div>
-                      <button @click="removeItem(item)" class="text-red-400 p-2 -mr-2 -mt-2 hover:bg-red-50 rounded-lg transition-colors">
-                          <span class="material-icons-round text-lg">delete</span>
+                      <button @click="removeItem(item)" class="text-slate-400 p-2 -mr-2 -mt-2 hover:bg-slate-100 rounded-lg transition-colors">
+                          <span class="material-icons-outlined text-lg">delete</span>
                       </button>
                   </div>
 
@@ -200,11 +200,11 @@ const getDishSlotName = (id) => {
                       <button 
                         @click="toggleShopping(item)"
                         class="flex-1 flex items-center gap-2 h-9 px-2 rounded-xl bg-slate-50 border border-slate-100 tap-effect transition-colors"
-                        :class="item.ignore_shopping ? 'bg-indigo-50 border-indigo-100' : ''"
+                        :class="item.ignore_shopping ? 'bg-slate-100 border-slate-200' : ''"
                       >
                           <div 
                             class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0"
-                            :class="item.ignore_shopping ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 bg-white'"
+                            :class="item.ignore_shopping ? 'bg-slate-900 border-slate-900' : 'border-slate-300 bg-white'"
                           >
                               <span v-if="item.ignore_shopping" class="material-icons-round text-white text-[10px] font-bold">check</span>
                           </div>
@@ -333,7 +333,7 @@ const getDishSlotName = (id) => {
                               <div class="text-xl">🥦</div>
                               <span class="card-title text-sm">{{ prod.name }}</span>
                           </div>
-                          <button class="w-7 h-7 rounded-lg bg-slate-50 text-indigo-500 flex items-center justify-center">
+                          <button class="w-7 h-7 rounded-lg bg-slate-100 text-slate-900 flex items-center justify-center">
                               <span class="material-icons-round text-sm">add</span>
                           </button>
                       </div>

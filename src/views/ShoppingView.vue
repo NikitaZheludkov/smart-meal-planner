@@ -186,7 +186,7 @@ const formatAmount = (val) => {
         <!-- Date Switcher Full Width -->
         <div class="flex items-center justify-between px-2 w-full">
             <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-                <span class="material-icons-round">chevron_left</span>
+                <span class="material-icons-outlined">chevron_left</span>
             </button>
             
             <div class="flex flex-col items-center tap-effect" @click="goToToday">
