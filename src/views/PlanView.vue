@@ -399,7 +399,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                 <div v-if="dailyTotals.kcal === 0 && currentDayData.every(g => !g.hasItems)" class="text-center py-20 opacity-40">
                     <div class="text-4xl mb-2">🍽️</div>
                     <p class="text-sm font-bold text-slate-400">День свободен</p>
-                    <button @click="switchTab('week')" class="mt-4 text-indigo-500 font-bold text-xs bg-indigo-50 px-4 py-2 rounded-xl">Перейти к сетке</button>
+                    <button @click="switchTab('week')" class="mt-4 btn-secondary text-xs px-4 py-2">Перейти к сетке</button>
                 </div>
 
                 <div class="space-y-6 mt-2">

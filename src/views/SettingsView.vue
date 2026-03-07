@@ -143,7 +143,7 @@ const periods = [
         </div>
         <button 
           @click="handleSave" 
-          class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 shadow-lg tap-effect"
+          class="btn-primary shadow-lg tap-effect text-xs"
         >
           Сохранить
         </button>
@@ -198,8 +198,8 @@ const periods = [
                 <div v-if="settingsStore.household?.invite_code">
                     <div class="text-[10px] font-bold text-slate-400 uppercase mb-1 text-center">Код для приглашения</div>
                     
-                    <button @click="copyCode" class="w-full bg-slate-900 rounded-2xl p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
-                        <div class="text-3xl font-black text-white tracking-[0.2em] text-center">
+                    <button @click="copyCode" class="w-full bg-slate-900 rounded-[20px] p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
+                        <div class="text-3xl font-black text-white tracking-[0.2em] text-center font-mono">
                             {{ settingsStore.household.invite_code }}
                         </div>
                         <div class="text-[9px] text-slate-400 text-center mt-1 font-bold uppercase tracking-widest">
@@ -215,14 +215,14 @@ const periods = [
                 <button 
                     v-else 
                     @click="handleGenerateCode"
-                    class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold text-xs tap-effect shadow-lg shadow-indigo-500/20"
+                    class="btn-primary w-full text-xs shadow-lg"
                 >
                     {{ isGenerating ? 'Создаем...' : 'Получить код доступа' }}
                 </button>
 
                 <button 
                     @click="showJoinModal = true"
-                    class="w-full mt-2 py-3 border border-slate-200 text-slate-500 rounded-xl font-bold text-xs tap-effect"
+                    class="btn-secondary w-full mt-2 text-xs"
                 >
                     Вступить в другую семью
                 </button>
@@ -231,7 +231,7 @@ const periods = [
             <div v-else>
                  <button 
                     @click="handleLeave"
-                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl font-bold text-xs tap-effect flex items-center justify-center gap-2"
+                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-full font-bold text-xs tap-effect flex items-center justify-center gap-2"
                 >
                     <span class="material-icons-round text-sm">logout</span>
                     Покинуть семью
@@ -294,20 +294,20 @@ const periods = [
                 v-model="joinCodeInput" 
                 placeholder="000 000" 
                 type="tel"
-                class="w-full text-center text-3xl tracking-[0.2em] font-black p-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500/20 mb-4 text-slate-900 placeholder:text-slate-200"
+                class="w-full text-center text-3xl tracking-[0.2em] font-black p-4 bg-slate-50 rounded-[20px] outline-none border-none mb-4 text-slate-900 placeholder:text-slate-200"
                 maxlength="6"
             >
             
             <button 
                 @click="handleJoin" 
                 :disabled="isJoining || joinCodeInput.length < 6"
-                class="w-full py-3.5 bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 mb-2 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 transition-all"
+                class="btn-primary w-full shadow-lg mb-2 flex items-center justify-center gap-2"
             >
                 <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
                 {{ isJoining ? 'Проверка...' : 'Войти' }}
             </button>
             
-            <button @click="showJoinModal = false" class="w-full py-3 text-slate-400 font-bold text-xs tap-effect">Отмена</button>
+            <button @click="showJoinModal = false" class="btn-secondary w-full text-xs font-bold">Отмена</button>
         </div>
     </div>
     </Transition>

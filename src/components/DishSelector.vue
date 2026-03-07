@@ -155,7 +155,7 @@ const getDishSlotName = (id) => {
                   {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
               </p>
           </div>
-          <button @click="$emit('close')" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg tap-effect">
+          <button @click="$emit('close')" class="btn-primary text-xs font-bold shadow-lg">
               Готово
           </button>
       </div>
@@ -231,26 +231,26 @@ const getDishSlotName = (id) => {
           </div>
 
           <div class="relative">
-             <span class="material-icons-round absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
+             <span class="material-icons-round absolute left-3 top-3.5 text-slate-400 text-lg">search</span>
              <input 
                 v-model="searchQuery" 
-                :placeholder="activeMode === 'dish' ? 'Найти рецепт...' : 'Найти продукт...'" 
-                class="w-full pl-9 pr-10 p-2.5 bg-slate-50 rounded-xl font-bold text-slate-800 outline-none border border-slate-100 focus:border-indigo-200 transition-colors text-sm placeholder:font-medium"
+                placeholder="Поиск рецептов..." 
+                class="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300"
              >
              <button 
                 v-if="searchQuery" 
                 @click="searchQuery = ''; telegram.haptic.selection()"
-                class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 tap-effect"
+                class="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 tap-effect"
             >
                 <span class="material-icons-round text-lg">close</span>
             </button>
           </div>
 
-          <div v-if="activeMode === 'dish'" class="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+          <div v-if="activeMode === 'dish'" class="flex overflow-x-auto gap-2 no-scrollbar pb-1 -mx-4 px-4">
               <button 
                   @click="activeCategory = 'all'; telegram.haptic.selection()" 
-                  class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors"
-                  :class="activeCategory === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'"
+                  class="shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold border transition-all tap-effect"
+                  :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
               >
                   Все
               </button>
@@ -258,8 +258,8 @@ const getDishSlotName = (id) => {
                   v-for="cat in dictionaries.dishTypes" 
                   :key="cat.id" 
                   @click="activeCategory = cat.id; telegram.haptic.selection()" 
-                  class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors"
-                  :class="activeCategory === cat.id ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-slate-500 border-slate-200'"
+                  class="shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold border transition-all tap-effect"
+                  :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
               >
                   {{ cat.name }}
               </button>

@@ -152,7 +152,7 @@ const handleCancel = () => {
             </button>
         </div>
         
-        <h3 class="text-lg font-bold text-slate-900 truncate px-2 text-center flex-1">
+        <h3 class="card-title text-lg truncate px-2 text-center flex-1">
             {{ isEditing ? (formData.id ? 'Редактирование' : 'Новый продукт') : 'Продукт' }}
         </h3>
 
@@ -160,7 +160,7 @@ const handleCancel = () => {
             <template v-if="isEditing">
                  <button 
                     @click="handleSave" 
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center gap-2"
+                    class="btn-primary text-xs font-bold shadow-lg flex items-center gap-2"
                     :class="formData.name && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
                     :disabled="!formData.name || isSaving"
                 >
@@ -205,7 +205,7 @@ const handleCancel = () => {
                 <input 
                     v-model="formData.name" 
                     placeholder="Например: Молоко" 
-                    class="w-full p-4 bg-white rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 text-lg shadow-sm"
+                    class="w-full p-4 bg-white rounded-2xl font-bold text-slate-900 outline-none border-none text-lg shadow-sm"
                     autoFocus
                 >
             </div>
@@ -214,7 +214,7 @@ const handleCancel = () => {
                 <div class="space-y-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Категория</label>
                     <div class="relative">
-                        <select v-model="formData.category" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm shadow-sm">
+                        <select v-model="formData.category" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
                             <option v-for="cat in dictionaries.productCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
                              <option v-if="dictionaries.productCategories.length === 0" value="Разное">Разное</option>
                         </select>
@@ -225,7 +225,7 @@ const handleCancel = () => {
                 <div class="space-y-1">
                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ед. изм.</label>
                     <div class="relative">
-                        <select v-model="formData.unit" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border border-slate-100 appearance-none text-sm shadow-sm">
+                        <select v-model="formData.unit" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
                             <option v-for="u in units" :key="u" :value="u">{{ u }}</option>
                         </select>
                         <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>

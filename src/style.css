@@ -19,12 +19,21 @@ body {
 }
 
 /* Typography System */
-.app-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 32px;
-  font-weight: 900; /* Heavy/Bold */
+body {
+  font-family: 'Montserrat', 'Inter', sans-serif; /* Montserrat as primary, Inter as fallback */
+  background-color: #F5F5F7;
   color: #000000;
-  letter-spacing: -0.02em;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 32px;
+  font-weight: 900; /* Black/Heavy */
+  color: #000000;
+  letter-spacing: -0.04em; /* Tighten Montserrat slightly */
   line-height: 1.1;
   text-transform: lowercase;
 }
@@ -34,13 +43,92 @@ body {
 }
 
 .card-title {
+  font-family: 'Montserrat', sans-serif;
   font-weight: 600; /* Semibold */
   color: #000000;
+  letter-spacing: -0.02em;
 }
 
 .text-secondary {
+  font-family: 'Inter', sans-serif; /* Inter is better for small/body text */
   font-weight: 400; /* Regular */
-  color: #8E8E93 !important; /* Muted Gray */
+  color: #8E8E93 !important;
+}
+
+/* Button Styles */
+button {
+  border-radius: 50px; /* Pill shape */
+}
+
+/* Primary Button Class (Black) */
+.btn-primary {
+  background-color: #000000;
+  color: #FFFFFF;
+  border-radius: 50px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 12px 24px;
+  border: none;
+  transition: transform 0.1s ease, opacity 0.2s ease;
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+/* Secondary Button Class (White/Outline) */
+.btn-secondary {
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #E5E5EA; /* Light gray border */
+  border-radius: 50px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  padding: 12px 24px;
+  transition: background-color 0.2s ease;
+}
+
+.btn-secondary:active {
+  background-color: #F5F5F7;
+}
+
+/* Input Styles */
+input, select, textarea {
+  border: none !important;
+  background-color: #FFFFFF !important;
+  border-radius: 16px; /* Slightly less rounded than buttons for inputs */
+  padding: 14px 16px;
+  font-family: 'Inter', sans-serif;
+  color: #000000;
+  outline: none;
+  box-shadow: none !important;
+  transition: background-color 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  background-color: #FFFFFF;
+  /* Optional: very subtle indicator */
+  /* box-shadow: inset 0 -1px 0 0 #000000 !important; */
+}
+
+input::placeholder {
+  color: #8E8E93;
+}
+
+/* Override existing utilities if needed */
+.rounded-xl {
+  border-radius: 20px !important; /* Consistent card rounding */
+}
+
+/* Custom Scrollbar Hide */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 /* Disable backdrop blur for flat feel */

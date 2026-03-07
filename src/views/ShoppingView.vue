@@ -216,12 +216,12 @@ const formatAmount = (val) => {
             </div>
 
             <!-- Reset Checks Button -->
-             <button @click="resetChecks" class="h-full flex-1 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors">
+             <button @click="resetChecks" class="h-full flex-1 btn-secondary flex items-center justify-center text-slate-400 tap-effect hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors shadow-sm">
                 <span class="material-icons-round text-xl">remove_done</span>
             </button>
 
             <!-- Copy List Button -->
-            <button @click="copyList" class="h-full flex-1 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 font-bold text-sm tap-effect">
+            <button @click="copyList" class="h-full flex-1 btn-secondary text-indigo-500 font-bold text-sm tap-effect shadow-sm">
                 <span class="material-icons-round text-lg">content_copy</span>
             </button>
         </div>

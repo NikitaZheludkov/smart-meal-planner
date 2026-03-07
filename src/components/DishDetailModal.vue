@@ -564,6 +564,25 @@ const onProductCreated = (product) => {
                         {{ formData.description }}
                     </div>
                 </div>
+
+                <div class="pt-2">
+                    <button 
+                        v-if="!isEditing"
+                        @click="isEditing = true; currentStep = 1" 
+                        class="btn-primary w-full shadow-lg text-sm flex items-center justify-center gap-2 mb-3"
+                    >
+                        <span class="material-icons-round text-lg">edit</span>
+                        Редактировать
+                    </button>
+                    
+                    <button 
+                        v-if="!isEditing"
+                        @click="$emit('close')" 
+                        class="btn-secondary w-full text-sm font-bold"
+                    >
+                        Закрыть
+                    </button>
+                </div>
             </div>
 
             <div v-else class="space-y-4 pb-20 relative overflow-hidden min-h-[400px]">
@@ -574,8 +593,8 @@ const onProductCreated = (product) => {
                     <div class="space-y-2">
                         <input 
                             v-model="formData.name" 
-                            placeholder="Название блюда" 
-                            class="w-full text-lg font-bold text-slate-900 bg-slate-50 rounded-2xl px-4 py-3.5 placeholder:text-slate-300 outline-none border-2 border-transparent focus:border-indigo-100 transition-colors"
+                            placeholder="Название блюда"
+                            class="text-center text-xl font-bold bg-slate-50 border-none rounded-2xl px-4 py-3 w-full focus:ring-0 placeholder:text-slate-300"
                             autofocus
                         >
                     </div>
@@ -648,7 +667,7 @@ const onProductCreated = (product) => {
                                 type="number" 
                                 inputmode="numeric"
                                 placeholder="1"
-                                class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none text-lg"
+                                class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
                                 @focus="$event.target.select()"
                             >
                             <button 
@@ -668,7 +687,7 @@ const onProductCreated = (product) => {
                                     v-model="productSearchQuery" 
                                     @blur="setTimeout(() => showProductDropdown = false, 200)"
                                     placeholder="Найти и добавить ингредиент..." 
-                                    class="w-full p-3.5 bg-transparent font-bold text-slate-700 outline-none text-base placeholder:text-slate-300"
+                                    class="w-full p-3.5 bg-transparent font-bold text-slate-700 outline-none border-none text-base placeholder:text-slate-300"
                                 >
                              </div>
                              <div v-else class="flex gap-2 items-center flex-1 px-1 py-1">
@@ -679,7 +698,7 @@ const onProductCreated = (product) => {
                                     type="number" 
                                     inputmode="decimal"
                                     :placeholder="selectedProductToAdd.unit" 
-                                    class="w-16 p-2 bg-slate-50 rounded-xl font-bold text-center outline-none border border-slate-200 focus:border-indigo-300 text-base" 
+                                    class="w-16 p-2 bg-slate-50 rounded-xl font-bold text-center outline-none border-none focus:ring-0 text-base" 
                                     @keydown.enter="addIngredientToForm"
                                 >
                                 <button @click="addIngredientToForm" class="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-md tap-effect disabled:opacity-50" :disabled="!amountToAdd"><span class="material-icons-round text-sm">check</span></button>
@@ -793,7 +812,7 @@ const onProductCreated = (product) => {
                     <textarea 
                         v-model="formData.description" 
                         placeholder="Заметки / Рецепт..." 
-                        class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 ring-indigo-500/10 border border-slate-100 min-h-[120px] text-base leading-relaxed"
+                        class="w-full p-4 bg-slate-50 rounded-2xl font-medium text-slate-700 outline-none focus:ring-0 border-none min-h-[120px] text-base leading-relaxed"
                     ></textarea>
 
                 </div>
