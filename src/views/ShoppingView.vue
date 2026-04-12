@@ -179,17 +179,25 @@ const formatAmount = (val) => {
     
     <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100">
       
-      <div class="px-5 pt-app-header pb-4 flex flex-col gap-4">
+      <div class="px-5 pt-app-header pb-3 flex flex-col gap-3">
           
-        <h1 class="app-title mb-0">Купить</h1>
-
-        <!-- Date Switcher Full Width -->
-        <div class="flex items-center justify-between px-2 w-full">
-            <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-                <span class="material-icons-outlined">chevron_left</span>
-            </button>
+        <!-- Header Row -->
+        <div class="flex items-center justify-between">
+            <h1 class="app-title mb-0">Купить</h1>
             
-            <div class="flex flex-col items-center tap-effect" @click="goToToday">
+            <div class="flex items-center gap-1">
+                <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                    <span class="material-icons-outlined text-xl">chevron_left</span>
+                </button>
+                <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                    <span class="material-icons-round text-xl">chevron_right</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Date Info & Today Btn -->
+        <div class="flex items-center justify-between px-1">
+            <div class="flex flex-col tap-effect" @click="goToToday">
                 <div class="text-sm font-black text-slate-900 flex items-center gap-2">
                     {{ periodLabel }}
                 </div>
@@ -197,31 +205,27 @@ const formatAmount = (val) => {
                     Вернуться
                 </div>
             </div>
-
-            <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-                <span class="material-icons-round">chevron_right</span>
-            </button>
         </div>
 
-        <!-- Controls Row -->
-        <div class="flex items-center gap-2 w-full h-10">
+        <!-- Controls Row (Smaller) -->
+        <div class="flex items-center gap-2 w-full h-9">
             <!-- View Switcher -->
-            <div class="flex-1 bg-slate-50 border border-slate-100 p-0.5 rounded-xl flex items-center h-full">
+            <div class="flex-[2] bg-slate-50 border border-slate-100 p-0.5 rounded-xl flex items-center h-full">
                 <button @click="switchViewTab('list')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
-                    <span class="material-icons-round text-lg">format_list_bulleted</span>
+                    <span class="material-icons-round text-base">format_list_bulleted</span>
                 </button>
                 <button @click="switchViewTab('departments')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
-                    <span class="material-icons-round text-lg">grid_view</span>
+                    <span class="material-icons-round text-base">grid_view</span>
                 </button>
             </div>
 
             <!-- Reset Checks Button -->
-             <button @click="resetChecks" class="h-full flex-1 btn-secondary flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors shadow-sm">
-                <span class="material-icons-round text-xl">remove_done</span>
+             <button @click="resetChecks" class="h-full flex-1 btn-secondary flex items-center justify-center text-slate-400 tap-effect p-0 shadow-sm">
+                <span class="material-icons-round text-lg">remove_done</span>
             </button>
 
             <!-- Copy List Button -->
-            <button @click="copyList" class="h-full flex-1 btn-secondary text-slate-900 font-bold text-sm tap-effect shadow-sm">
+            <button @click="copyList" class="h-full flex-1 btn-secondary text-slate-900 flex items-center justify-center tap-effect p-0 shadow-sm">
                 <span class="material-icons-round text-lg">content_copy</span>
             </button>
         </div>

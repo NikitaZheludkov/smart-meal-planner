@@ -74,21 +74,21 @@ onMounted(async () => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative border-b border-slate-100 px-5 pt-app-header pb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
         
         <h1 class="app-title mb-4">Продукты</h1>
 
         <div class="relative mb-4">
-            <span class="material-icons-outlined absolute left-4 top-3.5 text-slate-400">search</span>
+            <span class="material-icons-outlined absolute left-4 top-3 text-slate-400">search</span>
             <input 
                 v-model="searchQuery" 
-                placeholder="Поиск" 
-                class="w-full pl-11 pr-10 py-3.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
+                placeholder="Поиск по базе..." 
+                class="w-full pl-11 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
             >
             <button 
                 v-if="searchQuery" 
                 @click="searchQuery = ''"
-                class="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 tap-effect"
+                class="absolute right-4 top-3 text-slate-400 hover:text-slate-600 tap-effect"
             >
                 <span class="material-icons-round text-lg">close</span>
             </button>
@@ -99,8 +99,8 @@ onMounted(async () => {
                 v-for="cat in categories" 
                 :key="cat"
                 @click="selectedCategory = cat; telegram.haptic.selection()"
-                class="whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border"
-                :class="selectedCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]' : 'bg-white text-slate-500 border-slate-200'"
+                class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-all border"
+                :class="selectedCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
             >
                 {{ cat }}
             </button>

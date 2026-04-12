@@ -351,26 +351,11 @@ onMounted(() => { if (auth.isAuth) loadData() })
   <div class="flex flex-col h-full bg-slate-50 relative">
 
     <!-- Header with Date and View Switcher -->
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
       
-      <!-- Tab Switcher -->
-      <div class="bg-slate-100 p-1 rounded-full flex relative mb-4 h-10">
-         <div class="absolute inset-y-1 w-1/2 bg-white rounded-full shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
-         <button @click="switchTab('day')" class="flex-1 relative z-10 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
-             День
-         </button>
-         <button @click="switchTab('week')" class="flex-1 relative z-10 text-xs font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
-             Сетка
-         </button>
-      </div>
-
-      <!-- Date Navigation -->
-      <div class="flex items-center justify-between">
-          <button @click="changePeriod(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-              <span class="material-icons-outlined">chevron_left</span>
-          </button>
-          
-          <div class="flex flex-col items-center tap-effect" @click="goToToday">
+      <!-- Date Navigation & Switcher Row -->
+      <div class="flex items-center justify-between mb-4">
+          <div class="flex flex-col tap-effect" @click="goToToday">
               <div class="app-title !mb-0 text-2xl flex items-center gap-2">
                   {{ displayDateLabel }}
               </div>
@@ -379,9 +364,25 @@ onMounted(() => { if (auth.isAuth) loadData() })
               </div>
           </div>
 
-          <button @click="changePeriod(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
-              <span class="material-icons-round">chevron_right</span>
-          </button>
+          <div class="flex items-center gap-1">
+            <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <span class="material-icons-outlined text-xl">chevron_left</span>
+            </button>
+            <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <span class="material-icons-round text-xl">chevron_right</span>
+            </button>
+          </div>
+      </div>
+
+      <!-- Tab Switcher (Smaller) -->
+      <div class="bg-slate-100 p-0.5 rounded-xl flex relative h-9">
+         <div class="absolute inset-y-0.5 w-1/2 bg-white rounded-[10px] shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
+         <button @click="switchTab('day')" class="flex-1 relative z-10 text-[11px] font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
+             День
+         </button>
+         <button @click="switchTab('week')" class="flex-1 relative z-10 text-[11px] font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
+             Сетка
+         </button>
       </div>
     </div>
 

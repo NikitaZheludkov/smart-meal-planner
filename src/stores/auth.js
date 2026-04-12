@@ -236,7 +236,10 @@ export const useAuthStore = defineStore('auth', () => {
             // 1. Создаем новую "семью" (household)
             const { data: newHousehold, error: hError } = await supabase
                 .from('households')
-                .insert({ name: 'Моя семья' })
+                .insert({ 
+                    name: 'Моя семья',
+                    owner_id: authUser.id // Устанавливаем владельца
+                })
                 .select()
                 .single()
             

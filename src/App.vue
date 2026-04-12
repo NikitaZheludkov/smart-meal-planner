@@ -174,9 +174,9 @@ onUnmounted(() => {
     <!-- Кнопка логов (ВСЕГДА ДОСТУПНА ДЛЯ ОТЛАДКИ) -->
     <button 
       @click="ui.isLogOpen = true" 
-      class="fixed top-2 right-2 z-[200] w-12 h-12 flex items-center justify-center bg-slate-900/40 text-white rounded-full active:scale-95 shadow-lg backdrop-blur-sm"
+      class="fixed bottom-24 left-5 z-[200] w-10 h-10 flex items-center justify-center bg-slate-900/20 text-white/40 rounded-full active:scale-95 backdrop-blur-sm"
     >
-      <span class="material-icons-outlined text-xl">bug_report</span>
+      <span class="material-icons-outlined text-lg">bug_report</span>
     </button>
 
     <AppLogs />

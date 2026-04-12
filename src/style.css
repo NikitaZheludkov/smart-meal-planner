@@ -4,8 +4,8 @@
 
 :root {
   font-family: 'Inter', sans-serif;
-  /* Базовый отступ увеличен до 96px (64+32) по просьбе пользователя */
-  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 96px);
+  /* Стандартный отступ для мобильных устройств (Safe Area + базовый хедер) */
+  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 16px);
 }
 
 body {

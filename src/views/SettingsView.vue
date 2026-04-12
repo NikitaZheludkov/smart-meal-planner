@@ -127,26 +127,24 @@ const periods = [
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-10 sticky top-0 border-b border-slate-100 px-5 pt-app-header pb-4">
-      <h1 class="app-title mb-4">Настройки</h1>
-      <div class="flex items-center justify-between">
-        <div>
-          
-          <div class="flex items-center gap-2 mt-1">
-              <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-                  {{ getInitials(authStore.user?.user_metadata?.first_name) }}
-              </div>
-              <p class="text-sm font-bold text-slate-500">
-                  {{ authStore.user?.user_metadata?.first_name || 'Пользователь' }}
-              </p>
-          </div>
-        </div>
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="app-title mb-0">Настройки</h1>
         <button 
           @click="handleSave" 
-          class="btn-primary shadow-lg tap-effect text-xs"
+          class="btn-primary shadow-lg tap-effect text-[11px] py-2 px-4"
         >
           Сохранить
         </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
+              {{ getInitials(authStore.user?.user_metadata?.first_name || authStore.user?.email) }}
+          </div>
+          <p class="text-sm font-bold text-slate-500 truncate">
+              {{ authStore.user?.user_metadata?.first_name || authStore.user?.email?.split('@')[0] || 'Пользователь' }}
+          </p>
       </div>
     </div>
 
@@ -194,7 +192,7 @@ const periods = [
 
             <div class="h-[1px] bg-slate-50 w-full"></div>
 
-            <div v-if="isOwner">
+            <div v-if="isOwner || settingsStore.household?.invite_code">
                 <div v-if="settingsStore.household?.invite_code">
                     <div class="text-[10px] font-bold text-slate-400 mb-1 text-center">Код для приглашения</div>
                     
@@ -207,13 +205,13 @@ const periods = [
                         </div>
                     </button>
 
-                    <button @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
+                    <button v-if="isOwner" @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
                         {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
                     </button>
                 </div>
                 
                 <button 
-                    v-else 
+                    v-else-if="isOwner" 
                     @click="handleGenerateCode"
                     class="btn-primary w-full text-xs shadow-lg"
                 >
@@ -228,7 +226,7 @@ const periods = [
                 </button>
             </div>
 
-            <div v-else>
+            <div v-else-if="!isOwner && !settingsStore.household?.invite_code">
                  <button 
                     @click="handleLeave"
                     class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-full font-bold text-xs tap-effect flex items-center justify-center gap-2"
