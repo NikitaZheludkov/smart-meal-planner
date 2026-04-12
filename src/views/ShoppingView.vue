@@ -231,28 +231,35 @@ const formatAmount = (val) => {
         </div>
       </div>
 
-      <div v-if="dishStats.length > 0" class="pl-5 pb-4 overflow-x-auto no-scrollbar flex gap-2">
+      <!-- Dish Indicators Row (Horizontal Scroll) -->
+      <div v-if="dishStats.length > 0" class="overflow-x-auto no-scrollbar flex gap-2 px-5 pb-4">
           <div 
             v-for="dish in dishStats" 
             :key="dish.id"
-            class="relative w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect flex items-center justify-center p-0.5"
+            class="relative h-9 px-3 min-w-[100px] max-w-[160px] rounded-xl flex-shrink-0 overflow-hidden shadow-sm border border-slate-100 bg-white tap-effect flex items-center gap-2"
           >
+              <!-- Progress Background (Subtle) -->
+              <div 
+                class="absolute inset-0 bg-slate-900/5 transition-all duration-500" 
+                :style="{ width: dish.percent + '%' }"
+              ></div>
+
               <!-- Dish Name -->
-              <div class="text-[7px] font-normal text-center leading-tight text-secondary line-clamp-4 break-words w-full pb-1">
+              <div class="text-[10px] font-bold text-slate-700 truncate flex-1 relative z-10">
                   {{ dish.name }}
               </div>
+
+              <!-- Count Badge (Simple) -->
+              <div v-if="dish.count > 1" class="text-[10px] font-black text-slate-400 relative z-10">
+                  x{{ dish.count }}
+              </div>
               
-              <!-- Progress Overlay (Bottom Bar) -->
-              <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-100">
+              <!-- Progress Line (Bottom) -->
+              <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100">
                   <div 
                     class="h-full transition-all duration-500 bg-slate-900" 
                     :style="{ width: dish.percent + '%' }"
                   ></div>
-              </div>
-
-              <!-- Count Badge -->
-              <div v-if="dish.count > 1" class="absolute top-0 right-0 bg-slate-900 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm leading-none z-10">
-                  x{{ dish.count }}
               </div>
           </div>
       </div>
