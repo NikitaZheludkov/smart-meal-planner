@@ -12,23 +12,35 @@ export const useTelegramStore = defineStore('telegram', () => {
 
   // Инициализация (запускаем 1 раз при старте App.vue)
   const init = () => {
-    // Переносим получение tg сюда и добавляем проверку
+    // 1. Отслеживаем клавиатуру (работает везде)
+    const isInputLike = (el) => {
+        if (!el) return false
+        const tag = (el.tagName || '').toUpperCase()
+        return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+    }
+
+    window.addEventListener('focusin', (e) => {
+        if (isInputLike(e.target)) isKeyboardOpen.value = true
+    }, true)
+
+    window.addEventListener('focusout', (e) => {
+        if (isInputLike(e.target)) isKeyboardOpen.value = false
+    }, true)
+
+    // 2. Инициализация специфичных для TG функций
     tg = window.Telegram?.WebApp
     if (!tg) {
       console.log('Telegram WebApp не найден (обычный браузер)')
       return
     }
 
-    // 1. Сообщаем Телеграму, что приложение готово к показу
     tg.ready()
     isReady.value = true
 
-    // 2. Пытаемся развернуть на весь экран
     try {
         tg.expand()
     } catch (e) { console.error('Expand error:', e) }
 
-    // 3. Настраиваем цвета шапки и фона
     const appBgColor = '#F8FAFC' 
     
     try {
@@ -38,14 +50,12 @@ export const useTelegramStore = defineStore('telegram', () => {
         console.log('Настройка цветов не поддерживается этой версией Telegram')
     }
 
-    // 4. Сохраняем данные
     user.value = tg.initDataUnsafe?.user || null
     initData.value = tg.initData 
     platform.value = tg.platform || 'unknown'
     
     console.log('🦁 Telegram Store initialized on', platform.value)
     
-    // Проверка версии для избежания ошибок на старых клиентах
     const isVersionSupported = (minVersion) => {
         return tg.isVersionAtLeast ? tg.isVersionAtLeast(minVersion) : false
     }
@@ -55,25 +65,6 @@ export const useTelegramStore = defineStore('telegram', () => {
         tg.enableClosingConfirmation(true)
       }
     } catch (e) {}
-
-    // 5. Отслеживаем открытие клавиатуры по фокусу на полях ввода
-    const isInputLike = (el) => {
-      if (!el) return false
-      const tag = (el.tagName || '').toUpperCase()
-      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
-    }
-
-    window.addEventListener('focusin', (e) => {
-      if (isInputLike(e.target)) {
-        isKeyboardOpen.value = true
-      }
-    }, true)
-
-    window.addEventListener('focusout', (e) => {
-      if (isInputLike(e.target)) {
-        isKeyboardOpen.value = false
-      }
-    }, true)
 
     try {
       tg.onEvent('viewportChanged', () => {

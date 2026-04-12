@@ -1,16 +1,26 @@
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useTelegramStore } from '../stores/telegram'
 
 const auth = useAuthStore()
 const telegram = useTelegramStore()
 
-// При открытии страницы пытаемся сразу войти
-onMounted(() => {
-    // Если init() в App.vue еще не сработал или не вошел, 
-    // authStore.init() сам вызовет loginWithTelegram
-})
+const email = ref('')
+const password = ref('')
+const isLogin = ref(true)
+
+const handleSubmit = async () => {
+    try {
+        if (isLogin.value) {
+            await auth.signIn(email.value, password.value)
+        } else {
+            await auth.signUp(email.value, password.value)
+        }
+    } catch (e) {
+        // Ошибка уже обработана в сторе
+    }
+}
 </script>
 
 <template>
@@ -27,13 +37,17 @@ onMounted(() => {
       </div>
 
       <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Meal Planner</h1>
-      <p class="text-slate-400 text-sm font-bold mb-8">Загрузка вашего профиля...</p>
+      <p class="text-slate-400 text-sm font-bold mb-8">
+        {{ telegram.initData ? 'Загрузка профиля...' : 'Добро пожаловать!' }}
+      </p>
 
-      <div v-if="auth.loading || auth.authStatus === 'loading'" class="flex flex-col items-center gap-3">
+      <!-- Состояние загрузки TG (только если мы в TMA) -->
+      <div v-if="telegram.initData && (auth.loading || auth.authStatus === 'loading')" class="flex flex-col items-center gap-3">
         <span class="material-icons-outlined animate-spin text-3xl text-indigo-500">donut_large</span>
         <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Синхронизация с Telegram</p>
       </div>
 
+      <!-- Ошибка входа (TG или Web) -->
       <div v-else-if="auth.authStatus === 'error'" class="w-full animate-fade-in">
         <div class="bg-red-50 p-4 rounded-2xl border border-red-100 text-red-500 text-xs font-bold mb-4">
             <div class="flex items-center justify-center gap-2 mb-2">
@@ -48,29 +62,63 @@ onMounted(() => {
         </div>
         
         <button 
-            v-if="auth.authError?.canRetry"
-            @click="auth.loginWithTelegram()" 
+            @click="auth.authError?.type === 'network' ? auth.init() : (auth.authStatus = 'idle')" 
             class="w-full py-3 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95 transition-transform font-bold text-sm"
         >
-            Попробовать снова
-        </button>
-        <button 
-            v-else
-            @click="auth.loginWithTelegram()" 
-            class="px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl text-xs font-bold"
-        >
-            Перезагрузить
+            {{ auth.authError?.type === 'network' ? 'Попробовать снова' : 'Вернуться назад' }}
         </button>
       </div>
 
+      <!-- Форма входа (Web) -->
       <div v-else-if="!telegram.initData" class="w-full space-y-4 animate-fade-in">
-        <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-orange-600 text-xs font-bold mb-4">
-            Приложение запущено вне Telegram.<br>Авто-вход невозможен.
+        <div class="bg-white/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-100 shadow-xl shadow-indigo-100/20 space-y-4">
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-2">
+                <button 
+                    @click="isLogin = true" 
+                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-all"
+                    :class="isLogin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
+                >Вход</button>
+                <button 
+                    @click="isLogin = false" 
+                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-all"
+                    :class="!isLogin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
+                >Регистрация</button>
+            </div>
+
+            <div class="space-y-3 text-left">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Email</label>
+                    <input 
+                        v-model="email"
+                        type="email" 
+                        placeholder="your@email.com"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    >
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Пароль</label>
+                    <input 
+                        v-model="password"
+                        type="password" 
+                        placeholder="••••••••"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    >
+                </div>
+            </div>
+
+            <button 
+                @click="handleSubmit"
+                :disabled="auth.loading"
+                class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+                <span v-if="auth.loading" class="material-icons-round animate-spin text-lg">donut_large</span>
+                <span>{{ isLogin ? 'Войти' : 'Создать аккаунт' }}</span>
+            </button>
         </div>
         
         <button 
           @click="auth.loginAsTestUser()" 
-          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl tap-effect"
+          class="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-colors"
         >
           Войти как Dev User
         </button>
@@ -79,7 +127,9 @@ onMounted(() => {
     </div>
     
     <div class="p-6 text-center z-10">
-        <p class="text-[10px] text-slate-300 font-bold">Secure Telegram Auth • v1.0</p>
+        <p class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
+            {{ telegram.initData ? 'Secure Telegram Auth' : 'Meal Planner Cloud' }} • v1.1
+        </p>
     </div>
   </div>
 </template>

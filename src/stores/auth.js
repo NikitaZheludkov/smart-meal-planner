@@ -58,9 +58,12 @@ export const useAuthStore = defineStore('auth', () => {
         if (session?.user) {
             ui.addLog('Сессия найдена при старте, юзер: ' + session.user.id)
             await handleUserSession(session.user)
-        } else {
+        } else if (useTelegramStore().initData) {
             ui.addLog('Сессия не найдена при старте, пробуем TG вход')
             await loginWithTelegram()
+        } else {
+            ui.addLog('Сессия не найдена, вход через TG невозможен (не в TMA)')
+            authStatus.value = 'idle'
         }
         
         // 3. Слушаем изменения
@@ -215,7 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
         ui.addLog('Загрузка профиля из БД для: ' + authUser.id)
         
-        const { data, error } = await withRetry(async () => {
+        let { data, error } = await withRetry(async () => {
             return await withTimeout(
                 supabase
                     .from('profiles')
@@ -226,13 +229,44 @@ export const useAuthStore = defineStore('auth', () => {
             )
         })
             
+        // Если профиль не найден (новый пользователь через Email/Password)
+        if (error && error.code === 'PGRST116') {
+            ui.addLog('Профиль не найден, создаем новый household...', 'warn')
+            
+            // 1. Создаем новую "семью" (household)
+            const { data: newHousehold, error: hError } = await supabase
+                .from('households')
+                .insert({ name: 'Моя семья' })
+                .select()
+                .single()
+            
+            if (hError) {
+                ui.addLog('Ошибка создания household', 'error', hError)
+                throw hError
+            }
+
+            // 2. Создаем профиль
+            const { data: newProfile, error: pError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: authUser.id,
+                    household_id: newHousehold.id,
+                    first_name: authUser.email?.split('@')[0] || 'Пользователь'
+                })
+                .select()
+                .single()
+            
+            if (pError) {
+                ui.addLog('Ошибка создания профиля', 'error', pError)
+                throw pError
+            }
+
+            data = newProfile
+            error = null
+        }
+
         if (error) {
             ui.addLog('Ошибка загрузки профиля', 'error', error)
-            if (error.code === 'PGRST116') {
-                ui.addLog('Профиль не найден в базе', 'warn')
-                authStatus.value = 'error'
-                authError.value = { message: 'Профиль не найден', type: 'auth', canRetry: false }
-            }
             // При сетевых ошибках НЕ выходим из аккаунта, просто ждем
             const isTransient = isNetworkError(error)
             
@@ -277,6 +311,50 @@ export const useAuthStore = defineStore('auth', () => {
     resetState()
   }
 
+  const signIn = async (email, password) => {
+    loading.value = true
+    authStatus.value = 'loading'
+    authError.value = null
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+        await handleUserSession(data.user)
+    } catch (e) {
+        ui.addLog('Ошибка входа', 'error', e)
+        authStatus.value = 'error'
+        authError.value = { message: e.message, type: 'auth', canRetry: true }
+        throw e
+    } finally {
+        loading.value = false
+    }
+  }
+
+  const signUp = async (email, password) => {
+    loading.value = true
+    authStatus.value = 'loading'
+    authError.value = null
+    try {
+        const { data, error } = await supabase.auth.signUp({ email, password })
+        if (error) throw error
+        
+        if (data.user) {
+            // Если регистрация прошла, но нужно подтверждение почты (стандарт Supabase)
+            if (!data.session) {
+                ui.showToast('Проверьте почту для подтверждения', 'info')
+            } else {
+                await handleUserSession(data.user)
+            }
+        }
+    } catch (e) {
+        ui.addLog('Ошибка регистрации', 'error', e)
+        authStatus.value = 'error'
+        authError.value = { message: e.message, type: 'auth', canRetry: true }
+        throw e
+    } finally {
+        loading.value = false
+    }
+  }
+
   const loginAsTestUser = async () => {
     // В продакшене этот метод должен быть недоступен или защищен
     if (import.meta.env.PROD && !import.meta.env.VITE_ENABLE_TEST_USER) {
@@ -314,6 +392,8 @@ export const useAuthStore = defineStore('auth', () => {
     refreshSession, 
     loginWithTelegram, 
     loginAsTestUser, 
+    signIn,
+    signUp,
     signOut, 
     handleUserSession
   }
