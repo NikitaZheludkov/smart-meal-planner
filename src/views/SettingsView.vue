@@ -279,33 +279,38 @@ const periods = [
     
 
     <Transition name="modal">
-    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="showJoinModal = false">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
-        <div class="bg-white w-full max-w-xs rounded-[32px] p-6 relative z-10 modal-content">
-            <div class="text-center mb-6">
-                <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🔑</div>
-                <h3 class="text-xl font-black text-slate-900">Вход в семью</h3>
-                <p class="text-xs text-slate-400 font-bold mt-1">Введите 6-значный код приглашения</p>
+    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex flex-col" @click.self="showJoinModal = false">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
+        
+        <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
+            <div class="flex-1 bg-white rounded-t-[32px] p-8 flex flex-col items-center justify-center">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm border border-slate-100">🔑</div>
+                    <h3 class="text-2xl font-black text-slate-900">Вход в семью</h3>
+                    <p class="text-sm text-slate-400 font-bold mt-2">Введите 6-значный код приглашения</p>
+                </div>
+                
+                <input 
+                    v-model="joinCodeInput" 
+                    placeholder="000 000" 
+                    type="tel"
+                    class="w-full text-center text-4xl tracking-[0.2em] font-black p-6 bg-slate-50 rounded-[24px] outline-none border-none mb-6 text-slate-900 placeholder:text-slate-200 shadow-inner"
+                    maxlength="6"
+                >
+                
+                <div class="w-full space-y-3">
+                    <button 
+                        @click="handleJoin" 
+                        :disabled="isJoining || joinCodeInput.length < 6"
+                        class="btn-primary w-full py-4 shadow-xl flex items-center justify-center gap-2"
+                    >
+                        <span v-if="isJoining" class="material-icons-round animate-spin text-lg">sync</span>
+                        {{ isJoining ? 'Проверка...' : 'Войти в семью' }}
+                    </button>
+                    
+                    <button @click="showJoinModal = false" class="btn-secondary w-full py-4 text-sm font-bold">Отмена</button>
+                </div>
             </div>
-            
-            <input 
-                v-model="joinCodeInput" 
-                placeholder="000 000" 
-                type="tel"
-                class="w-full text-center text-3xl tracking-[0.2em] font-black p-4 bg-slate-50 rounded-[20px] outline-none border-none mb-4 text-slate-900 placeholder:text-slate-200"
-                maxlength="6"
-            >
-            
-            <button 
-                @click="handleJoin" 
-                :disabled="isJoining || joinCodeInput.length < 6"
-                class="btn-primary w-full shadow-lg mb-2 flex items-center justify-center gap-2"
-            >
-                <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
-                {{ isJoining ? 'Проверка' : 'Войти' }}
-            </button>
-            
-            <button @click="showJoinModal = false" class="btn-secondary w-full text-xs font-bold">Отмена</button>
         </div>
     </div>
     </Transition>

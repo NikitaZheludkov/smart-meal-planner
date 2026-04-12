@@ -136,22 +136,24 @@ const handleCancel = () => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col" @click.self="$emit('close')">
       
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-[calc(100%-48px)] rounded-t-[40px] sm:rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
         
-        <!-- Handle -->
-        <div class="w-full bg-white pt-2 pb-1 shrink-0 z-20 rounded-t-[40px]">
-            <div class="modal-handle"></div>
-        </div>
+        <div class="flex-1 bg-white rounded-t-[32px] flex flex-col overflow-hidden relative">
+            
+            <!-- Handle -->
+            <div class="w-full pt-3 pb-1 shrink-0 z-20">
+                <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto"></div>
+            </div>
 
-        <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
+            <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
         <div class="w-20 flex justify-start">
             <button 
                 @click="handleCancel" 
-                class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
+                class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
             >
                 <span class="material-icons-outlined text-xl">close</span>
             </button>
@@ -245,6 +247,7 @@ const handleCancel = () => {
             </div>
         </div>
 
+      </div>
       </div>
     </div>
     </div>

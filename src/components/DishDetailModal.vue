@@ -434,15 +434,19 @@ const onProductCreated = (product) => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+    <div v-if="isOpen" class="fixed inset-0 z-[60] flex flex-col" @click.self="$emit('close')">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-[calc(100%-48px)] rounded-t-[40px] sm:rounded-[40px] p-0 shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+      <!-- Контейнер модалки с отступом сверху как у хедеров -->
+      <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
         
-        <!-- Handle -->
-        <div class="w-full bg-white pt-2 pb-1 shrink-0 z-20 rounded-t-[40px]">
-            <div class="modal-handle"></div>
-        </div>
+        <!-- Шапка модалки (белая с закруглениями) -->
+        <div class="flex-1 bg-white rounded-t-[32px] flex flex-col overflow-hidden relative">
+            
+            <!-- Handle -->
+            <div class="w-full pt-3 pb-1 shrink-0 z-20">
+                <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto"></div>
+            </div>
 
         <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
         
@@ -535,19 +539,19 @@ const onProductCreated = (product) => {
                 <div class="grid grid-cols-4 gap-2">
                     <div class="bg-slate-100 p-2 rounded-2xl border border-slate-200 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-900">{{ formData.kcal || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Ккал</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">Ккал</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.protein || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Белки</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">Белки</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.fat || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Жиры</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">Жиры</span>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-2xl border border-slate-100 flex flex-col items-center">
                         <span class="text-lg font-black text-slate-700">{{ formData.carbs || 0 }}</span>
-                        <span class="text-[9px] font-bold text-slate-400 uppercase uppercase uppercase">Угле</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">Угле</span>
                     </div>
                 </div>
 
@@ -858,18 +862,19 @@ const onProductCreated = (product) => {
       </div>
       
        <!-- Floating Action Button (Always Visible) -->
-      <div v-if="isEditing && !showTagSelection" class="fixed bottom-24 right-5 z-[70]">
-        <button 
-            @click="nextStep"
-            class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-all outline-none"
-            :disabled="currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)"
-            :class="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) ? 'opacity-50 cursor-not-allowed' : ''"
-        >
-            <span class="material-icons-round text-3xl">{{ currentStep === totalSteps ? 'check' : 'arrow_forward' }}</span>
-        </button>
-      </div>
+      <!-- Floating Action Button (Always Visible) -->
+        <div v-if="isEditing && !showTagSelection" class="fixed bottom-10 right-5 z-[70]">
+            <button 
+                @click="nextStep"
+                class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-all outline-none"
+                :disabled="currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)"
+                :class="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) ? 'opacity-50 cursor-not-allowed' : ''"
+            >
+                <span class="material-icons-round text-3xl">{{ currentStep === totalSteps ? 'check' : 'arrow_forward' }}</span>
+            </button>
+        </div>
 
-    </div>
+      </div>
     </div>
   </Transition>
     <ProductDetailModal 
