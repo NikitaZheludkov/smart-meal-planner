@@ -173,122 +173,101 @@ const getDishSlotName = (id) => {
             <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto"></div>
         </div>
 
-        <div class="px-5 pb-3 flex justify-between items-center shrink-0 bg-white z-20 shadow-sm border-b border-slate-50">
-            <div>
-                <h2 class="text-xl card-title">{{ getSlotName }}</h2>
-                <p class="text-[11px] font-bold text-slate-400">
-                    {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
-                </p>
+        <!-- Sticky Header Section -->
+        <div class="shrink-0 bg-white z-30 border-b border-slate-50 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
+            <!-- Top Row: Slot Info + Done Button -->
+            <div class="px-5 pb-3 flex justify-between items-center bg-white">
+                <div class="min-w-0 flex-1 pr-4">
+                    <h2 class="text-lg card-title truncate leading-tight">{{ getSlotName }}</h2>
+                    <p class="text-[10px] font-bold text-slate-400">
+                        {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
+                    </p>
+                </div>
+                <button @click="$emit('close')" class="btn-primary text-[11px] font-black py-2 px-5 shadow-md shrink-0">
+                    Готово
+                </button>
             </div>
-            <button @click="$emit('close')" class="btn-primary text-xs font-bold shadow-lg">
-                Готово
-            </button>
-        </div>
 
-        <div v-if="existingItems.length > 0" class="shrink-0 bg-slate-50/50 border-b border-slate-100 max-h-[40vh] overflow-y-auto no-scrollbar">
-            <div class="px-4 py-4 space-y-3">
-                <div class="text-[10px] font-bold text-slate-400 px-1">Выбрано ({{ existingItems.length }})</div>
-                
-                <div v-for="item in existingItems" :key="item.id" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 relative overflow-hidden">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="pr-8">
-                            <div class="card-title text-base leading-tight line-clamp-2">
-                                {{ item.dishes ? item.dishes.name : item.products?.name }}
-                            </div>
-                            <div v-if="item.dishes" class="text-[10px] font-bold text-orange-400 mt-0.5">
-                                🔥 {{ item.dishes.kcal }} ккал
-                            </div>
-                        </div>
-                        <button @click="removeItem(item)" class="text-slate-400 p-2 -mr-2 -mt-2 hover:bg-slate-100 rounded-lg transition-colors">
-                            <span class="material-icons-outlined text-lg">delete</span>
-                        </button>
+            <!-- Search Row -->
+            <div class="px-4 pb-3">
+                <div class="relative group">
+                    <span class="material-icons-round absolute left-3 top-2.5 text-slate-300 text-lg transition-colors group-focus-within:text-slate-900">search</span>
+                    <input 
+                        v-model="searchQuery" 
+                        :placeholder="activeMode === 'dish' ? 'Поиск рецептов...' : 'Поиск продуктов...'" 
+                        class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300 focus:bg-slate-100 transition-all"
+                    >
+                    <button 
+                        v-if="searchQuery" 
+                        @click="searchQuery = ''; telegram.haptic.selection()"
+                        class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 tap-effect"
+                    >
+                        <span class="material-icons-round text-lg">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Existing Items (Horizontal or Compact vertical) -->
+            <div v-if="existingItems.length > 0" class="px-4 pb-3">
+                <div class="bg-slate-50/80 rounded-2xl p-2 border border-slate-100">
+                    <div class="text-[9px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider flex justify-between items-center">
+                        <span>Выбрано ({{ existingItems.length }})</span>
+                        <span class="material-icons-round text-xs">expand_more</span>
                     </div>
-
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center bg-slate-50 rounded-xl h-9 border border-slate-100 px-1">
-                            <button @click="updatePortions(item, -1)" class="w-8 h-full flex items-center justify-center text-slate-400 active:scale-90 transition-transform">
-                                <span class="material-icons-round text-sm">remove</span>
-                            </button>
-                            <div class="text-sm font-black text-slate-900 w-6 text-center">
-                                {{ item.portions }}
-                            </div>
-                            <button @click="updatePortions(item, 1)" class="w-8 h-full flex items-center justify-center text-slate-400 active:scale-90 transition-transform">
-                                <span class="material-icons-round text-sm">add</span>
-                            </button>
-                        </div>
-
-                        <button 
-                            @click="toggleShopping(item)"
-                            class="flex-1 flex items-center gap-2 h-9 px-2 rounded-xl bg-slate-50 border border-slate-100 tap-effect transition-colors"
-                            :class="item.ignore_shopping ? 'bg-slate-100 border-slate-200' : ''"
+                    <div class="flex overflow-x-auto gap-2 no-scrollbar pb-0.5">
+                        <div v-for="item in existingItems" :key="item.id" 
+                            class="flex-shrink-0 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-sm animate-fade-in"
                         >
-                            <div 
-                                class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0"
-                                :class="item.ignore_shopping ? 'bg-slate-900 border-slate-900' : 'border-slate-300 bg-white'"
-                            >
-                                <span v-if="item.ignore_shopping" class="material-icons-round text-white text-[10px] font-bold">check</span>
-                            </div>
-                            <span class="text-[9px] font-bold text-slate-500 leading-none text-left pt-0.5">
-                                Не покупать
+                            <span class="text-[11px] font-bold text-slate-700 max-w-[100px] truncate">
+                                {{ item.dishes ? item.dishes.name : item.products?.name }}
                             </span>
-                        </button>
+                            <button @click="removeItem(item)" class="text-slate-300 hover:text-red-500 transition-colors">
+                                <span class="material-icons-round text-sm">cancel</span>
+                            </button>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Mode Switcher -->
+            <div class="px-4 pb-3 flex gap-2">
+                <div class="flex-1 bg-slate-100 p-1 rounded-xl flex font-bold text-[10px]">
+                    <button 
+                        @click="activeMode = 'dish'; telegram.haptic.selection()" 
+                        class="flex-1 py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1"
+                        :class="activeMode === 'dish' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
+                    >
+                        <span>🥘</span> Рецепты
+                    </button>
+                    <button 
+                        @click="activeMode = 'product'; telegram.haptic.selection()" 
+                        class="flex-1 py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1"
+                        :class="activeMode === 'product' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
+                    >
+                        <span>🥦</span> Продукты
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="px-4 py-2 bg-white z-10 shrink-0 space-y-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border-b border-slate-50">
-            <div class="bg-slate-100 p-1 rounded-full flex font-bold text-xs">
-                <button 
-                    @click="activeMode = 'dish'; telegram.haptic.selection()" 
-                    class="flex-1 py-2 rounded-full transition-all duration-200"
-                    :class="activeMode === 'dish' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
-                >
-                    🥘 Рецепты
-                </button>
-                <button 
-                    @click="activeMode = 'product'; telegram.haptic.selection()" 
-                    class="flex-1 py-2 rounded-full transition-all duration-200"
-                    :class="activeMode === 'product' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
-                >
-                    🥦 Продукты
-                </button>
-            </div>
-
-            <div class="relative">
-                <span class="material-icons-round absolute left-3 top-3.5 text-slate-400 text-lg">search</span>
-                <input 
-                    v-model="searchQuery" 
-                    placeholder="Поиск рецептов" 
-                    class="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300"
-                >
-                <button 
-                    v-if="searchQuery" 
-                    @click="searchQuery = ''; telegram.haptic.selection()"
-                    class="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 tap-effect"
-                >
-                    <span class="material-icons-round text-lg">close</span>
-                </button>
-            </div>
-
-            <div v-if="activeMode === 'dish'" class="flex overflow-x-auto gap-2 no-scrollbar pb-1 -mx-4 px-4">
-                <button 
-                    @click="activeCategory = 'all'; telegram.haptic.selection()" 
-                    class="shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold border transition-all tap-effect"
-                    :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
-                >
-                    Все
-                </button>
-                <button 
-                    v-for="cat in dictionaries.dishTypes" 
-                    :key="cat.id" 
-                    @click="activeCategory = cat.id; telegram.haptic.selection()" 
-                    class="shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold border transition-all tap-effect"
-                    :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
-                >
-                    {{ cat.name }}
-                </button>
-            </div>
+        <!-- Filter Row (Horizontal Scroll) -->
+        <div v-if="activeMode === 'dish'" class="shrink-0 bg-white px-4 py-2 border-b border-slate-50 flex overflow-x-auto gap-2 no-scrollbar">
+            <button 
+                @click="activeCategory = 'all'; telegram.haptic.selection()" 
+                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-all tap-effect"
+                :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+            >
+                Все
+            </button>
+            <button 
+                v-for="cat in dictionaries.dishTypes" 
+                :key="cat.id" 
+                @click="activeCategory = cat.id; telegram.haptic.selection()" 
+                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-all tap-effect"
+                :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+            >
+                {{ cat.name }}
+            </button>
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 pb-10 bg-slate-50 relative">
