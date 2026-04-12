@@ -250,6 +250,5 @@ const handleCancel = () => {
       </div>
       </div>
     </div>
-    </div>
   </Transition>
 </template>

@@ -861,8 +861,7 @@ const onProductCreated = (product) => {
 
       </div>
       
-       <!-- Floating Action Button (Always Visible) -->
-      <!-- Floating Action Button (Always Visible) -->
+        <!-- Floating Action Button -->
         <div v-if="isEditing && !showTagSelection" class="fixed bottom-10 right-5 z-[70]">
             <button 
                 @click="nextStep"
@@ -874,15 +873,16 @@ const onProductCreated = (product) => {
             </button>
         </div>
 
+        <ProductDetailModal 
+            :is-open="showCreateProductModal"
+            :product="newProductTarget"
+            @saved="onProductCreated"
+            @close="showCreateProductModal = false"
+        />
       </div>
     </div>
+  </div>
   </Transition>
-    <ProductDetailModal 
-        :is-open="showCreateProductModal"
-        :product="newProductTarget"
-        @saved="onProductCreated"
-        @close="showCreateProductModal = false"
-    />
 </template>
 
 <style scoped>
