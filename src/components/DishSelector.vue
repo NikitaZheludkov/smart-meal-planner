@@ -5,6 +5,7 @@ import { useProductStore } from '../stores/products'
 import { usePlanStore } from '../stores/plan'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useTelegramStore } from '../stores/telegram'
+import { useUIStore } from '../stores/ui'
 import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -29,6 +30,7 @@ const productStore = useProductStore()
 const planStore = usePlanStore()
 const dictionaries = useDictionariesStore()
 const telegram = useTelegramStore()
+const ui = useUIStore()
 
 const activeMode = ref('dish') 
 const searchQuery = ref('')
@@ -37,6 +39,10 @@ const activeCategory = ref('all')
 onMounted(async () => {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
     if (productStore.products.length === 0) await productStore.fetchProducts()
+})
+
+watch(() => props.isOpen, (newVal) => {
+    ui.isModalOpen = newVal
 })
 
 const yesterdayDishIds = computed(() => {
@@ -49,12 +55,37 @@ const yesterdayDishIds = computed(() => {
     return ids
 })
 
+const recommendedDishes = computed(() => {
+    if (activeMode.value !== 'dish' || searchQuery.value) return []
+    
+    return dishStore.dishes.filter(d => {
+        // Не показываем уже выбранные
+        if (props.existingItems.some(i => i.dish_id === d.id)) return false
+        
+        // Вчерашние или подходящие по слоту
+        return yesterdayDishIds.value.has(d.id) || d.meal_type_id === props.slotId
+    }).sort((a, b) => {
+        // Сначала вчерашние, потом по слоту
+        const isAYesterday = yesterdayDishIds.value.has(a.id)
+        const isBYesterday = yesterdayDishIds.value.has(b.id)
+        if (isAYesterday && !isBYesterday) return -1
+        if (!isAYesterday && isBYesterday) return 1
+        return 0
+    })
+})
+
 const filteredDishes = computed(() => {
     let list = dishStore.dishes
 
     if (props.existingItems.length > 0) {
         const selectedIds = new Set(props.existingItems.map(i => i.dish_id).filter(Boolean))
         list = list.filter(d => !selectedIds.has(d.id))
+    }
+
+    // Если нет поиска, убираем рекомендации из общего списка
+    if (!searchQuery.value) {
+        const recIds = new Set(recommendedDishes.value.map(d => d.id))
+        list = list.filter(d => !recIds.has(d.id))
     }
 
     if (activeCategory.value !== 'all') {
@@ -66,20 +97,7 @@ const filteredDishes = computed(() => {
         list = list.filter(d => d.name.toLowerCase().includes(q))
     }
 
-    return [...list].sort((a, b) => {
-        const isAYesterday = yesterdayDishIds.value.has(a.id)
-        const isBYesterday = yesterdayDishIds.value.has(b.id)
-        if (isAYesterday && !isBYesterday) return -1
-        if (!isAYesterday && isBYesterday) return 1
-
-        const isAMatch = a.meal_type_id === props.slotId
-        const isBMatch = b.meal_type_id === props.slotId
-        
-        if (isAMatch && !isBMatch) return -1
-        if (!isAMatch && isBMatch) return 1
-
-        return 0 
-    })
+    return list
 })
 
 const groupedProducts = computed(() => {
@@ -275,50 +293,76 @@ const getDishSlotName = (id) => {
 
         <div class="flex-1 overflow-y-auto px-4 pb-10 bg-slate-50 relative">
             <Transition name="slide-fade" mode="out-in">
-            <div v-if="activeMode === 'dish'" key="dish" class="space-y-2 pt-3">
-                <div v-if="filteredDishes.length === 0" class="text-center py-10 text-slate-400 text-sm font-bold">
+            <div v-if="activeMode === 'dish'" key="dish" class="space-y-4 pt-3">
+                <div v-if="filteredDishes.length === 0 && recommendedDishes.length === 0" class="text-center py-10 text-slate-400 text-sm font-bold">
                     {{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}
                 </div>
 
-                <TransitionGroup name="list" tag="div" class="space-y-2">
-                <div 
-                    v-for="dish in filteredDishes" 
-                    :key="dish.id"
-                    @click="selectItem(dish, 'dish')"
-                    class="p-2.5 rounded-2xl flex items-center gap-3 border transition-all tap-effect active:scale-[0.98]"
-                    :class="[
-                        isYesterday(dish.id) ? 'bg-indigo-50 border-indigo-100 shadow-sm' : 
-                        isSlotMatch(dish.meal_type_id) ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-100 shadow-sm'
-                    ]"
-                >
-                    <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-white flex items-center justify-center text-xl border border-slate-100/50 relative">
-                        <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
-                        <span v-else>🥘</span>
+                <!-- Рекомендованные блюда -->
+                <div v-if="recommendedDishes.length > 0" class="space-y-2">
+                    <div class="flex items-center gap-2 px-1">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Рекомендуем</span>
+                        <div class="h-px bg-slate-200 flex-1"></div>
                     </div>
-
-                    <div class="flex-1 min-w-0">
-                        <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                            <span v-if="isYesterday(dish.id)" class="text-[9px] font-black text-indigo-500 bg-white px-1.5 rounded border border-indigo-100 uppercase tracking-wide">Вчера</span>
-                            <span v-else-if="isSlotMatch(dish.meal_type_id)" class="text-[9px] font-black text-emerald-600 bg-white px-1.5 rounded border border-emerald-200 uppercase tracking-wide">
-                                {{ getDishSlotName(dish.meal_type_id) }}
-                            </span>
-                            <div class="card-title text-sm truncate">{{ dish.name }}</div>
-                        </div>
-                        
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
-                            <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
-                        </div>
-                    </div>
-
-                    <button 
-                        class="w-8 h-8 rounded-full bg-white border flex items-center justify-center shadow-sm"
-                        :class="isSlotMatch(dish.meal_type_id) && !isYesterday(dish.id) ? 'text-emerald-500 border-emerald-100' : 'text-indigo-500 border-slate-100'"
+                    
+                    <div v-for="dish in recommendedDishes" :key="dish.id" @click="selectItem(dish, 'dish')"
+                        class="p-3 rounded-2xl flex items-center gap-3 border transition-all tap-effect active:scale-[0.98] bg-white shadow-sm"
+                        :class="isYesterday(dish.id) ? 'border-indigo-200 ring-1 ring-indigo-50' : 'border-emerald-200 ring-1 ring-emerald-50'"
                     >
-                        <span class="material-icons-round text-lg">add</span>
-                    </button>
+                        <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center text-xl border border-slate-100">
+                            <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
+                            <span v-else>🥘</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                <span v-if="isYesterday(dish.id)" class="text-[9px] font-black text-indigo-500 bg-indigo-50 px-1.5 rounded border border-indigo-100 uppercase">Вчера</span>
+                                <span v-else class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 rounded border border-emerald-100 uppercase">{{ getSlotName }}</span>
+                                <div class="card-title text-sm truncate">{{ dish.name }}</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
+                                <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
+                            </div>
+                        </div>
+                        <button class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md">
+                            <span class="material-icons-round text-lg">add</span>
+                        </button>
+                    </div>
                 </div>
-                </TransitionGroup>
+
+                <!-- Основной список -->
+                <div v-if="filteredDishes.length > 0" class="space-y-2">
+                    <div v-if="recommendedDishes.length > 0" class="flex items-center gap-2 px-1 pt-2">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Все блюда</span>
+                        <div class="h-px bg-slate-200 flex-1"></div>
+                    </div>
+
+                    <TransitionGroup name="list" tag="div" class="space-y-2">
+                    <div 
+                        v-for="dish in filteredDishes" 
+                        :key="dish.id"
+                        @click="selectItem(dish, 'dish')"
+                        class="p-2.5 rounded-2xl flex items-center gap-3 border bg-white border-slate-100 shadow-sm transition-all tap-effect active:scale-[0.98]"
+                    >
+                        <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center text-xl border border-slate-100/50 relative">
+                            <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
+                            <span v-else>🥘</span>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="card-title text-sm truncate mb-0.5">{{ dish.name }}</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
+                                <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
+                            </div>
+                        </div>
+
+                        <button class="w-8 h-8 rounded-full bg-white border border-slate-100 text-slate-400 flex items-center justify-center shadow-sm">
+                            <span class="material-icons-round text-lg">add</span>
+                        </button>
+                    </div>
+                    </TransitionGroup>
+                </div>
             </div>
 
             <div v-else key="product" class="space-y-4 pt-3">

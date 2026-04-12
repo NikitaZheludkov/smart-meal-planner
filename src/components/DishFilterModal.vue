@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import { useTelegramStore } from '../stores/telegram'
@@ -13,6 +13,10 @@ const emit = defineEmits(['close'])
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 const telegram = useTelegramStore()
+
+watch(() => props.isOpen, (newVal) => {
+    uiStore.isModalOpen = newVal
+})
 
 // Категории для группировки
 const categoryLabels = {

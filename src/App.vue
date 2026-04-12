@@ -14,7 +14,6 @@ import ProductsView from './views/ProductsView.vue'
 import ShoppingView from './views/ShoppingView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AuthView from './views/AuthView.vue' 
-import AppLogs from './components/AppLogs.vue'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
@@ -171,15 +170,6 @@ onUnmounted(() => {
         Нет соединения с интернетом
     </div>
 
-    <!-- Кнопка логов (ВСЕГДА ДОСТУПНА ДЛЯ ОТЛАДКИ) -->
-    <button 
-      @click="ui.isLogOpen = true" 
-      class="fixed bottom-24 left-5 z-[200] w-10 h-10 flex items-center justify-center bg-slate-900/20 text-white/40 rounded-full active:scale-95 backdrop-blur-sm"
-    >
-      <span class="material-icons-outlined text-lg">bug_report</span>
-    </button>
-
-    <AppLogs />
     <ToastContainer />
 
     <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
@@ -209,7 +199,7 @@ onUnmounted(() => {
       </main>
 
       <nav class="pb-safe bg-white z-50 absolute bottom-0 w-full rounded-t-[30px] border-t border-slate-100 transition-transform duration-300"
-           :class="{ 'translate-y-full': telegram.isKeyboardOpen }">
+           :class="{ 'translate-y-full': telegram.isKeyboardOpen || ui.isModalOpen }">
         <div class="h-[76px] grid grid-cols-5 items-center px-2">
           <button 
             v-for="tab in tabs" 

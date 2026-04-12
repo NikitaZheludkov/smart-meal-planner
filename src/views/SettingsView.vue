@@ -1,12 +1,14 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useTelegramStore } from '../stores/telegram'
+import { useUIStore } from '../stores/ui'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const telegram = useTelegramStore()
+const ui = useUIStore()
 
 const selectedStartDay = ref(1)
 const selectedPeriod = ref(7)
@@ -22,6 +24,10 @@ onMounted(async () => {
 
 // --- ЛОГИКА СЕМЬИ ---
 const showJoinModal = ref(false)
+
+watch(showJoinModal, (newVal) => {
+    ui.isModalOpen = newVal
+})
 const joinCodeInput = ref('')
 const isGenerating = ref(false)
 const isJoining = ref(false)

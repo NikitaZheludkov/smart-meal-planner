@@ -291,6 +291,7 @@ const initForm = (dishData) => {
 }
 
 watch(() => props.isOpen, (newVal) => {
+    ui.isModalOpen = newVal
     if (newVal) {
         isSaving.value = false // Reset loading state
         if (props.dish) {
@@ -862,7 +863,7 @@ const onProductCreated = (product) => {
       </div>
       
         <!-- Floating Action Button -->
-        <div v-if="isEditing && !showTagSelection" class="fixed bottom-10 right-5 z-[70]">
+        <div v-if="isEditing && !showTagSelection" class="fixed bottom-24 right-5 z-[70]">
             <button 
                 @click="nextStep"
                 class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-all outline-none"

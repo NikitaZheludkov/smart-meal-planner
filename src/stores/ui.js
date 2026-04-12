@@ -32,6 +32,7 @@ export const useUIStore = defineStore('ui', () => {
   const toasts = ref([]) // Очередь уведомлений
   const isLogOpen = ref(false)
   const isOffline = ref(!navigator.onLine)
+  const isModalOpen = ref(false) // Глобальный флаг открытого модального окна
   
   const showToast = (message, type = 'info', duration = 3000) => {
     const id = Date.now()
@@ -91,7 +92,7 @@ export const useUIStore = defineStore('ui', () => {
 
   return { 
       plan, dishes, shopping, 
-      logs, toasts, isLogOpen, isOffline, 
+      logs, toasts, isLogOpen, isOffline, isModalOpen,
       setOffline, addLog, showToast, initNetworkListeners 
   }
 })
