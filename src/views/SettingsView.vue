@@ -133,8 +133,8 @@ const periods = [
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
-      <div class="flex items-center justify-between mb-4">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[160px] flex flex-col justify-between">
+      <div class="flex items-center justify-between">
         <h1 class="app-title mb-0">Настройки</h1>
         <button 
           @click="handleSave" 

@@ -351,15 +351,15 @@ onMounted(() => { if (auth.isAuth) loadData() })
   <div class="flex flex-col h-full bg-slate-50 relative">
 
     <!-- Header with Date and View Switcher -->
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[165px] flex flex-col justify-between">
       
       <!-- Date Navigation & Switcher Row -->
-      <div class="flex items-center justify-between mb-4">
-          <div class="flex flex-col tap-effect" @click="goToToday">
-              <div class="app-title !mb-0 text-2xl flex items-center gap-2">
+      <div class="flex items-center justify-between">
+          <div class="flex flex-col tap-effect min-h-[50px] justify-center" @click="goToToday">
+              <div class="app-title !mb-0 text-2xl flex items-center gap-2 leading-none">
                   {{ displayDateLabel }}
               </div>
-              <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-0.5">
+              <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-1">
                   Вернуться
               </div>
           </div>
@@ -375,7 +375,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
       </div>
 
       <!-- Tab Switcher (Smaller) -->
-      <div class="bg-slate-100 p-0.5 rounded-xl flex relative h-9">
+      <div class="bg-slate-100 p-0.5 rounded-xl flex relative h-9 shrink-0">
          <div class="absolute inset-y-0.5 w-1/2 bg-white rounded-[10px] shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
          <button @click="switchTab('day')" class="flex-1 relative z-10 text-[11px] font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
              День

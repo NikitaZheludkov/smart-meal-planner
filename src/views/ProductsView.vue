@@ -74,11 +74,11 @@ onMounted(async () => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[185px] flex flex-col justify-between">
         
-        <h1 class="app-title mb-4">Продукты</h1>
+        <h1 class="app-title">Продукты</h1>
 
-        <div class="relative mb-4">
+        <div class="relative">
             <span class="material-icons-outlined absolute left-4 top-3 text-slate-400">search</span>
             <input 
                 v-model="searchQuery" 

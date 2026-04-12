@@ -108,9 +108,9 @@ const setMealType = (id) => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[215px] flex flex-col justify-between">
         
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between">
         <h1 class="app-title mb-0">Рецепты</h1>
         
         <button 
@@ -122,7 +122,7 @@ const setMealType = (id) => {
         </button>
       </div>
 
-      <div class="relative mb-4">
+      <div class="relative">
         <span class="material-icons-outlined absolute left-3.5 top-3 text-slate-400">search</span>
         <input 
           v-model="uiStore.dishes.searchQuery" 
@@ -139,7 +139,7 @@ const setMealType = (id) => {
         </button>
       </div>
       
-      <div class="flex overflow-x-auto gap-2 no-scrollbar mb-3">
+      <div class="flex overflow-x-auto gap-2 no-scrollbar">
         <button 
           @click="setMealType(null)" 
           class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all tap-effect border" 
@@ -159,7 +159,7 @@ const setMealType = (id) => {
         </button>
       </div>
 
-      <div class="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+      <div class="flex overflow-x-auto gap-2 no-scrollbar">
         <button 
           @click="setCategory('all')" 
           class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all tap-effect border" 

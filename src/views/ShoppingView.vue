@@ -177,7 +177,7 @@ const formatAmount = (val) => {
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-10 relative overflow-hidden flex flex-col border-b border-slate-100 h-[260px] justify-between">
       
       <div class="px-5 pt-app-header pb-3 flex flex-col gap-3">
           
@@ -197,11 +197,11 @@ const formatAmount = (val) => {
 
         <!-- Date Info & Today Btn -->
         <div class="flex items-center justify-between px-1">
-            <div class="flex flex-col tap-effect" @click="goToToday">
-                <div class="text-sm font-black text-slate-900 flex items-center gap-2">
+            <div class="flex flex-col tap-effect min-h-[40px] justify-center" @click="goToToday">
+                <div class="text-sm font-black text-slate-900 flex items-center gap-2 leading-none">
                     {{ periodLabel }}
                 </div>
-                <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-0.5">
+                <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-1">
                     Вернуться
                 </div>
             </div>
@@ -232,7 +232,7 @@ const formatAmount = (val) => {
       </div>
 
       <!-- Dish Indicators Row (Horizontal Scroll) -->
-      <div v-if="dishStats.length > 0" class="overflow-x-auto no-scrollbar flex gap-2 px-5 pb-4">
+      <div v-if="dishStats.length > 0" class="overflow-x-auto no-scrollbar flex gap-2 px-5 pb-4 min-h-[52px]">
           <div 
             v-for="dish in dishStats" 
             :key="dish.id"
@@ -263,8 +263,9 @@ const formatAmount = (val) => {
               </div>
           </div>
       </div>
+      <div v-else class="h-[52px]"></div>
 
-      <div class="h-1 w-full bg-slate-100">
+      <div class="h-1 w-full bg-slate-100 shrink-0">
           <div class="h-full bg-slate-900 transition-all duration-500" :style="{ width: (totalItems > 0 ? (countChecked / totalItems * 100) : 0) + '%' }"></div>
       </div>
     </div>
