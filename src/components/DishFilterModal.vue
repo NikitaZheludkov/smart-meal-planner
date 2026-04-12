@@ -71,7 +71,7 @@ const close = () => {
     <div v-if="isOpen" class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="close">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
       
-      <div class="bg-white w-full max-w-sm h-[80vh] sm:rounded-[32px] rounded-t-[32px] shadow-2xl relative z-10 flex flex-col modal-content">
+      <div class="bg-white w-full max-w-sm h-[calc(100%-48px)] sm:rounded-[32px] rounded-t-[32px] shadow-2xl relative z-10 flex flex-col modal-content">
         
         <div class="px-5 pt-5 pb-3 border-b border-slate-50 flex justify-between items-center bg-white rounded-t-[32px]">
           <div class="flex items-center gap-2">

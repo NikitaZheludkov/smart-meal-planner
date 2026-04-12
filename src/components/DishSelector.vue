@@ -146,7 +146,7 @@ const getDishSlotName = (id) => {
   <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center p-0 sm:p-4" @click.self="$emit('close')">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
     
-    <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-96px)] rounded-t-[40px] sm:rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
+    <div class="bg-white w-full max-w-sm h-full max-h-[calc(100%-48px)] rounded-t-[40px] sm:rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden modal-content">
       
       <!-- Handle -->
       <div class="w-full bg-white pt-2 pb-1 shrink-0 z-20 rounded-t-[40px]">
