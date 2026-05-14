@@ -186,10 +186,10 @@ const formatAmount = (val) => {
             <h1 class="app-title mb-0">Купить</h1>
             
             <div class="flex items-center gap-1">
-                <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
                     <span class="material-icons-outlined text-xl">chevron_left</span>
                 </button>
-                <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+                <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
                     <span class="material-icons-round text-xl">chevron_right</span>
                 </button>
             </div>
@@ -211,10 +211,10 @@ const formatAmount = (val) => {
         <div class="flex items-center gap-2 w-full h-9">
             <!-- View Switcher -->
             <div class="flex-[2] bg-slate-50 border border-slate-100 p-0.5 rounded-xl flex items-center h-full">
-                <button @click="switchViewTab('list')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('list')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-colors" :class="activeTab === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-base">format_list_bulleted</span>
                 </button>
-                <button @click="switchViewTab('departments')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-all" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
+                <button @click="switchViewTab('departments')" class="flex-1 h-full rounded-[10px] flex items-center justify-center transition-colors" :class="activeTab === 'departments' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'">
                     <span class="material-icons-round text-base">grid_view</span>
                 </button>
             </div>
@@ -240,7 +240,7 @@ const formatAmount = (val) => {
           >
               <!-- Progress Background (Subtle) -->
               <div 
-                class="absolute inset-0 bg-slate-900/5 transition-all duration-500" 
+                class="absolute inset-0 bg-slate-900/5 transition-width duration-500" 
                 :style="{ width: dish.percent + '%' }"
               ></div>
 
@@ -257,7 +257,7 @@ const formatAmount = (val) => {
               <!-- Progress Line (Bottom) -->
               <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100">
                   <div 
-                    class="h-full transition-all duration-500 bg-slate-900" 
+                    class="h-full transition-width duration-500 bg-slate-900" 
                     :style="{ width: dish.percent + '%' }"
                   ></div>
               </div>
@@ -266,7 +266,7 @@ const formatAmount = (val) => {
       <div v-else class="h-[52px]"></div>
 
       <div class="h-1 w-full bg-slate-100 shrink-0">
-          <div class="h-full bg-slate-900 transition-all duration-500" :style="{ width: (totalItems > 0 ? (countChecked / totalItems * 100) : 0) + '%' }"></div>
+          <div class="h-full bg-slate-900 transition-width duration-500" :style="{ width: (totalItems > 0 ? (countChecked / totalItems * 100) : 0) + '%' }"></div>
       </div>
     </div>
 
@@ -309,7 +309,7 @@ const formatAmount = (val) => {
                                     
                                     <!-- Content Area (Expandable) -->
                                     <div class="flex-1 flex items-center cursor-pointer tap-effect min-w-0 h-full py-0.5 ml-2" @click="item.dishes.length ? toggleExpand(item.id) : toggleCheck(item.id)">
-                                         <div class="flex-1 card-title transition-all duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
+                                         <div class="flex-1 card-title transition-opacity duration-200 truncate pr-2 leading-tight" :class="checkedIds.has(item.id) ? 'opacity-30 line-through' : ''">
                                             {{ item.name }}
                                         </div>
                                         

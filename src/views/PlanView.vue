@@ -365,10 +365,10 @@ onMounted(() => { if (auth.isAuth) loadData() })
           </div>
 
           <div class="flex items-center gap-1">
-            <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+            <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
                 <span class="material-icons-outlined text-xl">chevron_left</span>
             </button>
-            <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-all tap-effect">
+            <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
                 <span class="material-icons-round text-xl">chevron_right</span>
             </button>
           </div>
@@ -376,7 +376,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
       <!-- Tab Switcher (Smaller) -->
       <div class="bg-slate-100 p-0.5 rounded-xl flex relative h-9 shrink-0">
-         <div class="absolute inset-y-0.5 w-1/2 bg-white rounded-[10px] shadow-sm transition-all duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
+         <div class="absolute inset-y-0.5 w-1/2 bg-white rounded-[10px] shadow-sm transition-transform duration-300 ease-out" :class="uiStore.plan.activeTab === 'week' ? 'translate-x-full' : 'translate-x-0'"></div>
          <button @click="switchTab('day')" class="flex-1 relative z-10 text-[11px] font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'day' ? 'text-slate-900' : 'text-slate-400'">
              День
          </button>
@@ -423,7 +423,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                             <div v-if="group.hasItems">
                                 <div class="flex items-center justify-between px-2 mb-2">
                                     <h3 class="card-title text-lg">{{ group.slot.name }}</h3>
-                                    <button @click="openSelector(selectedDate, group.slot)" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 active:scale-90 transition-all tap-effect">
+                                    <button @click="openSelector(selectedDate, group.slot)" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform tap-effect">
                                         <span class="material-icons-round text-lg">add</span>
                                     </button>
                                 </div>
@@ -466,7 +466,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
                 <div v-for="day in weekDays" :key="day" 
-                    class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-all duration-300"
+                    class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-colors duration-300"
                     :class="isToday(day) ? 'shadow-md ring-2 ring-slate-900/5 border-slate-900' : 'shadow-sm border border-slate-100'"
                 >
                     
@@ -503,7 +503,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         v-for="slot in mealSlots" 
                         :key="slot.id" 
             @click="openSelector(day, slot)" 
-            class="w-full h-20 rounded-xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-all bg-white shadow-sm border-slate-100" 
+            class="w-full h-20 rounded-xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-colors bg-white shadow-sm border-slate-100" 
             :class="getSlotItems(day, slot.id).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
           >
             <span v-if="getSlotItems(day, slot.id).length === 0" class="text-[7px] font-bold text-slate-300 text-center break-all px-1">

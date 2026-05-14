@@ -37,11 +37,18 @@ const getBgColor = (type) => {
 <style scoped>
 .toast-enter-active,
 .toast-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity var(--dur-fast) var(--easing-base), transform var(--dur-fast) var(--easing-base);
 }
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
   transform: translateY(-20px);
+}
+.toast-leave-active {
+  position: absolute;
+  width: 100%;
+}
+.toast-move {
+  transition: transform var(--dur-fast) var(--easing-base);
 }
 </style>

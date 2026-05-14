@@ -195,7 +195,7 @@ const getDishSlotName = (id) => {
                     <input 
                         v-model="searchQuery" 
                         :placeholder="activeMode === 'dish' ? 'Поиск рецептов...' : 'Поиск продуктов...'" 
-                        class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300 focus:bg-slate-100 transition-all"
+                        class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300 focus:bg-slate-100 transition-colors"
                     >
                     <button 
                         v-if="searchQuery" 
@@ -234,14 +234,14 @@ const getDishSlotName = (id) => {
                 <div class="flex-1 bg-slate-100 p-1 rounded-xl flex font-bold text-[10px]">
                     <button 
                         @click="activeMode = 'dish'; telegram.haptic.selection()" 
-                        class="flex-1 py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1"
+                        class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         :class="activeMode === 'dish' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                     >
                         <span>🥘</span> Рецепты
                     </button>
                     <button 
                         @click="activeMode = 'product'; telegram.haptic.selection()" 
-                        class="flex-1 py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1"
+                        class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         :class="activeMode === 'product' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                     >
                         <span>🥦</span> Продукты
@@ -254,7 +254,7 @@ const getDishSlotName = (id) => {
         <div v-if="activeMode === 'dish'" class="shrink-0 bg-white px-4 py-2 border-b border-slate-50 flex overflow-x-auto gap-2 no-scrollbar">
             <button 
                 @click="activeCategory = 'all'; telegram.haptic.selection()" 
-                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-all tap-effect"
+                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
                 :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
             >
                 Все
@@ -263,7 +263,7 @@ const getDishSlotName = (id) => {
                 v-for="cat in dictionaries.dishTypes" 
                 :key="cat.id" 
                 @click="activeCategory = cat.id; telegram.haptic.selection()" 
-                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-all tap-effect"
+                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
                 :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
             >
                 {{ cat.name }}
@@ -285,7 +285,7 @@ const getDishSlotName = (id) => {
                     </div>
                     
                     <div v-for="dish in recommendedDishes" :key="dish.id" @click="selectItem(dish, 'dish')"
-                        class="p-3 rounded-2xl flex items-center gap-3 border transition-all tap-effect active:scale-[0.98] bg-white shadow-sm"
+                        class="p-3 rounded-2xl flex items-center gap-3 border transition-colors tap-effect active:scale-[0.98] bg-white shadow-sm"
                         :class="isYesterday(dish.id) ? 'border-indigo-200 ring-1 ring-indigo-50' : 'border-emerald-200 ring-1 ring-emerald-50'"
                     >
                         <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center text-xl border border-slate-100">
@@ -321,7 +321,7 @@ const getDishSlotName = (id) => {
                         v-for="dish in filteredDishes" 
                         :key="dish.id"
                         @click="selectItem(dish, 'dish')"
-                        class="p-2.5 rounded-2xl flex items-center gap-3 border bg-white border-slate-100 shadow-sm transition-all tap-effect active:scale-[0.98]"
+                        class="p-2.5 rounded-2xl flex items-center gap-3 border bg-white border-slate-100 shadow-sm transition-colors tap-effect active:scale-[0.98]"
                     >
                         <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center text-xl border border-slate-100/50 relative">
                             <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
@@ -375,4 +375,23 @@ const getDishSlotName = (id) => {
 
 <style scoped>
 /* Removed animate-slide-up as it is handled by global modal transition */
+.list-enter-active,
+.list-leave-active {
+  transition: opacity var(--dur-fast) var(--easing-base), transform var(--dur-fast) var(--easing-base);
+}
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+.list-leave-active {
+  position: absolute;
+  width: 100%;
+}
+.list-move {
+  transition: transform var(--dur-fast) var(--easing-base);
+}
 </style>

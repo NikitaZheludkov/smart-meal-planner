@@ -115,7 +115,7 @@ const setMealType = (id) => {
         
         <button 
             @click="openFilters"
-            class="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center relative tap-effect active:scale-95 transition-all"
+            class="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center relative tap-effect active:scale-95 transition-transform"
         >
             <span class="material-icons-round text-slate-400 text-xl">tune</span>
             <div v-if="uiStore.dishes.filterTags.length > 0" class="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border border-white"></div>
@@ -128,7 +128,7 @@ const setMealType = (id) => {
           v-model="uiStore.dishes.searchQuery" 
           type="text" 
           placeholder="Поиск по названию..." 
-          class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-slate-900/10 transition-all border border-slate-100"
+          class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-slate-900/10 transition-colors border border-slate-100"
         >
         <button 
             v-if="uiStore.dishes.searchQuery" 
@@ -142,7 +142,7 @@ const setMealType = (id) => {
       <div class="flex overflow-x-auto gap-2 no-scrollbar">
         <button 
           @click="setMealType(null)" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all tap-effect border" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-colors tap-effect border" 
           :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
         >
           Все
@@ -152,7 +152,7 @@ const setMealType = (id) => {
           v-for="type in mealTypes" 
           :key="type.id" 
           @click="setMealType(type.id)" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all tap-effect border" 
+          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-colors tap-effect border" 
           :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
         >
             {{ type.name }}
@@ -162,7 +162,7 @@ const setMealType = (id) => {
       <div class="flex overflow-x-auto gap-2 no-scrollbar">
         <button 
           @click="setCategory('all')" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all tap-effect border" 
+          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
           :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300' : 'bg-slate-50 text-slate-400 border-slate-100'"
         >
             Все типы
@@ -172,7 +172,7 @@ const setMealType = (id) => {
           v-for="cat in dishCategories" 
           :key="cat.id" 
           @click="setCategory(cat.id)" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all tap-effect border" 
+          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
           :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
         >
             {{ cat.name }}

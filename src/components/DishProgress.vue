@@ -63,7 +63,7 @@ const dishesWithProgress = computed(() => {
           <div 
             v-for="item in dishesWithProgress" 
             :key="item.id"
-            class="min-w-[140px] max-w-[140px] bg-white rounded-2xl p-3 border shadow-sm flex flex-col justify-between transition-all duration-300"
+            class="min-w-[140px] max-w-[140px] bg-white rounded-2xl p-3 border shadow-sm flex flex-col justify-between transition-colors duration-300"
             :class="item.isReady ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100'"
           >
               <div class="mb-2">
@@ -79,7 +79,7 @@ const dishesWithProgress = computed(() => {
 
               <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                   <div 
-                    class="h-full rounded-full transition-all duration-500 ease-out"
+                    class="h-full rounded-full transition-width duration-500 ease-out"
                     :class="item.isReady ? 'bg-emerald-500' : 'bg-indigo-500'"
                     :style="{ width: item.percent + '%' }"
                   ></div>

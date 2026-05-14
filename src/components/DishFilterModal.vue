@@ -109,7 +109,7 @@ const close = () => {
                             v-for="tag in group.tags" 
                             :key="tag.id" 
                             @click="toggleFilter(tag.id)"
-                            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
+                            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
                             :class="isSelected(tag.id) ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200'"
                         >
                             <span>{{ tag.icon }}</span>

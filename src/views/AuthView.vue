@@ -75,12 +75,12 @@ const handleSubmit = async () => {
             <div class="flex bg-slate-100 p-1 rounded-xl mb-2">
                 <button 
                     @click="isLogin = true" 
-                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-all"
+                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-colors"
                     :class="isLogin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                 >Вход</button>
                 <button 
                     @click="isLogin = false" 
-                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-all"
+                    class="flex-1 py-2 text-xs font-bold rounded-lg transition-colors"
                     :class="!isLogin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                 >Регистрация</button>
             </div>
@@ -92,7 +92,7 @@ const handleSubmit = async () => {
                         v-model="email"
                         type="email" 
                         placeholder="your@email.com"
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
                     >
                 </div>
                 <div>
@@ -101,7 +101,7 @@ const handleSubmit = async () => {
                         v-model="password"
                         type="password" 
                         placeholder="••••••••"
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
                     >
                 </div>
             </div>
@@ -109,7 +109,7 @@ const handleSubmit = async () => {
             <button 
                 @click="handleSubmit"
                 :disabled="auth.loading"
-                class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
             >
                 <span v-if="auth.loading" class="material-icons-round animate-spin text-lg">donut_large</span>
                 <span>{{ isLogin ? 'Войти' : 'Создать аккаунт' }}</span>

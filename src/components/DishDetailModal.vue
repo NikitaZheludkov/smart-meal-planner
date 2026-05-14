@@ -480,7 +480,7 @@ const onProductCreated = (product) => {
                     v-for="(label, idx) in ['Инфо', 'Состав', 'Детали']" 
                     :key="idx"
                     @click="goToStep(idx + 1)"
-                    class="flex-1 py-1.5 rounded-xl text-[10px] font-bold transition-all duration-300 tap-effect"
+                    class="flex-1 py-1.5 rounded-xl text-[10px] font-bold transition-colors duration-300 tap-effect"
                     :class="currentStep === (idx + 1) ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'"
                 >
                     {{ label }}
@@ -618,7 +618,7 @@ const onProductCreated = (product) => {
                                 :key="t.id" 
                                 @click="formData.dish_type_id = t.id"
                                 type="button"
-                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
                                 :class="formData.dish_type_id === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                             >
                                 {{ t.name }}
@@ -633,7 +633,7 @@ const onProductCreated = (product) => {
                                 :key="t.id" 
                                 @click="toggleMealType(t.id)"
                                 type="button"
-                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border tap-effect flex items-center gap-1.5"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
                                 :class="formData.meal_type_ids.includes(t.id) ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                             >
                                 {{ t.name }}
@@ -668,7 +668,7 @@ const onProductCreated = (product) => {
                         <div class="flex items-center gap-2">
                             <button 
                                 @click="formData.batch_yield = Math.max(1, (formData.batch_yield || 1) - 1); telegram.haptic.selection()"
-                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-all"
+                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
                             >
                                 <span class="material-icons-round text-base">remove</span>
                             </button>
@@ -682,7 +682,7 @@ const onProductCreated = (product) => {
                             >
                             <button 
                                 @click="formData.batch_yield = (formData.batch_yield || 1) + 1; telegram.haptic.selection()"
-                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-all"
+                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
                             >
                                 <span class="material-icons-round text-base">add</span>
                             </button>
@@ -845,7 +845,7 @@ const onProductCreated = (product) => {
                             v-for="tag in group.tags" 
                             :key="tag.id" 
                             @click="toggleTag(tag)"
-                            class="px-4 py-3 rounded-2xl text-sm font-bold transition-all border tap-effect flex items-center gap-2"
+                            class="px-4 py-3 rounded-2xl text-sm font-bold transition-colors border tap-effect flex items-center gap-2"
                             :class="isTagSelected(tag) ? 'bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]' : 'bg-white text-slate-600 border-slate-200'"
                          >
                             <span>{{ tag.icon }}</span>
@@ -866,7 +866,7 @@ const onProductCreated = (product) => {
         <div v-if="isEditing && !showTagSelection" class="fixed bottom-24 right-5 z-[70]">
             <button 
                 @click="nextStep"
-                class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-all outline-none"
+                class="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center tap-effect hover:scale-105 active:scale-95 transition-transform outline-none"
                 :disabled="currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)"
                 :class="(currentStep === 1 && (!formData.name || formData.meal_type_ids.length === 0)) ? 'opacity-50 cursor-not-allowed' : ''"
             >
