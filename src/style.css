@@ -156,6 +156,10 @@ html, body { overscroll-behavior-y: none; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.pb-app-nav {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
 /* --- NEW STYLES START HERE --- */
 
 /* Modal Sheet Style */

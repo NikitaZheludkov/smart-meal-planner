@@ -180,7 +180,7 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area relative">
+    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area relative">
       
       <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40 absolute inset-0 pointer-events-none">
         <div class="text-5xl mb-2">🍳</div>
@@ -235,7 +235,7 @@ const setMealType = (id) => {
       </TransitionGroup>
     </div>
 
-    <div class="fixed bottom-24 right-5 z-[60]">
+    <div class="fixed bottom-[calc(76px+env(safe-area-inset-bottom,0px)+16px)] right-5 z-[60]">
       <button 
         @click="openCreateDish" 
         class="bg-slate-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center tap-effect hover:scale-105 transition-transform"

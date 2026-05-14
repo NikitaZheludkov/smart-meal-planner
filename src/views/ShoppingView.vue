@@ -272,7 +272,7 @@ const formatAmount = (val) => {
 
     <div class="flex-1 relative overflow-hidden">
         <transition :name="transitionName">
-            <div :key="activeTab" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
+            <div :key="activeTab" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area w-full">
                 
                 <div v-if="totalItems === 0" class="empty-state-container -mt-10">
                     <div class="empty-state-icon">

@@ -388,7 +388,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
     <div class="flex-1 relative overflow-hidden">
         <transition :name="transitionName">
-            <div v-if="uiStore.plan.activeTab === 'day'" :key="'day-' + selectedDate.toISOString()" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] scroll-area w-full">
+            <div v-if="uiStore.plan.activeTab === 'day'" :key="'day-' + selectedDate.toISOString()" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area w-full">
                 <div v-if="dailyTotals.kcal > 0" class="card-accent-inverse p-4 rounded-[24px] mb-4 flex justify-around items-center mx-1 mt-2">
                     <div class="text-center">
                         <div class="text-lg font-black text-white">{{ Math.round(dailyTotals.kcal) }}</div>
@@ -464,7 +464,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                 </div>
             </div>
 
-            <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-[76px] space-y-3 mt-2 scroll-area w-full">
+            <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
                 <div v-for="day in weekDays" :key="day" 
                     class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-all duration-300"
                     :class="isToday(day) ? 'shadow-md ring-2 ring-slate-900/5 border-slate-900' : 'shadow-sm border border-slate-100'"
