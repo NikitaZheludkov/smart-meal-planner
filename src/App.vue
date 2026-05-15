@@ -9,8 +9,7 @@ import { useUIStore } from './stores/ui'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
-import DishesView from './views/DishesView.vue'
-import ProductsView from './views/ProductsView.vue'
+import CatalogView from './views/CatalogView.vue'
 import ShoppingView from './views/ShoppingView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AuthView from './views/AuthView.vue' 
@@ -30,11 +29,14 @@ const error = ref(null)
 const isAppInitializing = ref(true)
 const initError = ref(null)
 
+// Флаг синхронизации
+const isSyncing = ref(false)
+
 const tabs = [
   { id: 'plan', label: 'План', icon: 'calendar_today', component: PlanView },
-  { id: 'dishes', label: 'Блюда', icon: 'restaurant_menu', component: DishesView },
+  { id: 'catalog', label: 'Каталог', icon: 'restaurant_menu', component: CatalogView },
   { id: 'shopping', label: 'Купить', icon: 'shopping_bag', component: ShoppingView },
-  { id: 'products', label: 'Продукты', icon: 'kitchen', component: ProductsView },
+  { id: 'sync', label: 'Синхронизация', icon: 'sync', isAction: true },
   { id: 'settings', label: 'Настройки', icon: 'tune', component: SettingsView }
 ]
 
@@ -54,6 +56,20 @@ const switchTab = (tabId) => {
     
     telegram.haptic.impact('light') 
     currentTab.value = tabId
+}
+
+// Логика принудительной синхронизации
+const handleSync = async () => {
+    isSyncing.value = true
+    try {
+        await loadUserData()
+        ui.showToast('Синхронизация выполнена', 'success')
+    } catch (e) {
+        console.error('Ошибка синхронизации:', e)
+        ui.showToast('Ошибка синхронизации', 'error')
+    } finally {
+        isSyncing.value = false
+    }
 }
 
 // Единая функция загрузки данных пользователя
@@ -204,12 +220,19 @@ onUnmounted(() => {
           <button 
             v-for="tab in tabs" 
             :key="tab.id" 
-            @click="switchTab(tab.id)" 
+            @click="tab.isAction ? handleSync() : switchTab(tab.id)" 
             class="flex flex-col items-center justify-center transition-all duration-200 active:scale-95 group relative" 
           >
             <!-- Special styling for center button (Shopping) -->
             <div v-if="tab.id === 'shopping'" class="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-lg shadow-slate-900/20 group-active:scale-95 transition-transform absolute -top-8 border-4 border-slate-50">
                  <span class="material-icons-outlined text-[28px]">shopping_bag</span>
+            </div>
+            
+            <!-- Sync button with spinner -->
+            <div v-else-if="tab.id === 'sync'" class="flex flex-col items-center justify-center w-full h-full">
+                 <div class="w-12 h-8 flex items-center justify-center rounded-full transition-colors duration-200">
+                    <span class="material-icons-outlined text-[28px] transition-colors duration-200" :class="isSyncing ? 'text-black animate-spin' : 'text-slate-300 group-hover:text-slate-500'">{{ tab.icon }}</span>
+                 </div>
             </div>
             
             <!-- Standard tabs -->

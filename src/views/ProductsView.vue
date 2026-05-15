@@ -5,14 +5,19 @@ import { useTelegramStore } from '../stores/telegram'
 import { useDictionariesStore } from '../stores/dictionaries'
 import ProductDetailModal from '../components/ProductDetailModal.vue'
 
+const props = defineProps({
+  searchQuery: {
+    type: String,
+    default: ''
+  }
+})
+
 const productStore = useProductStore()
 const telegram = useTelegramStore()
 const dictionaries = useDictionariesStore()
 
-const searchQuery = ref('')
 const selectedCategory = ref('Все')
 
-// Состояние модалки
 const showProductModal = ref(false)
 const selectedProduct = ref(null)
 
@@ -55,8 +60,8 @@ const filteredProducts = computed(() => {
         result = result.filter(p => (p.category || 'Разное') === selectedCategory.value)
     }
     
-    if (searchQuery.value) {
-        const q = searchQuery.value.toLowerCase()
+    if (props.searchQuery) {
+        const q = props.searchQuery.toLowerCase()
         result = result.filter(p => p.name.toLowerCase().includes(q))
     }
     
@@ -74,26 +79,8 @@ onMounted(async () => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[185px] flex flex-col justify-between">
+    <div class="bg-white border-b border-slate-100 px-5 pb-4 flex flex-col justify-between">
         
-        <h1 class="app-title">Продукты</h1>
-
-        <div class="relative">
-            <span class="material-icons-outlined absolute left-4 top-3 text-slate-400">search</span>
-            <input 
-                v-model="searchQuery" 
-                placeholder="Поиск по базе..." 
-                class="w-full pl-11 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 ring-slate-900/10 transition-colors border border-slate-100"
-            >
-            <button 
-                v-if="searchQuery" 
-                @click="searchQuery = ''"
-                class="absolute right-4 top-3 text-slate-400 hover:text-slate-600 tap-effect"
-            >
-                <span class="material-icons-round text-lg">close</span>
-            </button>
-        </div>
-
         <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             <button 
                 v-for="cat in categories" 

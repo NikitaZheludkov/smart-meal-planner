@@ -8,6 +8,13 @@ import { useTelegramStore } from '../stores/telegram'
 import DishDetailModal from '../components/DishDetailModal.vue'
 import DishFilterModal from '../components/DishFilterModal.vue'
 
+const props = defineProps({
+  searchQuery: {
+    type: String,
+    default: ''
+  }
+})
+
 const dishStore = useDishStore()
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
@@ -59,8 +66,8 @@ const filteredDishes = computed(() => {
   let result = dishStore.dishes
   
   // 1. Поиск (самый приоритетный)
-  if (uiStore.dishes.searchQuery) {
-    const q = uiStore.dishes.searchQuery.toLowerCase()
+  if (props.searchQuery) {
+    const q = props.searchQuery.toLowerCase()
     result = result.filter(d => d.name.toLowerCase().includes(q))
   }
 
@@ -108,10 +115,10 @@ const setMealType = (id) => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[215px] flex flex-col justify-between">
+    <div class="bg-white border-b border-slate-100 px-5 pb-4 flex flex-col justify-between">
         
-      <div class="flex items-center justify-between">
-        <h1 class="app-title mb-0">Рецепты</h1>
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex-1"></div>
         
         <button 
             @click="openFilters"
@@ -121,25 +128,8 @@ const setMealType = (id) => {
             <div v-if="uiStore.dishes.filterTags.length > 0" class="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border border-white"></div>
         </button>
       </div>
-
-      <div class="relative">
-        <span class="material-icons-outlined absolute left-3.5 top-3 text-slate-400">search</span>
-        <input 
-          v-model="uiStore.dishes.searchQuery" 
-          type="text" 
-          placeholder="Поиск по названию..." 
-          class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 ring-slate-900/10 transition-colors border border-slate-100"
-        >
-        <button 
-            v-if="uiStore.dishes.searchQuery" 
-            @click="uiStore.dishes.searchQuery = ''"
-            class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 tap-effect"
-        >
-            <span class="material-icons-round text-lg">close</span>
-        </button>
-      </div>
       
-      <div class="flex overflow-x-auto gap-2 no-scrollbar">
+      <div class="flex overflow-x-auto gap-2 no-scrollbar mb-2">
         <button 
           @click="setMealType(null)" 
           class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-colors tap-effect border" 
