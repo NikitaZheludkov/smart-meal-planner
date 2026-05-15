@@ -1,12 +1,41 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useTelegramStore } from '../stores/telegram'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { useProductStore } from '../stores/products'
+import { useUIStore } from '../stores/ui'
 import DishesView from './DishesView.vue'
 import ProductsView from './ProductsView.vue'
 
 const telegram = useTelegramStore()
+const dictionaries = useDictionariesStore()
+const productStore = useProductStore()
+const uiStore = useUIStore()
+
 const activeMode = ref('dishes')
 const searchQuery = ref('')
+
+// Категории для продуктов (вычисляемые из существующих продуктов)
+const productCategories = computed(() => {
+  const cats = new Set(productStore.products.map(p => p.category || 'Разное'))
+  return ['Все', ...Array.from(cats).sort()]
+})
+
+// Установка категории для блюд
+const setDishCategory = (id) => {
+  if (uiStore.dishes.activeCategory !== id) {
+    telegram.haptic.selection()
+    uiStore.dishes.activeCategory = id
+  }
+}
+
+// Установка категории для продуктов
+const setProductCategory = (cat) => {
+  if (uiStore.products.activeCategory !== cat) {
+    telegram.haptic.selection()
+    uiStore.products.activeCategory = cat
+  }
+}
 </script>
 
 <template>
@@ -31,7 +60,7 @@ const searchQuery = ref('')
         </button>
       </div>
       
-      <div class="flex gap-2">
+      <div class="flex gap-2 mb-3">
         <div class="flex-1 bg-slate-100 p-1 rounded-xl flex font-bold text-[10px]">
           <button 
             @click="activeMode = 'dishes'; telegram.haptic.selection()" 
@@ -48,6 +77,42 @@ const searchQuery = ref('')
             <span>🥦</span> Продукты
           </button>
         </div>
+      </div>
+
+      <!-- Блок категорий -->
+      <div class="flex overflow-x-auto gap-2 no-scrollbar">
+        <!-- Категории для рецептов -->
+        <template v-if="activeMode === 'dishes'">
+          <button 
+            @click="setDishCategory('all')" 
+            class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
+            :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
+          >
+            Все типы
+          </button>
+          <button 
+            v-for="cat in dictionaries.dishTypes" 
+            :key="cat.id" 
+            @click="setDishCategory(cat.id)" 
+            class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
+            :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
+          >
+            {{ cat.name }}
+          </button>
+        </template>
+
+        <!-- Категории для продуктов -->
+        <template v-else>
+          <button 
+            v-for="cat in productCategories" 
+            :key="cat"
+            @click="setProductCategory(cat)"
+            class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-colors border"
+            :class="uiStore.products.activeCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+          >
+            {{ cat }}
+          </button>
+        </template>
       </div>
     </div>
 

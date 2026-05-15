@@ -18,6 +18,11 @@ export const useUIStore = defineStore('ui', () => {
     searchQuery: ''
   })
 
+  // --- ПРОДУКТЫ ---
+  const products = ref({
+    activeCategory: 'Все'
+  })
+
   // --- ПОКУПКИ ---
   const shopping = ref({
     activeTab: 'list',
@@ -91,7 +96,7 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   return { 
-      plan, dishes, shopping, 
+      plan, dishes, products, shopping, 
       logs, toasts, isLogOpen, isOffline, isModalOpen,
       setOffline, addLog, showToast, initNetworkListeners 
   }

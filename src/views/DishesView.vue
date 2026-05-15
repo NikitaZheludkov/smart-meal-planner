@@ -21,10 +21,6 @@ const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 const telegram = useTelegramStore()
 
-// Справочники для фильтров
-const dishCategories = computed(() => dictionaries.dishTypes)
-const mealTypes = computed(() => dictionaries.mealTypes)
-
 // Состояние модалок
 const showDetailModal = ref(false)
 const showFilterModal = ref(false)
@@ -96,79 +92,10 @@ const filteredDishes = computed(() => {
   
   return result
 })
-
-const setCategory = (id) => {
-    if(uiStore.dishes.activeCategory !== id) {
-        telegram.haptic.selection()
-        uiStore.dishes.activeCategory = id
-    }
-}
-
-const setMealType = (id) => {
-    if(uiStore.dishes.activeTag !== id) {
-        telegram.haptic.selection()
-        uiStore.dishes.activeTag = id
-    }
-}
 </script>
 
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
-    
-    <div class="bg-white border-b border-slate-100 px-5 pb-4 flex flex-col justify-between">
-        
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex-1"></div>
-        
-        <button 
-            @click="openFilters"
-            class="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center relative tap-effect active:scale-95 transition-transform"
-        >
-            <span class="material-icons-round text-slate-400 text-xl">tune</span>
-            <div v-if="uiStore.dishes.filterTags.length > 0" class="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border border-white"></div>
-        </button>
-      </div>
-      
-      <div class="flex overflow-x-auto gap-2 no-scrollbar mb-2">
-        <button 
-          @click="setMealType(null)" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
-        >
-          Все
-        </button>
-
-        <button 
-          v-for="type in mealTypes" 
-          :key="type.id" 
-          @click="setMealType(type.id)" 
-          class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
-        >
-            {{ type.name }}
-        </button>
-      </div>
-
-      <div class="flex overflow-x-auto gap-2 no-scrollbar">
-        <button 
-          @click="setCategory('all')" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300' : 'bg-slate-50 text-slate-400 border-slate-100'"
-        >
-            Все типы
-        </button>
-
-        <button 
-          v-for="cat in dishCategories" 
-          :key="cat.id" 
-          @click="setCategory(cat.id)" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
-        >
-            {{ cat.name }}
-        </button>
-      </div>
-    </div>
 
     <div class="flex-1 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area relative">
       
