@@ -36,6 +36,14 @@ const setProductCategory = (cat) => {
     uiStore.products.activeCategory = cat
   }
 }
+
+// Установка приема пищи
+const setMealType = (id) => {
+  if (uiStore.dishes.activeTag !== id) {
+    telegram.haptic.selection()
+    uiStore.dishes.activeTag = id
+  }
+}
 </script>
 
 <template>
@@ -79,8 +87,8 @@ const setProductCategory = (cat) => {
         </div>
       </div>
 
-      <!-- Блок категорий -->
-      <div class="flex overflow-x-auto gap-2 no-scrollbar">
+      <!-- Блок категорий (основные) -->
+      <div class="flex overflow-x-auto gap-2 no-scrollbar mb-2">
         <!-- Категории для рецептов -->
         <template v-if="activeMode === 'dishes'">
           <button 
@@ -113,6 +121,26 @@ const setProductCategory = (cat) => {
             {{ cat }}
           </button>
         </template>
+      </div>
+
+      <!-- Блок приемов пищи (только для рецептов) -->
+      <div v-if="activeMode === 'dishes'" class="flex overflow-x-auto gap-2 no-scrollbar">
+        <button 
+          @click="setMealType(null)" 
+          class="whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors tap-effect border" 
+          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+        >
+          Все
+        </button>
+        <button 
+          v-for="type in dictionaries.mealTypes" 
+          :key="type.id" 
+          @click="setMealType(type.id)" 
+          class="whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors tap-effect border" 
+          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+        >
+          {{ type.name }}
+        </button>
       </div>
     </div>
 
