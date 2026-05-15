@@ -35,6 +35,7 @@ const ui = useUIStore()
 const activeMode = ref('dish') 
 const searchQuery = ref('')
 const activeCategory = ref('all')
+const showSearchDropdown = ref(false)
 
 onMounted(async () => {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
@@ -44,6 +45,16 @@ onMounted(async () => {
 watch(() => props.isOpen, (newVal) => {
     ui.isModalOpen = newVal
 })
+
+watch(searchQuery, (newValue) => {
+    showSearchDropdown.value = newValue.length > 0
+})
+
+const selectFromDropdown = (dish) => {
+    selectItem(dish, 'dish')
+    searchQuery.value = ''
+    showSearchDropdown.value = false
+}
 
 const yesterdayDishIds = computed(() => {
     const ids = new Set()
@@ -74,6 +85,20 @@ const recommendedDishes = computed(() => {
     })
 })
 
+const dropdownSearchResults = computed(() => {
+    if (!searchQuery.value) return []
+    
+    const q = searchQuery.value.toLowerCase().trim()
+    let list = dishStore.dishes
+
+    if (props.existingItems.length > 0) {
+        const selectedIds = new Set(props.existingItems.map(i => i.dish_id).filter(Boolean))
+        list = list.filter(d => !selectedIds.has(d.id))
+    }
+
+    return list.filter(d => d.name.toLowerCase().includes(q))
+})
+
 const filteredDishes = computed(() => {
     let list = dishStore.dishes
 
@@ -90,11 +115,6 @@ const filteredDishes = computed(() => {
 
     if (activeCategory.value !== 'all') {
         list = list.filter(d => d.dish_type_id === activeCategory.value)
-    }
-
-    if (searchQuery.value) {
-        const q = searchQuery.value.toLowerCase()
-        list = list.filter(d => d.name.toLowerCase().includes(q))
     }
 
     return list
@@ -196,6 +216,8 @@ const getDishSlotName = (id) => {
                         v-model="searchQuery" 
                         :placeholder="activeMode === 'dish' ? 'Поиск рецептов...' : 'Поиск продуктов...'" 
                         class="w-full pl-10 pr-10 py-2.5 bg-slate-50 rounded-2xl font-bold text-sm outline-none border-none placeholder:text-slate-300 focus:bg-slate-100 transition-colors"
+                        @blur="setTimeout(() => showSearchDropdown = false, 200)"
+                        @focus="searchQuery.length > 0 && (showSearchDropdown = true)"
                     >
                     <button 
                         v-if="searchQuery" 
@@ -204,6 +226,20 @@ const getDishSlotName = (id) => {
                     >
                         <span class="material-icons-round text-lg">close</span>
                     </button>
+                    
+                    <!-- Dropdown -->
+                    <div v-if="showSearchDropdown && activeMode === 'dish' && dropdownSearchResults.length > 0" 
+                         class="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-y-auto max-h-60 z-50">
+                        <button 
+                            v-for="dish in dropdownSearchResults" 
+                            :key="dish.id"
+                            @mousedown="selectFromDropdown(dish)"
+                            class="w-full text-left px-4 py-3 hover:bg-slate-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between items-center group"
+                        >
+                            <span class="group-hover:text-slate-900 transition-colors">{{ dish.name }}</span>
+                            <span v-if="dish.kcal" class="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">🔥 {{ dish.kcal }}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
