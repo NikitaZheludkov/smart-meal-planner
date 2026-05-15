@@ -280,6 +280,19 @@ watch(() => props.isOpen, (newVal) => {
         isSaving.value = false
         if (props.dish) {
             initForm(props.dish)
+        } else {
+            initForm({
+                id: null,
+                name: '',
+                dish_type_id: '',
+                meal_type_ids: [],
+                description: '',
+                kcal: null, protein: null, fat: null, carbs: null,
+                is_batch: false,
+                batch_yield: 1,
+                tags: [],
+                ingredients: []
+            })
         }
     }
 })
@@ -440,7 +453,7 @@ const onProductCreated = (product) => {
                 
                 <transition name="slide-fade">
                 
-                <div v-if="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-[100px] pt-4 no-scrollbar">
+                <div v-if="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-[120px] pt-4 no-scrollbar">
                     
                     <div v-if="!isEditing" class="flex flex-col space-y-6">
                         <div class="text-center">
@@ -703,7 +716,13 @@ const onProductCreated = (product) => {
                                     Удалить блюдо
                                 </button>
                             </div>
-
+                            
+                            <div class="pt-4">
+                                <button @click="handleSave" class="btn-primary w-full shadow-lg text-sm font-bold flex items-center justify-center gap-2" :class="formData.name ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'" :disabled="!formData.name">
+                                    <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
+                                    {{ isSaving ? 'Сохранение...' : 'Сохранить блюдо' }}
+                                </button>
+                            </div>
                         </div>
 
                     </div>
@@ -737,19 +756,6 @@ const onProductCreated = (product) => {
                 </div>
                 
                 </transition>
-
-            </div>
-            
-            <div v-if="isEditing && !showTagSelection" class="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-3 z-[65]">
-                <button 
-                    @click="handleSave" 
-                    class="w-full py-3 rounded-2xl text-sm font-bold text-white shadow-lg tap-effect active:scale-95 transition-transform transition-colors flex items-center justify-center gap-2"
-                    :class="(formData.name && formData.meal_type_ids.length > 0 && !isSaving) ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'"
-                    :disabled="(!formData.name || formData.meal_type_ids.length === 0) || isSaving"
-                >
-                    <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                    {{ isSaving ? 'Сохранение' : 'Сохранить' }}
-                </button>
             </div>
 
             <div v-if="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
@@ -841,14 +847,14 @@ const onProductCreated = (product) => {
                     </div>
                 </div>
             </div>
-
-            <ProductDetailModal 
-                :is-open="showCreateProductModal"
-                :product="newProductTarget"
-                @saved="onProductCreated"
-                @close="showCreateProductModal = false"
-            />
       </div>
+      <ProductDetailModal 
+          :is-open="showCreateProductModal"
+          :product="newProductTarget"
+          :z-index="100"
+          @saved="onProductCreated"
+          @close="showCreateProductModal = false"
+      />
     </div>
   </Transition>
 </template>

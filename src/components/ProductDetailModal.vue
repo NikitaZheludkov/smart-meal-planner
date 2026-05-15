@@ -137,7 +137,7 @@ const handleCancel = () => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col" @click.self="$emit('close')">
+    <div v-if="isOpen" class="fixed inset-0 flex flex-col" :style="{ zIndex: zIndex }" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
       <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
         <div class="flex-1 bg-white rounded-t-[32px] flex flex-col overflow-hidden relative">
