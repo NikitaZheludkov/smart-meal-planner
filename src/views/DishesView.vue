@@ -114,58 +114,60 @@ const filteredDishes = computed(() => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area relative">
+    <div class="flex-1 relative overflow-hidden">
       
-      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40 absolute inset-0 pointer-events-none">
+      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40 absolute inset-0 pointer-events-none z-10">
         <div class="text-5xl mb-2">🍳</div>
         <p class="font-bold text-slate-400">Ничего не найдено</p>
         <p v-if="uiStore.dishes.filterTags.length > 0" class="text-xs text-slate-300 mt-1">Попробуйте сбросить теги</p>
       </div>
 
-      <Transition :name="transitionName" mode="out-in">
-        <div :key="uiStore.dishes.activeTag || 'all'" class="space-y-3 relative min-h-full">
-          <div 
-              v-for="dish in filteredDishes" 
-              :key="dish.id" 
-              @click="openDish(dish)" 
-              class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
-          >
-              <div class="flex justify-between items-start">
-              <span class="card-title leading-tight pr-8">{{ dish.name }}</span>
-              <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
-                  {{ dish.dish_type_name }}
-              </span>
-              </div>
-              
-              <div class="flex flex-wrap gap-1 mt-1">
-                  <div v-if="dish.meal_types && dish.meal_types.length > 0" class="flex flex-wrap gap-1">
-                      <span 
-                          v-for="mt in dish.meal_types" 
-                          :key="mt.id"
-                          class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100"
-                      >
-                          {{ mt.name }}
-                      </span>
-                  </div>
-                  <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
-                      {{ dish.meal_type_name }}
-                  </span>
-                  <span 
-                      v-for="tag in dish.tags.slice(0, 3)" 
-                      :key="tag.id" 
-                      class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-50 border-slate-100 flex items-center gap-1" 
-                  >
-                  {{ tag.icon }} {{ tag.name }}
-                  </span>
-                  <span v-if="dish.tags.length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
-              </div>
-              
-              <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">
-              <span class="text-slate-900 font-bold">🔥 {{ dish.kcal || 0 }}</span>
-              <span>Б {{ dish.protein || 0 }}</span>
-              <span>Ж {{ dish.fat || 0 }}</span>
-              <span>У {{ dish.carbs || 0 }}</span>
-              </div>
+      <Transition :name="transitionName">
+        <div :key="uiStore.dishes.activeTag || 'all'" class="absolute inset-0 w-full h-full overflow-y-auto px-5 pt-4 pb-app-nav scroll-area">
+          <div class="space-y-3 relative min-h-full">
+            <div 
+                v-for="dish in filteredDishes" 
+                :key="dish.id" 
+                @click="openDish(dish)" 
+                class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
+            >
+                <div class="flex justify-between items-start">
+                <span class="card-title leading-tight pr-8">{{ dish.name }}</span>
+                <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
+                    {{ dish.dish_type_name }}
+                </span>
+                </div>
+                
+                <div class="flex flex-wrap gap-1 mt-1">
+                    <div v-if="dish.meal_types && dish.meal_types.length > 0" class="flex flex-wrap gap-1">
+                        <span 
+                            v-for="mt in dish.meal_types" 
+                            :key="mt.id"
+                            class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100"
+                        >
+                            {{ mt.name }}
+                        </span>
+                    </div>
+                    <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
+                        {{ dish.meal_type_name }}
+                    </span>
+                    <span 
+                        v-for="tag in dish.tags.slice(0, 3)" 
+                        :key="tag.id" 
+                        class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-50 border-slate-100 flex items-center gap-1" 
+                    >
+                    {{ tag.icon }} {{ tag.name }}
+                    </span>
+                    <span v-if="dish.tags.length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+                </div>
+                
+                <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">
+                <span class="text-slate-900 font-bold">🔥 {{ dish.kcal || 0 }}</span>
+                <span>Б {{ dish.protein || 0 }}</span>
+                <span>Ж {{ dish.fat || 0 }}</span>
+                <span>У {{ dish.carbs || 0 }}</span>
+                </div>
+            </div>
           </div>
         </div>
       </Transition>
@@ -193,32 +195,3 @@ const filteredDishes = computed(() => {
 
   </div>
 </template>
-
-<style scoped>
-.slide-left-enter-active,
-.slide-left-leave-active,
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: opacity 250ms ease, transform 250ms ease;
-}
-
-.slide-left-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-.slide-left-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-right-enter-from {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-right-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
-</style>
