@@ -33,9 +33,17 @@ const telegram = useTelegramStore()
 const ui = useUIStore()
 
 const activeMode = ref('dish') 
+const transitionName = ref('slide-left')
+const modes = ['dish', 'product']
 const searchQuery = ref('')
 const activeCategory = ref('all')
 const showSearchDropdown = ref(false)
+
+watch(activeMode, (newVal, oldVal) => {
+  const oldIndex = modes.indexOf(oldVal)
+  const newIndex = modes.indexOf(newVal)
+  transitionName.value = newIndex > oldIndex ? 'slide-left' : 'slide-right'
+})
 
 onMounted(async () => {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
@@ -306,9 +314,9 @@ const getDishSlotName = (id) => {
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-4 pb-10 bg-slate-50 relative">
-            <Transition name="slide-fade" mode="out-in">
-            <div v-if="activeMode === 'dish'" key="dish" class="space-y-4 pt-3">
+        <div class="flex-1 relative overflow-hidden bg-slate-50">
+            <Transition :name="transitionName">
+            <div v-if="activeMode === 'dish'" key="dish" class="absolute inset-0 w-full h-full overflow-y-auto px-4 pb-10 pt-3">
                 <div v-if="filteredDishes.length === 0 && recommendedDishes.length === 0" class="text-center py-10 text-slate-400 text-sm font-bold">
                     {{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}
                 </div>
@@ -380,7 +388,7 @@ const getDishSlotName = (id) => {
                 </div>
             </div>
 
-            <div v-else key="product" class="space-y-4 pt-3">
+            <div v-else key="product" class="absolute inset-0 w-full h-full overflow-y-auto px-4 pb-10 pt-3">
                 <div v-for="(products, catName) in groupedProducts" :key="catName">
                     <h3 class="text-[10px] font-black text-slate-400 mb-2 ml-1">{{ catName }}</h3>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">

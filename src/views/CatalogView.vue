@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useTelegramStore } from '../stores/telegram'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useProductStore } from '../stores/products'
@@ -13,7 +13,16 @@ const productStore = useProductStore()
 const uiStore = useUIStore()
 
 const activeMode = ref('dishes')
+const transitionName = ref('slide-left')
 const searchQuery = ref('')
+
+const modes = ['dishes', 'products']
+
+watch(activeMode, (newVal, oldVal) => {
+  const oldIndex = modes.indexOf(oldVal)
+  const newIndex = modes.indexOf(newVal)
+  transitionName.value = newIndex > oldIndex ? 'slide-left' : 'slide-right'
+})
 
 // Категории для продуктов (вычисляемые из существующих продуктов)
 const productCategories = computed(() => {
@@ -144,9 +153,11 @@ const setMealType = (id) => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-hidden">
-      <DishesView v-if="activeMode === 'dishes'" :search-query="searchQuery" />
-      <ProductsView v-else :search-query="searchQuery" />
+    <div class="flex-1 relative overflow-hidden">
+      <transition :name="transitionName">
+        <DishesView v-if="activeMode === 'dishes'" :key="'dishes'" :search-query="searchQuery" class="absolute inset-0 w-full h-full overflow-y-auto" />
+        <ProductsView v-else :key="'products'" :search-query="searchQuery" class="absolute inset-0 w-full h-full overflow-y-auto" />
+      </transition>
     </div>
   </div>
 </template>

@@ -95,7 +95,7 @@ const closeTagSelector = () => {
     showTagSelection.value = false
 }
 
-const direction = ref('next')
+const transitionName = ref('slide-left')
 
 // --- ЛОГИКА ШАГОВ ---
 const nextStep = () => {
@@ -113,7 +113,7 @@ const nextStep = () => {
                 return
             }
         }
-        direction.value = 'next'
+        transitionName.value = 'slide-left'
         currentStep.value++
         telegram.haptic.impact('light')
     } else if (currentStep.value === totalSteps) {
@@ -124,7 +124,7 @@ const nextStep = () => {
 
 const prevStep = () => {
     if (currentStep.value > 1) {
-        direction.value = 'prev'
+        transitionName.value = 'slide-right'
         currentStep.value--
         telegram.haptic.impact('light')
     }
@@ -145,7 +145,7 @@ const goToStep = (step) => {
         }
     }
 
-    direction.value = step > currentStep.value ? 'next' : 'prev'
+    transitionName.value = step > currentStep.value ? 'slide-left' : 'slide-right'
     currentStep.value = step
     telegram.haptic.impact('light')
 }
@@ -595,11 +595,11 @@ const onProductCreated = (product) => {
                 </div>
             </div>
 
-            <div v-else class="space-y-4 pb-20 relative overflow-hidden min-h-[400px]">
+            <div v-else class="relative overflow-hidden min-h-[400px]">
                 
-                <Transition :name="direction === 'next' ? 'step-next' : 'step-prev'" mode="out-in">
+                <Transition :name="transitionName">
                 <!-- STEP 1: Basic Info -->
-                <div v-if="currentStep === 1" key="step1" class="space-y-4">
+                <div v-if="currentStep === 1" key="step1" class="absolute inset-0 w-full h-full overflow-y-auto pb-20 pt-0 space-y-4">
                     <div class="space-y-2">
                         <input 
                             v-model="formData.name" 
@@ -651,7 +651,7 @@ const onProductCreated = (product) => {
                 </div>
 
                 <!-- STEP 2: Ingredients & Batch -->
-                <div v-else-if="currentStep === 2" key="step2" class="space-y-4">
+                <div v-else-if="currentStep === 2" key="step2" class="absolute inset-0 w-full h-full overflow-y-auto pb-20 pt-0 space-y-4">
                     
                     <!-- Yield / Portions Input -->
                      <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex items-center justify-between">
@@ -777,7 +777,7 @@ const onProductCreated = (product) => {
                 </div>
 
                 <!-- STEP 3: Details -->
-                <div v-else-if="currentStep === 3" key="step3" class="space-y-4">
+                <div v-else-if="currentStep === 3" key="step3" class="absolute inset-0 w-full h-full overflow-y-auto pb-20 pt-0 space-y-4">
                     
                     <!-- Compact Macros -->
                     <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">

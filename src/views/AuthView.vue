@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useTelegramStore } from '../stores/telegram'
 
@@ -9,6 +9,11 @@ const telegram = useTelegramStore()
 const email = ref('')
 const password = ref('')
 const isLogin = ref(true)
+const transitionName = ref('slide-left')
+
+watch(isLogin, (newVal) => {
+  transitionName.value = newVal ? 'slide-right' : 'slide-left'
+})
 
 const handleSubmit = async () => {
     try {
@@ -70,7 +75,7 @@ const handleSubmit = async () => {
       </div>
 
       <!-- Форма входа (Web) -->
-      <div v-else-if="!telegram.initData" class="w-full space-y-4 animate-fade-in">
+      <div v-else-if="!telegram.initData" class="w-full space-y-4 relative overflow-hidden">
         <div class="bg-white/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-100 shadow-xl shadow-indigo-100/20 space-y-4">
             <div class="flex bg-slate-100 p-1 rounded-xl mb-2">
                 <button 
@@ -85,25 +90,54 @@ const handleSubmit = async () => {
                 >Регистрация</button>
             </div>
 
-            <div class="space-y-3 text-left">
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Email</label>
-                    <input 
+            <div class="relative overflow-hidden min-h-[280px]">
+              <transition :name="transitionName">
+                <div v-if="isLogin" key="login" class="absolute inset-0 w-full h-full">
+                  <div class="space-y-3 text-left">
+                    <div>
+                      <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Email</label>
+                      <input 
                         v-model="email"
                         type="email" 
                         placeholder="your@email.com"
                         class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
-                    >
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Пароль</label>
-                    <input 
+                      >
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Пароль</label>
+                      <input 
                         v-model="password"
                         type="password" 
                         placeholder="••••••••"
                         class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
-                    >
+                      >
+                    </div>
+                  </div>
                 </div>
+
+                <div v-else key="register" class="absolute inset-0 w-full h-full">
+                  <div class="space-y-3 text-left">
+                    <div>
+                      <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Email</label>
+                      <input 
+                        v-model="email"
+                        type="email" 
+                        placeholder="your@email.com"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
+                      >
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Пароль</label>
+                      <input 
+                        v-model="password"
+                        type="password" 
+                        placeholder="••••••••"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-colors"
+                      >
+                    </div>
+                  </div>
+                </div>
+              </transition>
             </div>
 
             <button 
