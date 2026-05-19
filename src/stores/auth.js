@@ -343,7 +343,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (data.user) {
             // Если регистрация прошла, но нужно подтверждение почты (стандарт Supabase)
             if (!data.session) {
-                ui.showToast('Проверьте почту для подтверждения', 'info')
+                alert('Проверьте почту для подтверждения')
             } else {
                 await handleUserSession(data.user)
             }
@@ -361,7 +361,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loginAsTestUser = async () => {
     // В продакшене этот метод должен быть недоступен или защищен
     if (import.meta.env.PROD && !import.meta.env.VITE_ENABLE_TEST_USER) {
-        ui.showToast('Тестовый вход недоступен в PROD', 'error')
+        alert('Тестовый вход недоступен в PROD')
         return
     }
 
@@ -375,7 +375,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         if (error) {
              console.error('Ошибка Dev входа:', error)
-             ui.showToast('Ошибка входа Dev User', 'error')
+             alert('Ошибка входа Dev User')
         }
     } catch(e) { 
         console.error(e)

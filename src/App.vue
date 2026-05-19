@@ -54,7 +54,6 @@ const switchTab = (tabId) => {
     
     transitionName.value = newIndex > currentIndex ? 'slide-left' : 'slide-right'
     
-    telegram.haptic.impact('light') 
     currentTab.value = tabId
 }
 
@@ -63,10 +62,10 @@ const handleSync = async () => {
     isSyncing.value = true
     try {
         await loadUserData()
-        ui.showToast('Синхронизация выполнена', 'success')
+        alert('Синхронизация выполнена')
     } catch (e) {
         console.error('Ошибка синхронизации:', e)
-        ui.showToast('Ошибка синхронизации', 'error')
+        alert('Ошибка синхронизации')
     } finally {
         isSyncing.value = false
     }
@@ -185,8 +184,6 @@ onUnmounted(() => {
     <div v-if="ui.isOffline" class="fixed top-0 left-0 right-0 bg-slate-900 text-white text-[10px] font-bold text-center py-1 z-[2000] animate-slide-down">
         Нет соединения с интернетом
     </div>
-
-    <ToastContainer />
 
     <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
       <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>

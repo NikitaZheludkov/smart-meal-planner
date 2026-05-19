@@ -64,7 +64,7 @@ export const useShoppingStore = defineStore('shopping', () => {
     // 3. Откат при ошибке
     if (error) {
       console.error('Ошибка сохранения:', error)
-      ui.showToast('Не удалось обновить статус', 'error')
+      alert('Не удалось обновить статус')
       
       if (wasChecked) checkedIds.value.add(productId)
       else checkedIds.value.delete(productId)
@@ -84,9 +84,9 @@ export const useShoppingStore = defineStore('shopping', () => {
     
     if (error) {
       console.error('Ошибка очистки списка:', error)
-      ui.showToast('Не удалось очистить список', 'error')
+      alert('Не удалось очистить список')
     } else {
-        ui.showToast('Список очищен', 'success')
+        alert('Список очищен')
     }
 
     checkedIds.value.clear()

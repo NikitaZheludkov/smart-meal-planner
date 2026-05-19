@@ -39,7 +39,7 @@ export const useProductStore = defineStore('products', () => {
         products.value = data || []
     } catch (e) {
         console.error('Ошибка загрузки продуктов:', e)
-        ui.showToast('Ошибка загрузки продуктов', 'error')
+        alert('Ошибка загрузки продуктов')
         products.value = [] 
     } finally {
         loading.value = false

@@ -55,6 +55,28 @@ const formData = ref({
 const productSearchQuery = ref('')
 const selectedProductsInOverlay = ref([])
 const productAmounts = ref({})
+const ingredientLinkIndex = ref(null)
+
+const unitMap = { "г": "Кг", "грамм": "Кг", "гр": "Кг", "кг": "Кг", "л": "Л", "мл": "Л", "шт": "Шт", "упак": "Упак" }
+
+const normalizeUnit = (unitString) => {
+    if (!unitString) return unitString
+    const key = unitString.toString().toLowerCase().trim()
+    return unitMap[key] || unitString
+}
+
+const normalizeName = (value) => (value || '').toString().toLowerCase().trim()
+
+const findMatch = (aiName, productsBase) => {
+    const q = normalizeName(aiName)
+    if (!q) return null
+    for (const p of (productsBase || [])) {
+        const pn = normalizeName(p?.name)
+        if (!pn) continue
+        if (pn.includes(q) || q.includes(pn)) return p
+    }
+    return null
+}
 
 const filteredProducts = computed(() => {
     const q = productSearchQuery.value.toLowerCase().trim()
@@ -130,6 +152,7 @@ const confirmIngredients = () => {
     productSearchQuery.value = ''
     showProductDropdown.value = false
     showIngredientOverlay.value = false
+    ingredientLinkIndex.value = null
     telegram.haptic.notification('success')
 }
 
@@ -139,6 +162,27 @@ const closeIngredientOverlay = () => {
     productSearchQuery.value = ''
     showProductDropdown.value = false
     showIngredientOverlay.value = false
+    ingredientLinkIndex.value = null
+}
+
+const openIngredientSearch = (index) => {
+    ingredientLinkIndex.value = index
+    selectedProductsInOverlay.value = []
+    productAmounts.value = {}
+    productSearchQuery.value = formData.value.ingredients[index]?.name || ''
+    showProductDropdown.value = true
+    showIngredientOverlay.value = true
+}
+
+const linkIngredientToProduct = (prod) => {
+    const idx = ingredientLinkIndex.value
+    if (idx === null || idx === undefined) return
+    const ing = formData.value.ingredients[idx]
+    if (!ing) return
+    ing.product_id = prod.id
+    ing.unit = prod.unit || ing.unit
+    ing.name = prod.name || ing.name
+    closeIngredientOverlay()
 }
 
 const removeIngredient = (index) => {
@@ -313,7 +357,7 @@ const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
   
   if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) {
-      ui.showToast('Выберите хотя бы один прием пищи', 'error')
+      alert('Выберите хотя бы один прием пищи')
       telegram.haptic.notification('error')
       return
   }
@@ -453,7 +497,7 @@ const toggleVoiceRecord = async () => {
 
     } catch (error) {
         console.error('Failed to access microphone:', error)
-        ui.showToast('Не удалось получить доступ к микрофону', 'error')
+        alert('Не удалось получить доступ к микрофону')
     }
 }
 
@@ -472,7 +516,7 @@ const processAudioWithAI = async (audioBlob) => {
         })
 
         const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAqelG0qYblVPAWuJu72UuqZPA5dnnPk9c',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCPRxMnWOLolq0XZl4bnqisb9l3j7Hch_Y',
             {
                 method: 'POST',
                 headers: {
@@ -482,7 +526,7 @@ const processAudioWithAI = async (audioBlob) => {
                     contents: [{
                         parts: [
                             {
-                                text: 'Прослушай аудио рецепта. Верни СТРОГО валидный JSON (без маркдаун-разметки) со структурой: { "title": "Название блюда", "description": "Шаги приготовления", "ingredients": [ { "name": "продукт", "amount": число, "unit": "строка" } ] }'
+                                text: 'Ты — кулинарный ассистент. Извлеки ингредиенты из аудио. Верни JSON: { "title": "...", "ingredients": [ { "name": "имя продукта в ед. числе" } ] }. Никаких описаний, только JSON.'
                             },
                             {
                                 inline_data: {
@@ -504,6 +548,8 @@ const processAudioWithAI = async (audioBlob) => {
         let responseText = res.candidates[0].content.parts[0].text
         
         responseText = responseText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
+
+        console.log('Ответ от Gemini:', JSON.parse(responseText))
         
         const parsed = JSON.parse(responseText)
         
@@ -516,19 +562,28 @@ const processAudioWithAI = async (audioBlob) => {
         }
         
         if (parsed.ingredients && Array.isArray(parsed.ingredients)) {
+            if (productStore.products.length === 0) {
+                await productStore.fetchProducts()
+            }
             parsed.ingredients.forEach(ing => {
+                const aiName = (typeof ing === 'string' ? ing : (ing?.name || ing?.product || 'Неизвестно'))
+                const match = findMatch(aiName, productStore.products)
+                const amount = (typeof ing === 'object' && ing !== null && ing.amount !== undefined && ing.amount !== null)
+                    ? (parseFloat(ing.amount) || 1)
+                    : 1
+                const aiUnit = (typeof ing === 'object' && ing !== null) ? normalizeUnit(ing.unit) : undefined
                 formData.value.ingredients.push({
-                    product_id: null,
-                    name: ing.name || ing.product || 'Неизвестно',
-                    amount: parseFloat(ing.amount) || 1,
-                    unit: ing.unit || 'Шт'
+                    product_id: match?.id || null,
+                    name: match?.name || aiName,
+                    amount,
+                    unit: aiUnit || match?.unit || 'Шт'
                 })
             })
         }
         
     } catch (error) {
         console.error('Ошибка обработки аудио:', error)
-        ui.showToast('Не удалось обработать аудио', 'error')
+        alert('Не удалось обработать аудио')
     } finally {
         isProcessingVoice.value = false
     }
@@ -640,8 +695,15 @@ const createProductFromIngredient = (ing) => {
                                 <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product_id === null ? 'bg-yellow-50' : ''">
                                     <div class="flex items-center gap-2">
                                         <span class="card-title text-sm">{{ ing.name }}</span>
-                                        <button v-if="ing.product_id === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
+                                        <span v-if="ing.product_id !== null" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                                            <span class="material-icons-round text-[14px]">check_circle</span>
+                                            Связанный
+                                        </span>
+                                        <button v-else @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
                                             Создать
+                                        </button>
+                                        <button @click="openIngredientSearch(idx)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+                                            <span class="material-icons-round text-base">search</span>
                                         </button>
                                     </div>
                                     <span class="font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
@@ -932,7 +994,7 @@ const createProductFromIngredient = (ing) => {
                 </transition>
             </div>
 
-            <div v-if="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
+            <div v-show="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
                 <div class="absolute inset-0 bg-black/50" @click="closeIngredientOverlay"></div>
                 <div class="relative z-10 mt-auto bg-white rounded-t-3xl h-[92vh] flex flex-col shadow-2xl">
                     <div class="w-full pt-3 pb-1 shrink-0">
@@ -952,6 +1014,7 @@ const createProductFromIngredient = (ing) => {
                             </button>
                             <button 
                                 @click="confirmIngredients"
+                                v-if="ingredientLinkIndex === null"
                                 class="px-4 py-2 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg tap-effect active:scale-95 transition-transform"
                                 :disabled="selectedProductsInOverlay.length === 0"
                                 :class="selectedProductsInOverlay.length === 0 ? 'opacity-50 cursor-not-allowed' : ''"
@@ -974,11 +1037,11 @@ const createProductFromIngredient = (ing) => {
                                 >
                             </div>
                             
-                            <div v-if="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-y-auto max-h-[40vh] z-[100]">
+                            <div v-show="showProductDropdown && filteredProducts.length > 0" class="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-y-auto max-h-[40vh] z-[100]">
                                 <button 
                                     v-for="prod in filteredProducts" 
                                     :key="prod.id"
-                                    @click.stop="toggleProductSelection(prod)"
+                                    @click.stop="ingredientLinkIndex !== null ? linkIngredientToProduct(prod) : toggleProductSelection(prod)"
                                     class="w-full text-left px-4 py-4 hover:bg-slate-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between items-center group"
                                     :class="isProductSelected(prod.id) ? 'bg-slate-100' : ''"
                                 >

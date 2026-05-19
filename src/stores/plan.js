@@ -54,7 +54,7 @@ export const usePlanStore = defineStore('plan', () => {
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
         ui.addLog('Ошибка загрузки плана', 'error', e)
-        ui.showToast('Ошибка загрузки плана', 'error')
+        alert('Ошибка загрузки плана')
     } finally {
         loading.value = false
     }
@@ -64,7 +64,7 @@ export const usePlanStore = defineStore('plan', () => {
     const auth = useAuthStore()
     const ui = useUIStore()
     if (!auth.householdId) {
-        ui.showToast('Сессия потеряна. Перезагрузите страницу.', 'error')
+        alert('Сессия потеряна. Перезагрузите страницу.')
         throw new Error('Сессия потеряна. Перезагрузите страницу.')
     }
     
@@ -105,7 +105,7 @@ export const usePlanStore = defineStore('plan', () => {
         
     if (error) {
         console.error('Ошибка сохранения:', error)
-        ui.showToast('Не удалось сохранить в план', 'error')
+        alert('Не удалось сохранить в план')
         // Откат
         plan.value = plan.value.filter(p => p.id !== tempId)
     } else {
@@ -117,7 +117,7 @@ export const usePlanStore = defineStore('plan', () => {
                  ...data // Подменяем ID и другие поля из базы
              }
         }
-        ui.showToast('Добавлено в план', 'success')
+        alert('Добавлено в план')
     }
   }
 
@@ -143,7 +143,7 @@ export const usePlanStore = defineStore('plan', () => {
 
     if (error) {
         console.error('Ошибка обновления:', error)
-        ui.showToast('Не удалось обновить', 'error')
+        alert('Не удалось обновить')
         // Откат
         plan.value = originalPlan
     }
@@ -163,12 +163,12 @@ export const usePlanStore = defineStore('plan', () => {
     
     if (error) {
       console.error('Ошибка удаления из плана:', error)
-      ui.showToast('Не удалось удалить', 'error')
+      alert('Не удалось удалить')
       
       // Откат
       plan.value = originalPlan
     } else {
-      ui.showToast('Удалено из плана', 'success')
+      alert('Удалено из плана')
       // Не вызываем fetchPlan(), данные уже обновлены
     }
   }

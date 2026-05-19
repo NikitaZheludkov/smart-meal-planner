@@ -82,7 +82,7 @@ export const useDishStore = defineStore('dishes', () => {
     } catch (e) {
         console.error('Ошибка загрузки блюд:', e)
         ui.addLog('Ошибка загрузки блюд', 'error', e)
-        ui.showToast('Ошибка загрузки блюд', 'error')
+        alert('Ошибка загрузки блюд')
     } finally {
         loading.value = false
     }
@@ -92,7 +92,7 @@ export const useDishStore = defineStore('dishes', () => {
     const auth = useAuthStore()
     const ui = useUIStore()
     if (!auth.householdId) {
-        ui.showToast('Ошибка авторизации', 'error')
+        alert('Ошибка авторизации')
         throw new Error('Учётная запись не авторизована или ID семьи не найден. Попробуйте перезагрузить приложение.')
     }
     
@@ -140,7 +140,7 @@ export const useDishStore = defineStore('dishes', () => {
                 .single()
              
              if (findError || !existing) {
-                 ui.showToast('Ошибка при создании: ' + (err.message || 'Duplicate'), 'error')
+                 alert('Ошибка при создании: ' + (err.message || 'Duplicate'))
                  throw err 
              }
              
@@ -159,7 +159,7 @@ export const useDishStore = defineStore('dishes', () => {
 
         } else {
             console.error(err); 
-            ui.showToast('Ошибка при создании блюда', 'error')
+            alert('Ошибка при создании блюда')
             throw err 
         }
     }
@@ -196,9 +196,9 @@ export const useDishStore = defineStore('dishes', () => {
         ui.addLog('Ошибка при сохранении ингредиентов/тегов', 'warn', relationError)
         
         if (relationError.code === '23505') {
-             ui.showToast('Блюдо сохранено (дубликаты связей пропущены)', 'success')
+             alert('Блюдо сохранено (дубликаты связей пропущены)')
         } else {
-             ui.showToast('Блюдо создано, но возможны ошибки в связях', 'warn')
+             alert('Блюдо создано, но возможны ошибки в связях')
         }
     }
 
@@ -217,14 +217,14 @@ export const useDishStore = defineStore('dishes', () => {
         await fetchDishes()
     }
 
-    ui.showToast('Блюдо сохранено', 'success')
+    alert('Блюдо сохранено')
   }
 
   const updateDish = async (id, dishData) => {
     const auth = useAuthStore()
     const ui = useUIStore()
     if (!auth.householdId) {
-        ui.showToast('Ошибка авторизации', 'error')
+        alert('Ошибка авторизации')
         throw new Error('Учётная запись не авторизована. Сохранение невозможно.')
     }
 
@@ -251,7 +251,7 @@ export const useDishStore = defineStore('dishes', () => {
 
     if (error) { 
         console.error(error); 
-        ui.showToast('Ошибка при обновлении', 'error')
+        alert('Ошибка при обновлении')
         throw error
     }
 
@@ -307,7 +307,7 @@ export const useDishStore = defineStore('dishes', () => {
         await fetchDishes()
     }
 
-    ui.showToast('Блюдо обновлено', 'success')
+    alert('Блюдо обновлено')
   }
 
   const deleteDish = async (id) => {
@@ -322,11 +322,11 @@ export const useDishStore = defineStore('dishes', () => {
         
         // Local update ONLY
         dishes.value = dishes.value.filter(d => d.id !== id)
-        ui.showToast('Блюдо удалено', 'success')
+        alert('Блюдо удалено')
         
     } catch (e) {
         console.error('Ошибка удаления блюда:', e)
-        ui.showToast('Не удалось удалить блюдо', 'error')
+        alert('Не удалось удалить блюдо')
         // Если ошибка - лучше перегрузить список для синхронизации
         await fetchDishes()
     }

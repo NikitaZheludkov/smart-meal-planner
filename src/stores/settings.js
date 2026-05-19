@@ -151,7 +151,7 @@ export const useSettingsStore = defineStore('settings', () => {
       const auth = useAuthStore()
       const ui = useUIStore() // <-- Нужно добавить импорт
       if (!code || code.length < 6) {
-          ui.showToast('Код должен состоять из 6 цифр', 'warn')
+          alert('Код должен состоять из 6 цифр')
           throw new Error('Неверный код')
       }
       
@@ -162,7 +162,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .single()
       
       if (error || !targetHousehold) {
-          ui.showToast('Семья с таким кодом не найдена', 'error')
+          alert('Семья с таким кодом не найдена')
           throw new Error('Неверный код')
       }
 
@@ -173,7 +173,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       if (updateError) throw updateError
       
-      ui.showToast('Вы присоединились к семье!', 'success')
+      alert('Вы присоединились к семье!')
       
       // Даем пользователю прочитать сообщение перед перезагрузкой
       setTimeout(() => {
@@ -199,7 +199,7 @@ export const useSettingsStore = defineStore('settings', () => {
               .single()
            if (newHousehold) {
                 await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
-                ui.showToast('Создана новая семья', 'success')
+                alert('Создана новая семья')
                 setTimeout(() => window.location.reload(), 1000)
                 return
            }
@@ -211,7 +211,7 @@ export const useSettingsStore = defineStore('settings', () => {
           .update({ household_id: myOwnHousehold.id })
           .eq('id', auth.user.id)
       
-      ui.showToast('Вы вернулись в свою семью', 'success')
+      alert('Вы вернулись в свою семью')
       setTimeout(() => window.location.reload(), 1000)
   }
 
