@@ -32,6 +32,12 @@ const newProductTarget = ref(null)
 const showAdditionalDetails = ref(false)
 const showProductDropdown = ref(false)
 const lastSelectedProductId = ref(null)
+const isRecordingVoice = ref(false)
+const isProcessingVoice = ref(false)
+const voiceText = ref('')
+let audioRecorder = null
+let audioChunks = []
+let mediaStream = null
 
 const formData = ref({
     id: null,
@@ -396,6 +402,78 @@ const onProductCreated = (product) => {
     showCreateProductModal.value = false
     toggleProductSelection(product)
 }
+
+const toggleVoiceRecord = async () => {
+    if (isRecordingVoice.value) {
+        if (audioRecorder && audioRecorder.state !== 'inactive') {
+            audioRecorder.stop()
+        }
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop())
+        }
+        isRecordingVoice.value = false
+        return
+    }
+
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        audioChunks = []
+        
+        audioRecorder = new MediaRecorder(mediaStream, {
+            mimeType: MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/wav'
+        })
+
+        audioRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+                audioChunks.push(event.data)
+            }
+        }
+
+        audioRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: audioRecorder.mimeType })
+            console.log('Audio recorded:', audioBlob.size, 'bytes')
+            processAudioWithAI(audioBlob)
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop())
+            }
+        }
+
+        audioRecorder.onerror = (event) => {
+            console.error('Audio recording error:', event.error)
+            isRecordingVoice.value = false
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop())
+            }
+        }
+
+        audioRecorder.start()
+        isRecordingVoice.value = true
+        voiceText.value = ''
+
+    } catch (error) {
+        console.error('Failed to access microphone:', error)
+        ui.showToast('Не удалось получить доступ к микрофону', 'error')
+    }
+}
+
+const processAudioWithAI = async (audioBlob) => {
+    isProcessingVoice.value = true
+    console.log("Аудиофайл для обработки:", audioBlob)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    formData.value.ingredients.push({
+        product_id: null,
+        name: "Тестовый продукт из голоса",
+        unit: "Кг",
+        amount: 1
+    })
+    isProcessingVoice.value = false
+}
+
+const createProductFromIngredient = (ing) => {
+    newProductTarget.value = { name: ing.name }
+    showCreateProductModal.value = true
+}
 </script>
 
 <template>
@@ -495,8 +573,13 @@ const onProductCreated = (product) => {
                                 Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary opacity-70">(На {{ formData.batch_yield }} порц.)</span>
                             </h4>
                             <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm">
-                                    <span class="card-title text-sm">{{ ing.name }}</span>
+                                <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product_id === null ? 'bg-yellow-50' : ''">
+                                    <div class="flex items-center gap-2">
+                                        <span class="card-title text-sm">{{ ing.name }}</span>
+                                        <button v-if="ing.product_id === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
+                                            Создать
+                                        </button>
+                                    </div>
                                     <span class="font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
                                 </div>
                             </div>
@@ -534,12 +617,35 @@ const onProductCreated = (product) => {
                         <div class="space-y-4">
                             
                             <div class="space-y-2">
-                                <input 
-                                    v-model="formData.name" 
-                                    placeholder="Название блюда"
-                                    class="text-center text-xl font-bold bg-slate-50 border-none rounded-2xl px-4 py-3 w-full focus:ring-0 placeholder:text-slate-300"
-                                    autofocus
-                                >
+                                <div class="flex items-center gap-2">
+                                    <input 
+                                        v-model="formData.name" 
+                                        placeholder="Название блюда"
+                                        class="flex-1 text-center text-xl font-bold bg-slate-50 border-none rounded-2xl px-4 py-3 w-full focus:ring-0 placeholder:text-slate-300"
+                                        autofocus
+                                    >
+                                    <button 
+                                        v-if="isProcessingVoice"
+                                        class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center"
+                                        disabled
+                                    >
+                                        <span class="material-icons-round text-xl text-slate-400 animate-spin">sync</span>
+                                    </button>
+                                    <button 
+                                        v-else
+                                        @click="toggleVoiceRecord"
+                                        class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all tap-effect"
+                                        :class="isRecordingVoice 
+                                            ? 'bg-red-500 animate-pulse text-white' 
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                    >
+                                        <span v-if="isRecordingVoice" class="material-icons-round text-xl">stop</span>
+                                        <span v-else class="material-icons-round text-xl">mic</span>
+                                    </button>
+                                </div>
+                                <div v-if="isRecordingVoice" class="text-center text-xs font-bold text-red-500">
+                                    Слушаю...
+                                </div>
                             </div>
 
                             <div class="space-y-3">
@@ -610,7 +716,7 @@ const onProductCreated = (product) => {
                             <div class="space-y-2">
                                 <div class="text-[10px] font-bold text-slate-400 pl-2">Состав на {{ formData.batch_yield || 1 }} порц.</div>
                                 <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1">
-                                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
+                                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border shadow-sm" :class="ing.product_id === null ? 'border-yellow-400 bg-yellow-50' : 'border-slate-100'">
                                         <div class="w-1.5 h-1.5 rounded-full bg-slate-900 ml-1"></div>
                                         <div class="flex-1 font-bold text-slate-700 text-sm truncate">{{ ing.name }}</div>
                                         
@@ -631,6 +737,10 @@ const onProductCreated = (product) => {
                                             class="font-bold text-slate-500 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
                                         >
                                             {{ ing.amount }} {{ ing.unit }}
+                                        </button>
+
+                                        <button v-if="ing.product_id === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
+                                            Создать в базе
                                         </button>
 
                                         <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
