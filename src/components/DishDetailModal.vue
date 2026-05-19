@@ -459,15 +459,79 @@ const toggleVoiceRecord = async () => {
 
 const processAudioWithAI = async (audioBlob) => {
     isProcessingVoice.value = true
-    console.log("Аудиофайл для обработки:", audioBlob)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    formData.value.ingredients.push({
-        product_id: null,
-        name: "Тестовый продукт из голоса",
-        unit: "Кг",
-        amount: 1
-    })
-    isProcessingVoice.value = false
+    
+    try {
+        const base64Audio = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1]
+                resolve(base64)
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(audioBlob)
+        })
+
+        const response = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAqelG0qYblVPAWuJu72UuqZPA5dnnPk9c',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            {
+                                text: 'Прослушай аудио рецепта. Верни СТРОГО валидный JSON (без маркдаун-разметки) со структурой: { "title": "Название блюда", "description": "Шаги приготовления", "ingredients": [ { "name": "продукт", "amount": число, "unit": "строка" } ] }'
+                            },
+                            {
+                                inline_data: {
+                                    mime_type: audioBlob.type,
+                                    data: base64Audio
+                                }
+                            }
+                        ]
+                    }]
+                })
+            }
+        )
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`)
+        }
+
+        const res = await response.json()
+        let responseText = res.candidates[0].content.parts[0].text
+        
+        responseText = responseText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
+        
+        const parsed = JSON.parse(responseText)
+        
+        if (parsed.title) {
+            formData.value.name = parsed.title
+        }
+        
+        if (parsed.description) {
+            formData.value.description = parsed.description
+        }
+        
+        if (parsed.ingredients && Array.isArray(parsed.ingredients)) {
+            parsed.ingredients.forEach(ing => {
+                formData.value.ingredients.push({
+                    product_id: null,
+                    name: ing.name || ing.product || 'Неизвестно',
+                    amount: parseFloat(ing.amount) || 1,
+                    unit: ing.unit || 'Шт'
+                })
+            })
+        }
+        
+    } catch (error) {
+        console.error('Ошибка обработки аудио:', error)
+        ui.showToast('Не удалось обработать аудио', 'error')
+    } finally {
+        isProcessingVoice.value = false
+    }
 }
 
 const createProductFromIngredient = (ing) => {
