@@ -37,6 +37,9 @@ export const useDishStore = defineStore('dishes', () => {
   const fetchSingleDish = async (id) => {
     const auth = useAuthStore()
     const productStore = useProductStore()
+    if (productStore.products.length === 0) {
+      await productStore.fetchProducts()
+    }
     const productIndex = new Map((productStore.products || []).map((p) => [p.id, p]))
 
     const dish = await withRetry(async () => {
@@ -63,6 +66,9 @@ export const useDishStore = defineStore('dishes', () => {
     const ui = useUIStore()
     const auth = useAuthStore()
     const productStore = useProductStore()
+    if (productStore.products.length === 0) {
+      await productStore.fetchProducts()
+    }
     const productIndex = new Map((productStore.products || []).map((p) => [p.id, p]))
 
     if (!auth.householdId) {

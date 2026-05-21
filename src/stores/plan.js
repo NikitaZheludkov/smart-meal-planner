@@ -9,6 +9,11 @@ export const usePlanStore = defineStore('plan', () => {
   const plan = ref([])
   const loading = ref(false)
 
+  const normalizeDate = (v) => {
+    if (typeof v !== 'string') return v
+    return v.length >= 10 ? v.slice(0, 10) : v
+  }
+
   const fetchPlan = async () => {
     const auth = useAuthStore()
     const ui = useUIStore()
@@ -57,6 +62,7 @@ export const usePlanStore = defineStore('plan', () => {
 
           return {
             ...item,
+            date: normalizeDate(item.date),
             slot: mealType?.name || 'Неизвестно',
             dishData,
             productData: product
@@ -78,7 +84,7 @@ export const usePlanStore = defineStore('plan', () => {
     const auth = useAuthStore()
     const ui = useUIStore()
     if (!auth.householdId) {
-        alert('Сессия потеряна. Перезагрузите страницу.')
+        ui.showToast('Сессия потеряна. Перезагрузите страницу.', 'error')
         throw new Error('Сессия потеряна. Перезагрузите страницу.')
     }
     
@@ -116,7 +122,7 @@ export const usePlanStore = defineStore('plan', () => {
         
     if (data?.error) {
         console.error('Ошибка сохранения:', data.error)
-        alert('Не удалось сохранить в план')
+        ui.showToast('Не удалось сохранить в план', 'error')
         // Откат
         plan.value = plan.value.filter(p => p.id !== tempId)
     } else {
@@ -125,10 +131,13 @@ export const usePlanStore = defineStore('plan', () => {
         if (index !== -1) {
              plan.value[index] = {
                  ...plan.value[index],
-                 ...data
+                 ...data,
+                 date: normalizeDate(data.date)
              }
         }
-        alert('Добавлено в план')
+        if (!ui.isModalOpen) {
+          ui.showToast('Добавлено в план', 'success', 1200)
+        }
     }
   }
 
@@ -151,7 +160,7 @@ export const usePlanStore = defineStore('plan', () => {
 
     if (error) {
         console.error('Ошибка обновления:', error)
-        alert('Не удалось обновить')
+        ui.showToast('Не удалось обновить', 'error')
         // Откат
         plan.value = originalPlan
     }
@@ -171,12 +180,14 @@ export const usePlanStore = defineStore('plan', () => {
     
     if (error) {
       console.error('Ошибка удаления из плана:', error)
-      alert('Не удалось удалить')
+      ui.showToast('Не удалось удалить', 'error')
       
       // Откат
       plan.value = originalPlan
     } else {
-      alert('Удалено из плана')
+      if (!ui.isModalOpen) {
+        ui.showToast('Удалено из плана', 'success', 1200)
+      }
       // Не вызываем fetchPlan(), данные уже обновлены
     }
   }
