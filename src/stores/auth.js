@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
 import { useTelegramStore } from './telegram'
 import { useUIStore } from './ui'
 import { withTimeout, withRetry, isNetworkError } from '../lib/utils'
+import { pb } from '../lib/supabase'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -15,7 +15,121 @@ export const useAuthStore = defineStore('auth', () => {
 
   const ui = useUIStore()
 
-  // Инициализация
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || import.meta.env.ADMIN_EMAIL
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || import.meta.env.ADMIN_PASSWORD
+
+  const resetState = () => {
+    user.value = null
+    householdId.value = null
+    isAuth.value = false
+  }
+
+  const generateInviteCode = () => {
+    return String(Math.floor(100000 + Math.random() * 900000))
+  }
+
+  const isInviteCodeNotUnique = (err) => {
+    const code = err?.data?.data?.invite_code?.code
+    return code === 'validation_not_unique'
+  }
+
+  const ensureHouseholdId = async () => {
+    if (householdId.value) return householdId.value
+
+    const ownerUserId = pb.authStore.model?.id
+    if (!ownerUserId) throw new Error('Пользователь не найден')
+
+    const fromUser = pb.authStore.model?.household
+    if (typeof fromUser === 'string' && fromUser) {
+      householdId.value = fromUser
+      return householdId.value
+    }
+
+    let ownedHousehold = null
+    try {
+      ownedHousehold = await withRetry(async () => {
+        return await withTimeout(
+          pb.collection('households').getFirstListItem(`owner="${ownerUserId}"`),
+          15000
+        )
+      })
+    } catch {
+      ownedHousehold = null
+    }
+
+    if (ownedHousehold?.id) {
+      householdId.value = ownedHousehold.id
+      try {
+        const updatedUser = await withTimeout(
+          pb.collection('users').update(ownerUserId, { household: householdId.value }),
+          15000
+        )
+        user.value = updatedUser
+      } catch {}
+      return householdId.value
+    }
+
+    let created = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const invite_code = generateInviteCode()
+        created = await withRetry(async () => {
+          return await withTimeout(
+            pb.collection('households').create({
+              name: 'Моя семья',
+              owner: ownerUserId,
+              invite_code,
+              start_day: 1,
+              period_length: 7,
+              default_portions: 2
+            }),
+            15000
+          )
+        })
+        break
+      } catch (e) {
+        if (isInviteCodeNotUnique(e) && attempt < 4) continue
+        throw e
+      }
+    }
+
+    if (!created?.id) throw new Error('Не удалось создать семью')
+
+    householdId.value = created.id
+
+    try {
+      const updatedUser = await withTimeout(
+        pb.collection('users').update(ownerUserId, { household: householdId.value }),
+        15000
+      )
+      user.value = updatedUser
+    } catch (e) {
+      ui.addLog('Не удалось привязать семью к пользователю', 'warn', e)
+    }
+
+    return householdId.value
+  }
+
+  const handleUserSession = async (authModel) => {
+    if (!authModel) return
+    user.value = authModel
+    try {
+      await ensureHouseholdId()
+      isAuth.value = true
+      authStatus.value = 'success'
+    } catch (e) {
+      resetState()
+      authStatus.value = 'error'
+      const isNetwork = isNetworkError(e)
+      authError.value = {
+        message: isNetwork ? 'Ошибка сети при загрузке данных семьи' : 'Не удалось загрузить данные семьи',
+        type: isNetwork ? 'network' : 'auth',
+        canRetry: isNetwork
+      }
+      throw e
+    }
+  }
+
   const init = async () => {
     loading.value = true
     authStatus.value = 'loading'
@@ -23,86 +137,46 @@ export const useAuthStore = defineStore('auth', () => {
     
     ui.addLog('Запуск инициализации Auth...', 'info')
     
-    // Тест связи с Supabase
     try {
-      const start = Date.now()
-      // Добавляем мягкий таймаут 10 секунд для проверки связи
-      // Если не ответит - просто запишем в лог, но не будем блокировать вход
-      await withTimeout(
-          fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`),
-          10000
-      )
-      ui.addLog(`Связь с Auth API ок (${Date.now() - start}ms)`)
-    } catch (e) {
-      ui.addLog('Нет связи с Auth API (возможна блокировка)', 'warn', e.message)
-      // НЕ БЛОКИРУЕМ ЗАПУСК, пробуем продолжить (может сработать кеш или другие запросы)
-    }
+        if (pb.authStore.isValid && pb.authStore.model) {
+            ui.addLog('Сессия PocketBase найдена при старте', 'info')
+            await handleUserSession(pb.authStore.model)
+            return
+        }
 
-    try {
-        // 1. Проверяем текущую сессию
-        const { data: { session }, error } = await withTimeout(supabase.auth.getSession())
-        
-        if (error) {
-            ui.addLog('Ошибка getSession при старте', 'error', error)
-            if (isNetworkError(error)) {
-                authStatus.value = 'error'
-                authError.value = { 
-                    message: 'Нет связи с сервером. Проверьте интернет.', 
-                    type: 'network', 
-                    canRetry: true 
-                }
-                return
-            }
+        const telegramStore = useTelegramStore()
+        if (telegramStore.initData) {
+            ui.addLog('Вход через Telegram не поддерживается в PocketBase версии', 'warn')
         }
-        
-        if (session?.user) {
-            ui.addLog('Сессия найдена при старте, юзер: ' + session.user.id)
-            await handleUserSession(session.user)
-        } else if (useTelegramStore().initData) {
-            ui.addLog('Сессия не найдена при старте, пробуем TG вход')
-            await loginWithTelegram()
-        } else {
-            ui.addLog('Сессия не найдена, вход через TG невозможен (не в TMA)')
-            authStatus.value = 'idle'
-        }
-        
-        // 3. Слушаем изменения
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            ui.addLog('AuthStateChange event: ' + event)
-            if (session?.user) {
-                // Избегаем повторной инициализации, если пользователь тот же и мы уже авторизованы
-                if (isAuth.value && user.value?.id === session.user.id) return
-                await handleUserSession(session.user)
-            } else {
-                if (event === 'SIGNED_OUT') resetState()
-            }
-            loading.value = false
-        })
-        
+
+        authStatus.value = 'idle'
     } catch (e) {
         ui.addLog('Ошибка инициализации Auth', 'error', e)
         resetState()
+        authStatus.value = 'error'
+        const isNetwork = isNetworkError(e)
+        authError.value = {
+            message: isNetwork ? 'Ошибка сети. Попробуйте снова.' : 'Не удалось войти. Проверьте настройки.',
+            type: isNetwork ? 'network' : 'auth',
+            canRetry: isNetwork
+        }
     } finally {
         loading.value = false
     }
   }
 
-  // Метод для принудительного обновления сессии (помогает при выходе из сна)
   const refreshSession = async () => {
     ui.addLog('🔄 [Refresh] Начало обновления сессии...', 'info')
     try {
-        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 10000)
-        if (error) {
-            ui.addLog('❌ [Refresh] Ошибка getSession', 'error', error)
-            throw error
-        }
-        
-        if (session?.user) {
-            ui.addLog('✅ [Refresh] Сессия активна: ' + session.user.id)
-            await handleUserSession(session.user)
-        } else {
-            ui.addLog('ℹ️ [Refresh] Сессия не найдена, восстанавливаем...')
-            await loginWithTelegram()
+        if (!pb.authStore.isValid) return
+
+        await withRetry(async () => {
+            return await withTimeout(pb.collection('users').authRefresh(), 10000)
+        })
+
+        if (pb.authStore.model) {
+            ui.addLog('✅ [Refresh] Сессия обновлена', 'info')
+            await handleUserSession(pb.authStore.model)
         }
     } catch (e) {
         ui.addLog('❌ [Refresh] Критическая ошибка', 'error', e)
@@ -118,199 +192,12 @@ export const useAuthStore = defineStore('auth', () => {
         return
     }
     
-    authStatus.value = 'loading'
-    authError.value = null
-
-    try {
-        ui.addLog('Вызов Edge Function telegram-auth...')
-        ui.addLog('InitData length: ' + (telegramStore.initData?.length || 0))
-        
-        // Оборачиваем весь процесс в withRetry
-        const { data, error } = await withRetry(async () => {
-            // 1. Попытка через стандартный SDK
-            ui.addLog('Попытка SDK invoke...')
-            let response = await withTimeout(
-            supabase.functions.invoke('telegram-auth', { 
-                body: { initData: telegramStore.initData }
-            }),
-            15000
-            ).catch(err => ({ error: err }))
-
-            // 2. Если SDK не сработал, пробуем прямой fetch (иногда SDK глючит с Edge Functions)
-            if (response.error) {
-                ui.addLog('SDK invoke не удался, пробуем прямой fetch...', 'warn', response.error.message)
-                
-                const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`
-                
-                const fetchResponse = await withTimeout(
-                    fetch(functionUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-                        },
-                        body: JSON.stringify({ initData: telegramStore.initData })
-                    }),
-                    15000
-                ).catch(err => {
-                    ui.addLog('Прямой fetch тоже не удался', 'error', err.message)
-                    throw err
-                })
-
-                if (!fetchResponse.ok) {
-                    const errText = await fetchResponse.text()
-                    ui.addLog('Ошибка прямого fetch: ' + fetchResponse.status, 'error', errText)
-                    throw new Error(`Direct fetch error: ${fetchResponse.status}`)
-                }
-
-                const directData = await fetchResponse.json()
-                response = { data: directData, error: null }
-            }
-            
-            return response
-        })
-
-        if (error) {
-          ui.addLog('Edge Function вернула ошибку', 'error', error)
-          throw new Error(`Function invoke error: ${error.message}`)
-        }
-        if (!data || !data.session) throw new Error('No session returned from function')
-
-        ui.addLog('Установка полученной сессии...')
-        const { error: sessionError } = await supabase.auth.setSession(data.session)
-        if (sessionError) throw new Error(`Set session error: ${sessionError.message}`)
-
-        ui.addLog('Получение данных пользователя...')
-        const { data: userData, error: userError } = await withTimeout(supabase.auth.getUser())
-        if (userError) throw new Error(`Get user error: ${userError.message}`)
-        if (!userData?.user) throw new Error('User not found after setting session')
-        
-        ui.addLog('Успешный вход через TG, загрузка профиля...')
-        await handleUserSession(userData.user)
-
-    } catch (e) {
-        ui.addLog('Ошибка входа через Telegram', 'error', { message: e.message, stack: e.stack })
-        authStatus.value = 'error'
-        
-        const isNetwork = isNetworkError(e)
-        authError.value = {
-            message: isNetwork ? 'Ошибка сети. Попробуйте снова.' : 'Не удалось войти. Перезапустите приложение.',
-            type: isNetwork ? 'network' : 'auth',
-            canRetry: isNetwork
-        }
-    }
-  }
-
-  const handleUserSession = async (authUser) => {
-    if (!authUser) return
-    
-    // Предотвращаем множественные одновременные загрузки профиля
-    if (user.value?.id === authUser.id && isAuth.value) {
-        if (!householdId.value) {
-            ui.addLog('Профиль загружен, но householdId отсутствует. Повторная загрузка...', 'warn')
-        } else {
-            ui.addLog(`Профиль уже загружен. Household: ${householdId.value}`, 'info')
-            authStatus.value = 'success'
-            return
-        }
-    }
-
-    try {
-        ui.addLog('Загрузка профиля из БД для: ' + authUser.id)
-        
-        let { data, error } = await withRetry(async () => {
-            return await withTimeout(
-                supabase
-                    .from('profiles')
-                    .select('household_id')
-                    .eq('id', authUser.id)
-                    .single(),
-                15000
-            )
-        })
-            
-        // Если профиль не найден (новый пользователь через Email/Password)
-        if (error && error.code === 'PGRST116') {
-            ui.addLog('Профиль не найден, создаем новый household...', 'warn')
-            
-            // 1. Создаем новую "семью" (household)
-            const { data: newHousehold, error: hError } = await supabase
-                .from('households')
-                .insert({ 
-                    name: 'Моя семья',
-                    owner_id: authUser.id // Устанавливаем владельца
-                })
-                .select()
-                .single()
-            
-            if (hError) {
-                ui.addLog('Ошибка создания household', 'error', hError)
-                throw hError
-            }
-
-            // 2. Создаем профиль
-            const { data: newProfile, error: pError } = await supabase
-                .from('profiles')
-                .insert({
-                    id: authUser.id,
-                    household_id: newHousehold.id,
-                    first_name: authUser.email?.split('@')[0] || 'Пользователь'
-                })
-                .select()
-                .single()
-            
-            if (pError) {
-                ui.addLog('Ошибка создания профиля', 'error', pError)
-                throw pError
-            }
-
-            data = newProfile
-            error = null
-        }
-
-        if (error) {
-            ui.addLog('Ошибка загрузки профиля', 'error', error)
-            // При сетевых ошибках НЕ выходим из аккаунта, просто ждем
-            const isTransient = isNetworkError(error)
-            
-            if (isTransient) {
-                ui.addLog('Временная ошибка сети, сессия сохранена', 'warn')
-                authStatus.value = 'error'
-                authError.value = { message: 'Ошибка сети при загрузке профиля', type: 'network', canRetry: true }
-                return 
-            }
-            
-            await signOut()
-            return
-        }
-
-        if (!data) {
-            ui.addLog('Данные профиля пусты', 'warn')
-            await signOut()
-            return
-        }
-
-        ui.addLog('Профиль загружен, householdId: ' + data.household_id)
-        user.value = authUser
-        householdId.value = data.household_id
-        isAuth.value = true
-        authStatus.value = 'success'
-        
-    } catch (e) {
-        ui.addLog('Исключение в handleUserSession', 'error', e)
-        authStatus.value = 'error'
-        authError.value = { message: 'Ошибка приложения', type: 'auth', canRetry: false }
-    }
-  }
-
-  const resetState = () => {
-    user.value = null
-    householdId.value = null
-    isAuth.value = false
+    authStatus.value = 'error'
+    authError.value = { message: 'Telegram Auth сейчас отключен (PocketBase)', type: 'auth', canRetry: false }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    pb.authStore.clear()
     resetState()
   }
 
@@ -319,13 +206,15 @@ export const useAuthStore = defineStore('auth', () => {
     authStatus.value = 'loading'
     authError.value = null
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        await handleUserSession(data.user)
+        await withRetry(async () => {
+            return await withTimeout(pb.collection('users').authWithPassword(email, password), 15000)
+        })
+        await handleUserSession(pb.authStore.model)
     } catch (e) {
         ui.addLog('Ошибка входа', 'error', e)
         authStatus.value = 'error'
-        authError.value = { message: e.message, type: 'auth', canRetry: true }
+        const isNetwork = isNetworkError(e)
+        authError.value = { message: e.message, type: isNetwork ? 'network' : 'auth', canRetry: isNetwork }
         throw e
     } finally {
         loading.value = false
@@ -337,21 +226,27 @@ export const useAuthStore = defineStore('auth', () => {
     authStatus.value = 'loading'
     authError.value = null
     try {
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
-        
-        if (data.user) {
-            // Если регистрация прошла, но нужно подтверждение почты (стандарт Supabase)
-            if (!data.session) {
-                alert('Проверьте почту для подтверждения')
-            } else {
-                await handleUserSession(data.user)
-            }
-        }
+        await withRetry(async () => {
+            return await withTimeout(
+              pb.collection('users').create({
+                email,
+                password,
+                passwordConfirm: password
+              }),
+              15000
+            )
+        })
+
+        await withRetry(async () => {
+            return await withTimeout(pb.collection('users').authWithPassword(email, password), 15000)
+        })
+
+        await handleUserSession(pb.authStore.model)
     } catch (e) {
         ui.addLog('Ошибка регистрации', 'error', e)
         authStatus.value = 'error'
-        authError.value = { message: e.message, type: 'auth', canRetry: true }
+        const isNetwork = isNetworkError(e)
+        authError.value = { message: e.message, type: isNetwork ? 'network' : 'auth', canRetry: isNetwork }
         throw e
     } finally {
         loading.value = false
@@ -359,28 +254,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const loginAsTestUser = async () => {
-    // В продакшене этот метод должен быть недоступен или защищен
     if (import.meta.env.PROD && !import.meta.env.VITE_ENABLE_TEST_USER) {
         alert('Тестовый вход недоступен в PROD')
         return
     }
 
-    loading.value = true
     try {
-        // Попытка входа
-        const { error } = await supabase.auth.signInWithPassword({
-            email: 'dev@telegram.mini.app',
-            password: 'dev-password-123'
-        })
-        
-        if (error) {
-             console.error('Ошибка Dev входа:', error)
-             alert('Ошибка входа Dev User')
+        if (!adminEmail || !adminPassword) {
+            throw new Error('ADMIN_EMAIL/ADMIN_PASSWORD не заданы в env')
         }
-    } catch(e) { 
+        await signIn(adminEmail, adminPassword)
+    } catch (e) { 
         console.error(e)
-    } finally { 
-        loading.value = false 
     }
   }
 

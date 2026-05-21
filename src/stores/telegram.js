@@ -75,22 +75,40 @@ export const useTelegramStore = defineStore('telegram', () => {
 
   // --- МЕТОДЫ ВИБРАЦИИ (Haptic Feedback) ---
   
+  const isHapticSupported = () => {
+    const webApp = window.Telegram?.WebApp || tg
+    const hf = webApp?.HapticFeedback
+    if (!hf) return false
+    const hasApi = typeof hf.selectionChanged === 'function' && typeof hf.impactOccurred === 'function' && typeof hf.notificationOccurred === 'function'
+    if (!hasApi) return false
+    const versionOk = window.Telegram?.WebApp?.isVersionAtLeast?.('6.1') === true
+    const canFallback = typeof window.Telegram?.WebApp?.isVersionAtLeast !== 'function'
+    return versionOk || canFallback
+  }
+
+  const safeHapticCall = (fn) => {
+    if (!isHapticSupported()) return
+    try {
+      fn()
+    } catch (e) {}
+  }
+
   const haptic = {
     // Легкий удар (для кнопок, переключателей)
     // styles: 'light', 'medium', 'heavy', 'rigid', 'soft'
     impact: (style = 'medium') => {
-        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+        safeHapticCall(() => (window.Telegram?.WebApp || tg)?.HapticFeedback?.impactOccurred(style))
     },
     
     // Уведомление (успех, ошибка)
     // types: 'error', 'success', 'warning'
     notification: (type = 'success') => {
-         if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred(type)
+         safeHapticCall(() => (window.Telegram?.WebApp || tg)?.HapticFeedback?.notificationOccurred(type))
     },
     
     // Выбор (прокрутка списков, пикеров)
     selection: () => {
-         if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
+         safeHapticCall(() => (window.Telegram?.WebApp || tg)?.HapticFeedback?.selectionChanged())
     }
   }
 

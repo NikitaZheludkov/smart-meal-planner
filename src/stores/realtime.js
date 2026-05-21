@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { usePlanStore } from './plan'
 import { useShoppingStore } from './shopping'
@@ -8,109 +8,66 @@ import { useDishStore } from './dishes'
 import { useSettingsStore } from './settings'
 
 export const useRealtimeStore = defineStore('realtime', () => {
-  let channel = null
+  let isSubscribed = false
 
   const init = () => {
     const auth = useAuthStore()
     if (!auth.householdId) return
 
-    if (channel) return
+    if (isSubscribed) return
 
-    console.log('📡 Подключение к каналу семьи:', auth.householdId)
+    isSubscribed = true
+    console.log('📡 PocketBase Realtime: subscribe, household:', auth.householdId)
 
-    // Создаем канал
-    channel = supabase.channel(`household-${auth.householdId}`)
-
-    // 1. СЛУШАЕМ БАЗУ ДАННЫХ (Для Плана, Продуктов, Списка покупок)
-    // Это работает хорошо, оставляем как есть
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        filter: `household_id=eq.${auth.householdId}`
-      },
-      (payload) => handleDatabaseUpdate(payload)
-    )
-
-    // 2. СЛУШАЕМ "РАДИО" (Для Настроек)
-    // Получаем мгновенные команды от других устройств
-    channel.on(
-      'broadcast',
-      { event: 'settings_update' },
-      (payload) => {
-          console.log('📻 Получен сигнал об обновлении настроек:', payload)
-          const settings = useSettingsStore()
-          // Мгновенно применяем пришедшие настройки
-          settings.startDay = payload.payload.startDay
-          settings.periodLength = payload.payload.periodLength
-          settings.defaultPortions = payload.payload.defaultPortions
-          if (payload.payload.household) {
-              // Fix: household is unwrapped by Pinia, so assign directly
-              settings.household = payload.payload.household
-          }
+    ;(async () => {
+      try {
+        await pb.collection('*').subscribe('*', (e) => {
+          void handleRealtimeEvent(e)
+        })
+        console.log('🟢 Синхронизация активна')
+      } catch (e) {
+        console.error('🔴 Ошибка Realtime:', e)
+        isSubscribed = false
+        setTimeout(() => reconnect(), 5000)
       }
-    )
-
-    // Подписываемся
-    channel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
-          console.log('🟢 Синхронизация активна')
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('🔴 Ошибка Realtime:', status, err)
-          // Пробуем переподключиться через 5 секунд
-          setTimeout(() => reconnect(), 5000)
-      } else if (status === 'CLOSED') {
-          console.log('🔌 Канал закрыт')
-      }
-    })
+    })()
   }
 
-  // Функция, чтобы САМОМУ отправить сигнал (вызывается из settings.js)
   const notifySettingsChanged = async (newSettings) => {
-      if (!channel) return
-      await channel.send({
-          type: 'broadcast',
-          event: 'settings_update',
-          payload: newSettings
-      })
+      return newSettings
   }
 
-  // Обработка изменений из Базы Данных
-  const handleDatabaseUpdate = async (payload) => {
-    const { table } = payload
-    
-    // Игнорируем household, так как для него теперь используем Broadcast
-    if (table === 'households') return 
+  const handleRealtimeEvent = async (event) => {
+    const auth = useAuthStore()
+    const collection = event.collectionName
+    const record = event.record || null
 
-    console.log(`⚡ Обновление БД в ${table}, запрашиваем свежие данные...`)
+    const recordHousehold = record?.household || null
+    const shouldFilterByHousehold = ['plan', 'shopping_cart', 'products', 'dishes', 'ingredients', 'households'].includes(collection)
+    if (shouldFilterByHousehold && recordHousehold && recordHousehold !== auth.householdId) return
+
+    console.log(`⚡ Обновление БД в ${collection}, запрашиваем свежие данные...`)
 
     const plan = usePlanStore()
     const shopping = useShoppingStore()
     const products = useProductStore()
     const dishes = useDishStore()
+    const settings = useSettingsStore()
 
-    // Просто запрашиваем свежие данные в зависимости от того, какая таблица изменилась
-    if (table === 'plan') {
-      await plan.fetchPlan()
-    }
-    else if (table === 'shopping_cart') {
-      await shopping.fetchChecklist()
-    }
-    else if (table === 'products') {
-      await products.fetchProducts()
-    }
-    else if (table === 'dishes' || table === 'ingredients' || table === 'dish_tag_links') {
-      await dishes.fetchDishes()
-    }
+    if (collection === 'plan') await plan.fetchPlan()
+    else if (collection === 'shopping_cart') await shopping.fetchChecklist()
+    else if (collection === 'products') await products.fetchProducts()
+    else if (collection === 'dishes' || collection === 'ingredients') await dishes.fetchDishes()
+    else if (collection === 'households') await settings.fetchSettings()
   }
 
   const unsubscribe = () => {
-    if (channel) {
-      console.log('🔌 Отключение от канала')
-      supabase.removeChannel(channel)
-      channel = null
-    }
+    if (!isSubscribed) return
+    console.log('🔌 Отключение от канала')
+    isSubscribed = false
+    try {
+      pb.collection('*').unsubscribe('*')
+    } catch {}
   }
 
   const reconnect = () => {

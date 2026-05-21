@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
 import { useUIStore } from './ui'
+import { pb } from '../lib/supabase'
+import { withRetry, withTimeout } from '../lib/utils'
 
 export const useDictionariesStore = defineStore('dictionaries', () => {
   
@@ -28,32 +29,20 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
     loading.value = true
     const ui = useUIStore()
     try {
-      // 1. Приемы пищи (Завтрак, Обед...) - сортировка по порядку
-      const { data: meals, error: mealsError } = await supabase
-        .from('meal_types')
-        .select('*')
-        .order('sort_order')
-      
-      if (mealsError) throw mealsError
-      if (meals) mealTypes.value = meals
+      const [meals, dishes, tags] = await withRetry(async () => {
+        return await withTimeout(
+          Promise.all([
+            pb.collection('meal_types').getFullList({ sort: 'sort_order' }),
+            pb.collection('dish_types').getFullList({ sort: 'sort_order' }),
+            pb.collection('dish_tags').getFullList({ sort: 'sort_order' })
+          ]),
+          15000
+        )
+      })
 
-      // 2. Типы блюд (Основные, Салаты...) - сортировка по важности (sort_order)
-      const { data: dishes, error: dishesError } = await supabase
-        .from('dish_types')
-        .select('*')
-        .order('sort_order')
-      
-      if (dishesError) throw dishesError
-      if (dishes) dishTypes.value = dishes
-
-      // 3. Теги (Быстро, ПП...) - сортировка по группам и порядку
-      const { data: tags, error: tagsError } = await supabase
-          .from('dish_tags')
-          .select('*')
-          .order('sort_order')
-      
-      if (tagsError) throw tagsError
-      if (tags) availableTags.value = tags
+      mealTypes.value = meals || []
+      dishTypes.value = dishes || []
+      availableTags.value = tags || []
       
       ui.addLog('Справочники загружены')
 

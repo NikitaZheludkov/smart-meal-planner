@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useUIStore } from './ui'
 import { usePlanStore } from './plan'
@@ -18,28 +18,48 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const fetchChecklist = async () => {
     const auth = useAuthStore()
-    if (!auth.user) return
+    if (!auth.householdId) return
 
     loading.value = true
-    const { data, error } = await withTimeout(
-      supabase
-      .from('shopping_cart')
-      .select('product_id')
-      .eq('is_checked', true),
-      7000
-    )
-
-    if (error) {
-      console.error('Ошибка списка покупок:', error)
-    } else {
-      checkedIds.value = new Set(data.map(item => item.product_id))
+    try {
+      const rows = await withTimeout(
+        pb.collection('shopping_cart').getFullList({
+          filter: `household="${auth.householdId}" && is_checked=true`
+        }),
+        15000
+      )
+      checkedIds.value = new Set((rows || []).map((r) => r.product).filter(Boolean))
+    } catch (e) {
+      console.error('Ошибка списка покупок:', e)
     }
     loading.value = false
   }
 
+  const upsertShoppingRow = async (household, product, isChecked) => {
+    const now = new Date().toISOString()
+    const payload = { household, product, is_checked: isChecked, updated_at: now }
+
+    let existing = null
+    try {
+      existing = await withTimeout(
+        pb.collection('shopping_cart').getFirstListItem(`household="${household}" && product="${product}"`, {
+          fields: 'id'
+        }),
+        5000
+      )
+    } catch {
+      existing = null
+    }
+
+    if (existing?.id) {
+      return await withTimeout(pb.collection('shopping_cart').update(existing.id, payload), 5000)
+    }
+
+    return await withTimeout(pb.collection('shopping_cart').create(payload), 5000)
+  }
+
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
-    const ui = useUIStore()
     if (!auth.householdId) return
 
     // 1. Оптимистичное обновление
@@ -48,20 +68,8 @@ export const useShoppingStore = defineStore('shopping', () => {
     if (newState) checkedIds.value.add(productId)
     else checkedIds.value.delete(productId)
 
-    // 2. Отправка запроса
-    const { error } = await withTimeout(
-      supabase
-        .from('shopping_cart')
-        .upsert({ 
-          household_id: auth.householdId, 
-          product_id: productId, 
-          is_checked: newState,
-          updated_at: new Date()
-        }, { onConflict: 'household_id, product_id' }),
-      5000
-    )
+    const error = await upsertShoppingRow(auth.householdId, productId, newState).then(() => null).catch((e) => e)
 
-    // 3. Откат при ошибке
     if (error) {
       console.error('Ошибка сохранения:', error)
       alert('Не удалось обновить статус')
@@ -73,20 +81,20 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const clearList = async () => {
     const auth = useAuthStore()
-    const ui = useUIStore()
     if (!auth.householdId) return
 
-    const { error } = await supabase
-      .from('shopping_cart')
-      .delete()
-      .eq('household_id', auth.householdId)
-      .neq('id', '00000000-0000-0000-0000-000000000000') 
-    
-    if (error) {
-      console.error('Ошибка очистки списка:', error)
+    try {
+      const rows = await withTimeout(
+        pb.collection('shopping_cart').getFullList({
+          filter: `household="${auth.householdId}"`
+        }),
+        15000
+      )
+      await Promise.all((rows || []).map((r) => pb.collection('shopping_cart').delete(r.id).catch(() => null)))
+      alert('Список очищен')
+    } catch (e) {
+      console.error('Ошибка очистки списка:', e)
       alert('Не удалось очистить список')
-    } else {
-        alert('Список очищен')
     }
 
     checkedIds.value.clear()
@@ -119,8 +127,8 @@ export const useShoppingStore = defineStore('shopping', () => {
         
         if (!isWithinInterval(planDate, { start, end })) return false
         if (item.ignore_shopping) return false
-        if (item.dish_id && !item.dishes) return false
-        if (item.product_id && !item.products) return false
+        if (item.dish && !item.dishData) return false
+        if (item.product && !item.productData) return false
         return true
     })
 
@@ -146,21 +154,21 @@ export const useShoppingStore = defineStore('shopping', () => {
     activePlanItems.forEach(planItem => {
         const portions = planItem.portions || 1
 
-        if (planItem.dish_id) {
-            const dishId = planItem.dish_id
+        if (planItem.dish) {
+            const dishId = planItem.dish
             if (!dishesMap[dishId]) {
                 dishesMap[dishId] = {
-                    name: planItem.dishes?.name,
-                    is_batch: planItem.dishes?.is_batch,
-                    batch_yield: planItem.dishes?.batch_yield || 1,
-                    ingredients: planItem.dishes?.ingredients || [],
+                    name: planItem.dishData?.name,
+                    is_batch: planItem.dishData?.is_batch,
+                    batch_yield: planItem.dishData?.batch_yield || 1,
+                    ingredients: planItem.dishData?.ingredients || [],
                     totalPortions: 0
                 }
             }
             dishesMap[dishId].totalPortions += portions
         } 
-        else if (planItem.product_id) {
-             addToAggregatedList(finalList, planItem.products, portions, 'Отдельно')
+        else if (planItem.product) {
+             addToAggregatedList(finalList, planItem.productData, portions, 'Отдельно')
         }
     })
 
@@ -173,8 +181,8 @@ export const useShoppingStore = defineStore('shopping', () => {
         const multiplier = Math.ceil(dish.totalPortions / yieldAmount)
         
         dish.ingredients.forEach(ing => {
-            if (!ing.products) return 
-            addToAggregatedList(finalList, ing.products, (ing.amount || 0) * multiplier, dish.name)
+            if (!ing.productData) return 
+            addToAggregatedList(finalList, ing.productData, (ing.amount || 0) * multiplier, dish.name)
         })
     })
 
@@ -205,21 +213,21 @@ export const useShoppingStore = defineStore('shopping', () => {
         planDate.setHours(0,0,0,0)
         if (!isWithinInterval(planDate, { start, end })) return
         if (item.ignore_shopping) return
-        if (!item.dish_id || !item.dishes) return
+        if (!item.dish || !item.dishData) return
         
-        const dishId = item.dishes.id
+        const dishId = item.dishData.id
         
         if (dishesMap.has(dishId)) {
             dishesMap.get(dishId).count++
         } else {
-            const ingredients = item.dishes.ingredients || []
+            const ingredients = item.dishData.ingredients || []
             let totalIngs = 0
             let foundIngs = 0
             
             ingredients.forEach(ing => {
-                if (!ing.products) return
+                if (!ing.product) return
                 totalIngs++
-                if (checkedIds.value.has(ing.product_id)) {
+                if (checkedIds.value.has(ing.product)) {
                     foundIngs++
                 }
             })
@@ -228,8 +236,8 @@ export const useShoppingStore = defineStore('shopping', () => {
             
             dishesMap.set(dishId, {
                 id: dishId,
-                name: item.dishes.name,
-                image_url: item.dishes.image_url,
+                name: item.dishData.name,
+                image_url: item.dishData.image_url,
                 count: 1, 
                 percent: percent
             })

@@ -96,30 +96,32 @@ const batchStatusMap = computed(() => {
     
     // Фильтруем по текущей неделе и только batch блюда (где yield > 1)
     const weekItems = plan.filter(p => {
-        if (!p.dish_id) return false
+        if (!p.dish) return false
         // Если yield > 1, считаем это batch-блюдом
-        const yieldAmount = p.dishes?.batch_yield || 1
+        const yieldAmount = p.dishData?.batch_yield || 1
         if (yieldAmount <= 1) return false
         
         const d = parseISO(p.date)
         return isWithinInterval(d, { start, end })
     })
 
-    // Группируем по dish_id
+    const sortOrderByMealType = new Map((dictionaries.mealTypes || []).map((m) => [m.id, Number(m.sort_order) || 0]))
+
+    // Группируем по dish
     const byDish = {}
     weekItems.forEach(item => {
-        if (!byDish[item.dish_id]) byDish[item.dish_id] = []
-        byDish[item.dish_id].push(item)
+        if (!byDish[item.dish]) byDish[item.dish] = []
+        byDish[item.dish].push(item)
     })
     
     Object.values(byDish).forEach(items => {
         // Сортируем: дата, потом слот
         items.sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date)
-            return a.meal_type_id - b.meal_type_id
+            return (sortOrderByMealType.get(a.meal_type) || 0) - (sortOrderByMealType.get(b.meal_type) || 0)
         })
         
-        const yieldAmount = items[0].dishes.batch_yield || 1
+        const yieldAmount = items[0].dishData.batch_yield || 1
         let currentBatch = 1
         let usedInBatch = 0
         
@@ -158,7 +160,7 @@ const getSlotItems = (date, slotId) => {
   const dStr = format(date, 'yyyy-MM-dd')
   
   return planStore.plan.filter(p => {
-    return p.date === dStr && p.meal_type_id === slotId
+    return p.date === dStr && p.meal_type === slotId
   })
 }
 
@@ -184,8 +186,8 @@ const onDishSelected = async ({ item, type }) => {
 
   // Проверка на дубликаты
   const isDuplicate = currentItems.some(existing => {
-      if (type === 'dish') return existing.dish_id === item.id
-      else return existing.product_id === item.id
+      if (type === 'dish') return existing.dish === item.id
+      else return existing.product === item.id
   })
 
   if (isDuplicate) return 
@@ -198,7 +200,7 @@ const onDishSelected = async ({ item, type }) => {
       
       // Считаем сколько уже запланировано
       const existingUses = planStore.plan.filter(p => 
-        p.dish_id === item.id && 
+        p.dish === item.id && 
         isWithinInterval(parseISO(p.date), { start, end })
       )
       
@@ -234,15 +236,16 @@ const viewingDish = ref(null)
 
 const openDishDetails = async (item) => {
   telegram.haptic.impact('light')
-  if (item.dish_id) {
+  if (item.dish) {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
-    const fullDish = dishStore.dishes.find(d => d.id === item.dish_id)
-    viewingDish.value = fullDish || item.dishes
+    const fullDish = dishStore.dishes.find(d => d.id === item.dish)
+    viewingDish.value = fullDish || item.dishData
     showDishModal.value = true
   }
 }
 
 const mealSlots = computed(() => dictionaries.mealTypes)
+const dishTypeNameById = computed(() => new Map((dictionaries.dishTypes || []).map((t) => [t.id, t.name])))
 
 const loadData = async () => {
   // Грузим последовательно
@@ -280,12 +283,12 @@ const dailyTotals = computed(() => {
   let totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 }
   currentDayData.value.forEach(group => {
     group.items.forEach(item => {
-      if (item.dish_id && item.dishes) {
+      if (item.dish && item.dishData) {
         // Считаем КБЖУ только для одной порции (на 1 человека), игнорируем item.portions
-        totals.kcal += (Number(item.dishes.kcal) || 0)
-        totals.protein += (Number(item.dishes.protein) || 0)
-        totals.fat += (Number(item.dishes.fat) || 0)
-        totals.carbs += (Number(item.dishes.carbs) || 0)
+        totals.kcal += (Number(item.dishData.kcal) || 0)
+        totals.protein += (Number(item.dishData.protein) || 0)
+        totals.fat += (Number(item.dishData.fat) || 0)
+        totals.carbs += (Number(item.dishData.carbs) || 0)
       }
     })
   })
@@ -297,11 +300,11 @@ const getDailyTotals = (day) => {
   mealSlots.value.forEach(slot => {
     const items = getSlotItems(day, slot.id)
     items.forEach(item => {
-      if (item.dish_id && item.dishes) {
-        totals.kcal += (Number(item.dishes.kcal) || 0)
-        totals.protein += (Number(item.dishes.protein) || 0)
-        totals.fat += (Number(item.dishes.fat) || 0)
-        totals.carbs += (Number(item.dishes.carbs) || 0)
+      if (item.dish && item.dishData) {
+        totals.kcal += (Number(item.dishData.kcal) || 0)
+        totals.protein += (Number(item.dishData.protein) || 0)
+        totals.fat += (Number(item.dishData.fat) || 0)
+        totals.carbs += (Number(item.dishData.carbs) || 0)
       }
     })
   })
@@ -428,15 +431,15 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                     </button>
                                 </div>
                                 <TransitionGroup name="list" tag="div" class="space-y-3 relative">
-                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish_id ? 'tap-effect active:scale-[0.98]' : ''">
+                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish ? 'tap-effect active:scale-[0.98]' : ''">
                                         <div class="w-16 h-16 bg-slate-50 rounded-[20px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
-                                            <img v-if="item.dish_id && item.dishes?.image_url" :src="item.dishes.image_url" class="w-full h-full object-cover">
-                                            <span v-else-if="item.product_id">🥦</span>
+                                            <img v-if="item.dish && item.dishData?.image_url" :src="item.dishData.image_url" class="w-full h-full object-cover">
+                                            <span v-else-if="item.product">🥦</span>
                                             <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
                                         </div>
                                         <div class="flex-1 min-w-0 py-1">
                                             <div class="text-base card-title truncate leading-tight">
-                                                {{ item.dish_id ? item.dishes?.name : item.products?.name }}
+                                                {{ item.dish ? item.dishData?.name : item.productData?.name }}
                                                 <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
                                             </div>
                                             <!-- Batch Indicator List View -->
@@ -446,16 +449,16 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                                 <span class="text-[9px] font-black text-slate-600">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</span>
                                             </div>
                                             <div class="mt-1.5 flex flex-wrap gap-2">
-                                                <template v-if="item.dish_id">
-                                                    <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ item.dishes?.dish_type || 'Блюдо' }}</span>
-                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ item.dishes?.kcal }} ккал</span>
+                                                <template v-if="item.dish">
+                                                    <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ dishTypeNameById.get(item.dishData?.dish_type) || 'Блюдо' }}</span>
+                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ item.dishData?.kcal }} ккал</span>
                                                 </template>
                                                 <template v-else>
-                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.products?.unit }}</span>
+                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.productData?.unit }}</span>
                                                 </template>
                                             </div>
                                         </div>
-                                        <div v-if="item.dish_id" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                                        <div v-if="item.dish" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
                                     </div>
                                 </TransitionGroup>
                             </div>
@@ -511,8 +514,8 @@ onMounted(() => { if (auth.isAuth) loadData() })
             </span>
 
             <template v-else-if="getSlotItems(day, slot.id).length === 1">
-               <template v-if="getSlotItems(day, slot.id)[0].dish_id && getSlotItems(day, slot.id)[0].dishes?.image_url">
-                    <img :src="getSlotItems(day, slot.id)[0].dishes.image_url" class="absolute inset-0 w-full h-full object-cover">
+               <template v-if="getSlotItems(day, slot.id)[0].dish && getSlotItems(day, slot.id)[0].dishData?.image_url">
+                    <img :src="getSlotItems(day, slot.id)[0].dishData.image_url" class="absolute inset-0 w-full h-full object-cover">
                     <div class="absolute inset-0 bg-black/10 transition-colors" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'bg-slate-900/40 grayscale' : ''"></div>
                     <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent"></div>
                     <div class="absolute bottom-1.5 left-1.5 right-1.5 z-10 text-left">
@@ -523,7 +526,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
                         <div class="text-[9px] font-bold text-white leading-tight line-clamp-2 shadow-sm">
                              <span v-if="getSlotItems(day, slot.id)[0].ignore_shopping" class="text-[8px] mr-1 opacity-70">🚫</span>
-                            {{ getSlotItems(day, slot.id)[0].dishes?.name }}
+                            {{ getSlotItems(day, slot.id)[0].dishData?.name }}
                             <span v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-white/80 ml-0.5">x{{ getSlotItems(day, slot.id)[0].portions }}</span>
                          </div>
                     </div>
@@ -536,10 +539,10 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         </div>
                         
                         <div class="text-xl mb-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'opacity-30' : ''">
-                            {{ getSlotItems(day, slot.id)[0].product_id ? '🥦' : getSlotIcon(slot.name) }}
+                            {{ getSlotItems(day, slot.id)[0].product ? '🥦' : getSlotIcon(slot.name) }}
                         </div>
                         <div class="text-[9px] font-bold text-center leading-tight line-clamp-2 px-1" :class="getSlotItems(day, slot.id)[0].ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-800'">
-                            {{ getSlotItems(day, slot.id)[0].dish_id ? getSlotItems(day, slot.id)[0].dishes?.name : getSlotItems(day, slot.id)[0].products?.name }}
+                            {{ getSlotItems(day, slot.id)[0].dish ? getSlotItems(day, slot.id)[0].dishData?.name : getSlotItems(day, slot.id)[0].productData?.name }}
                         </div>
                         <div v-if="getSlotItems(day, slot.id)[0].portions > 1" class="text-[8px] font-black text-slate-900">
                               x{{ getSlotItems(day, slot.id)[0].portions }}
@@ -557,7 +560,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                       :class="item.ignore_shopping ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'"
                    >
                       <span class="text-[7px] font-bold text-center leading-tight line-clamp-2 w-full break-words" :class="item.ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-700'">
-                          {{ item.dish_id ? item.dishes?.name : item.products?.name }}
+                          {{ item.dish ? item.dishData?.name : item.productData?.name }}
                           <span v-if="item.portions > 1" class="text-slate-900"> x{{ item.portions }}</span>
                       </span>
                     </div>

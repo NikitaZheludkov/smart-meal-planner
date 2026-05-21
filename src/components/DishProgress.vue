@@ -12,7 +12,7 @@ const dishesWithProgress = computed(() => {
     const groups = {}
 
     props.dishes.forEach(planItem => {
-        const dish = planItem.dishes
+        const dish = planItem.dishData
         // Пропускаем, если нет ингредиентов
         if (!dish || !dish.ingredients || dish.ingredients.length === 0) return
 
@@ -24,7 +24,7 @@ const dishesWithProgress = computed(() => {
             
             // 2. Считаем, сколько из них отмечено галочками
             const recipeBought = dish.ingredients.reduce((acc, ing) => {
-                return acc + (shoppingStore.isChecked(ing.product_id) ? 1 : 0)
+                return acc + (shoppingStore.isChecked(ing.product) ? 1 : 0)
             }, 0)
 
             groups[dish.id] = {

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
 import { useUIStore } from './ui'
+import { pb } from '../lib/supabase'
 
 export const useSettingsStore = defineStore('settings', () => {
   const startDay = ref(1) 
@@ -38,24 +38,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
     loading.value = true
     try {
-      // Если householdId уже известен из auth, используем его сразу
       const hhId = auth.householdId
-      if (hhId) {
-        await fetchHouseholdDetails(hhId)
-      } else {
-        const { data: profile, error: profileError } = await withTimeout(
-          supabase
-          .from('profiles')
-          .select('household_id')
-          .eq('id', auth.user.id)
-          .single(),
-          20000
-        )
-        if (profileError) throw profileError
-        if (profile?.household_id) {
-            await fetchHouseholdDetails(profile.household_id)
-        }
-      }
+      if (!hhId) return
+      await fetchHouseholdDetails(hhId)
     } catch (e) { 
         console.error('Ошибка загрузки настроек:', e) 
         ui.addLog('Ошибка загрузки настроек', 'error', e)
@@ -65,16 +50,9 @@ export const useSettingsStore = defineStore('settings', () => {
   }
   
   const fetchHouseholdDetails = async (householdId) => {
-      const { data: hhData, error: hhError } = await withTimeout(
-          supabase
-          .from('households')
-          .select('*')
-          .eq('id', householdId)
-          .single(),
-          20000
-      )
-      
-      if (!hhError && hhData) {
+      const hhData = await withTimeout(pb.collection('households').getOne(householdId), 20000)
+
+      if (hhData) {
           household.value = hhData
           startDay.value = Number(hhData.start_day ?? 1)
           periodLength.value = Number(hhData.period_length ?? 7)
@@ -82,12 +60,11 @@ export const useSettingsStore = defineStore('settings', () => {
           const ui = useUIStore()
           ui.addLog('Настройки семьи загружены')
       }
-      
-      const { data: members } = await supabase
-          .from('profiles')
-          .select('id, first_name, username, avatar_url, telegram_id')
-          .eq('household_id', householdId)
-      
+
+      const members = await pb.collection('users').getFullList({
+          filter: `household="${householdId}"`
+      })
+
       familyMembers.value = members || []
   }
 
@@ -105,22 +82,14 @@ export const useSettingsStore = defineStore('settings', () => {
     
     if (household.value?.id) {
         // 2. Сохраняем в базу данных (чтобы не пропало при перезагрузке)
-        const { error } = await withTimeout(
-            supabase
-            .from('households')
-            .update({ 
+        await withTimeout(
+            pb.collection('households').update(household.value.id, { 
                 start_day: day, 
                 period_length: period, 
                 default_portions: portions 
-            })
-            .eq('id', household.value.id),
+            }),
             5000
         )
-
-        if (error) {
-            console.error('Ошибка сохранения настроек:', error)
-            return
-        }
 
         // 3. ОТПРАВЛЯЕМ СИГНАЛ ВСЕМ ОСТАЛЬНЫМ (Broadcast)
         // Это гарантирует, что другие устройства получат обновление мгновенно
@@ -137,41 +106,28 @@ export const useSettingsStore = defineStore('settings', () => {
   const generateInviteCode = async () => {
       if (!household.value) throw new Error('Семья не найдена')
       const code = Math.floor(100000 + Math.random() * 900000).toString()
-      const { data, error } = await supabase
-          .from('households')
-          .update({ invite_code: code })
-          .eq('id', household.value.id)
-          .select()
-          .single()
-      if (error) throw error
+      const data = await pb.collection('households').update(household.value.id, { invite_code: code })
       if (data) household.value = data 
   }
 
   const joinHousehold = async (code) => {
       const auth = useAuthStore()
-      const ui = useUIStore() // <-- Нужно добавить импорт
       if (!code || code.length < 6) {
           alert('Код должен состоять из 6 цифр')
           throw new Error('Неверный код')
       }
       
-      const { data: targetHousehold, error } = await supabase
-          .from('households')
-          .select('id')
-          .eq('invite_code', code)
-          .single()
+      const targetHousehold = await pb.collection('households').getFirstListItem(`invite_code="${code}"`, { fields: 'id' })
       
-      if (error || !targetHousehold) {
+      if (!targetHousehold) {
           alert('Семья с таким кодом не найдена')
           throw new Error('Неверный код')
       }
 
-      const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ household_id: targetHousehold.id })
-          .eq('id', auth.user.id)
-      
-      if (updateError) throw updateError
+      if (!auth.user?.id) throw new Error('Пользователь не найден')
+      const updatedUser = await pb.collection('users').update(auth.user.id, { household: targetHousehold.id })
+      auth.user = updatedUser
+      auth.householdId = targetHousehold.id
       
       alert('Вы присоединились к семье!')
       
@@ -185,20 +141,27 @@ export const useSettingsStore = defineStore('settings', () => {
       const auth = useAuthStore()
       const ui = useUIStore()
       
-      const { data: myOwnHousehold } = await supabase
-          .from('households')
-          .select('id')
-          .eq('owner_id', auth.user.id)
-          .single()
+      if (!auth.user?.id) throw new Error('Пользователь не найден')
+
+      let myOwnHousehold = null
+      try {
+          myOwnHousehold = await pb.collection('households').getFirstListItem(`owner="${auth.user.id}"`, { fields: 'id' })
+      } catch {
+          myOwnHousehold = null
+      }
 
       if (!myOwnHousehold) {
-          const { data: newHousehold } = await supabase
-              .from('households')
-              .insert({ name: 'Моя семья', owner_id: auth.user.id })
-              .select()
-              .single()
+          const newHousehold = await pb.collection('households').create({
+              name: 'Моя семья',
+              owner: auth.user.id,
+              start_day: 1,
+              period_length: 7,
+              default_portions: 2
+          })
            if (newHousehold) {
-                await supabase.from('profiles').update({ household_id: newHousehold.id }).eq('id', auth.user.id)
+                const updatedUser = await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
+                auth.user = updatedUser
+                auth.householdId = newHousehold.id
                 alert('Создана новая семья')
                 setTimeout(() => window.location.reload(), 1000)
                 return
@@ -206,10 +169,9 @@ export const useSettingsStore = defineStore('settings', () => {
            throw new Error('Не удалось создать новую семью')
       }
       
-      await supabase
-          .from('profiles')
-          .update({ household_id: myOwnHousehold.id })
-          .eq('id', auth.user.id)
+      const updatedUser = await pb.collection('users').update(auth.user.id, { household: myOwnHousehold.id })
+      auth.user = updatedUser
+      auth.householdId = myOwnHousehold.id
       
       alert('Вы вернулись в свою семью')
       setTimeout(() => window.location.reload(), 1000)

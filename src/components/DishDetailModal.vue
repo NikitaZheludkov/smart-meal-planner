@@ -38,12 +38,13 @@ const voiceText = ref('')
 let audioRecorder = null
 let audioChunks = []
 let mediaStream = null
+let productSearchBlurTimeout = null
 
 const formData = ref({
     id: null,
     name: '',
-    dish_type_id: '',
-    meal_type_ids: [],
+    dish_type: '',
+    meal_type: '',
     description: '',
     kcal: null, protein: null, fat: null, carbs: null,
     is_batch: false,
@@ -95,6 +96,16 @@ watch(productSearchQuery, (newValue) => {
   }
 })
 
+const handleBlur = () => {
+    if (productSearchBlurTimeout) {
+        window.clearTimeout(productSearchBlurTimeout)
+    }
+    productSearchBlurTimeout = window.setTimeout(() => {
+        showProductDropdown.value = false
+        productSearchBlurTimeout = null
+    }, 200)
+}
+
 const isProductSelected = (productId) => {
     return selectedProductsInOverlay.value.some(p => p.id === productId)
 }
@@ -140,7 +151,7 @@ const confirmIngredients = () => {
         const amount = productAmounts.value[prod.id]
         if (amount) {
             formData.value.ingredients.push({
-                product_id: prod.id,
+                product: prod.id,
                 name: prod.name,
                 unit: prod.unit,
                 amount: parseFloat(amount)
@@ -179,7 +190,7 @@ const linkIngredientToProduct = (prod) => {
     if (idx === null || idx === undefined) return
     const ing = formData.value.ingredients[idx]
     if (!ing) return
-    ing.product_id = prod.id
+    ing.product = prod.id
     ing.unit = prod.unit || ing.unit
     ing.name = prod.name || ing.name
     closeIngredientOverlay()
@@ -210,13 +221,9 @@ const saveIngredientAmount = (index) => {
     telegram.haptic.notification('success')
 }
 
-const toggleMealType = (id) => {
+const selectMealType = (id) => {
     telegram.haptic.selection()
-    if (formData.value.meal_type_ids.includes(id)) {
-        formData.value.meal_type_ids = formData.value.meal_type_ids.filter(tid => tid !== id)
-    } else {
-        formData.value.meal_type_ids.push(id)
-    }
+    formData.value.meal_type = id
 }
 
 const categoryLabels = {
@@ -243,16 +250,18 @@ const groupedTags = computed(() => {
     })).filter(g => g.tags.length > 0)
 })
 
+const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
+
 const isTagSelected = (tag) => {
-    return formData.value.tags.some(t => t.id === tag.id)
+    return formData.value.tags.includes(tag.id)
 }
 
 const toggleTag = (tag) => {
     telegram.haptic.selection()
     if (isTagSelected(tag)) {
-        formData.value.tags = formData.value.tags.filter(t => t.id !== tag.id)
+        formData.value.tags = formData.value.tags.filter(tid => tid !== tag.id)
     } else {
-        formData.value.tags.push(tag)
+        formData.value.tags.push(tag.id)
     }
 }
 
@@ -268,23 +277,17 @@ const closeTagSelector = () => {
 
 const initForm = (dishData) => {
     formData.value = JSON.parse(JSON.stringify(dishData))
-    
-    if (dishData.meal_types && Array.isArray(dishData.meal_types)) {
-        formData.value.meal_type_ids = dishData.meal_types.map(m => m.id)
-    } else if (dishData.meal_type_id) {
-        formData.value.meal_type_ids = [dishData.meal_type_id]
-    } else {
-        formData.value.meal_type_ids = []
-    }
+    formData.value.meal_type = dishData.meal_type || ''
+    formData.value.dish_type = dishData.dish_type || ''
 
     if (!formData.value.ingredients) formData.value.ingredients = []
     
     formData.value.ingredients = formData.value.ingredients.map(ing => {
-        if (ing.products && !ing.name) {
+        if (ing.productData && !ing.name) {
             return {
-                product_id: ing.product_id,
-                name: ing.products.name || 'Неизвестно',
-                unit: ing.products.unit || '',
+                product: ing.product,
+                name: ing.productData.name || 'Неизвестно',
+                unit: ing.productData.unit || '',
                 amount: ing.amount
             }
         }
@@ -297,11 +300,11 @@ const initForm = (dishData) => {
     formData.value.is_batch = formData.value.batch_yield > 1
     
     if (!formData.value.id) {
-        if (!formData.value.dish_type_id && dictionaries.dishTypes.length) {
-            formData.value.dish_type_id = dictionaries.dishTypes[0].id
+        if (!formData.value.dish_type && dictionaries.dishTypes.length) {
+            formData.value.dish_type = dictionaries.dishTypes[0].id
         }
-        if ((!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) && dictionaries.mealTypes.length) {
-            formData.value.meal_type_ids = [dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id]
+        if (!formData.value.meal_type && dictionaries.mealTypes.length) {
+            formData.value.meal_type = dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id
         }
         isEditing.value = true
     } else {
@@ -334,8 +337,8 @@ watch(() => props.isOpen, (newVal) => {
             initForm({
                 id: null,
                 name: '',
-                dish_type_id: '',
-                meal_type_ids: [],
+                dish_type: '',
+                meal_type: '',
                 description: '',
                 kcal: null, protein: null, fat: null, carbs: null,
                 is_batch: false,
@@ -356,8 +359,8 @@ watch(() => props.dish, (newVal) => {
 const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
   
-  if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) {
-      alert('Выберите хотя бы один прием пищи')
+  if (!formData.value.meal_type) {
+      alert('Выберите прием пищи')
       telegram.haptic.notification('error')
       return
   }
@@ -420,21 +423,10 @@ const handleCancel = () => {
 }
 
 const getDishTypeName = computed(() => {
-    return dictionaries.getDishTypeById(formData.value.dish_type_id)?.name || '...'
+    return dictionaries.getDishTypeById(formData.value.dish_type)?.name || '...'
 })
 const getMealTypeName = computed(() => {
-    if (!formData.value.meal_type_ids || formData.value.meal_type_ids.length === 0) return '...'
-    
-    const sortedIds = [...formData.value.meal_type_ids].sort((a, b) => {
-        const indexA = dictionaries.mealTypes.findIndex(m => m.id === a)
-        const indexB = dictionaries.mealTypes.findIndex(m => m.id === b)
-        return indexA - indexB
-    })
-
-    return sortedIds
-        .map(id => dictionaries.getMealTypeById(id)?.name)
-        .filter(n => n)
-        .join(', ')
+    return dictionaries.getMealTypeById(formData.value.meal_type)?.name || '...'
 })
 
 const openCreateProduct = () => {
@@ -573,7 +565,7 @@ const processAudioWithAI = async (audioBlob) => {
                     : 1
                 const aiUnit = (typeof ing === 'object' && ing !== null) ? normalizeUnit(ing.unit) : undefined
                 formData.value.ingredients.push({
-                    product_id: match?.id || null,
+                    product: match?.id || null,
                     name: match?.name || aiName,
                     amount,
                     unit: aiUnit || match?.unit || 'Шт'
@@ -662,8 +654,8 @@ const createProductFromIngredient = (ing) => {
                                 <span class="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200">
                                     {{ getDishTypeName }}
                                 </span>
-                                <span v-for="tag in formData.tags" :key="tag.id" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold flex items-center gap-1">
-                                     {{ tag.icon }} {{ tag.name }}
+                                <span v-for="tagId in formData.tags" :key="tagId" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                                     {{ tagById.get(tagId)?.icon }} {{ tagById.get(tagId)?.name }}
                                 </span>
                             </div>
                         </div>
@@ -692,10 +684,10 @@ const createProductFromIngredient = (ing) => {
                                 Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary opacity-70">(На {{ formData.batch_yield }} порц.)</span>
                             </h4>
                             <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product_id === null ? 'bg-yellow-50' : ''">
+                                <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product === null ? 'bg-yellow-50' : ''">
                                     <div class="flex items-center gap-2">
                                         <span class="card-title text-sm">{{ ing.name }}</span>
-                                        <span v-if="ing.product_id !== null" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                                        <span v-if="ing.product !== null" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
                                             <span class="material-icons-round text-[14px]">check_circle</span>
                                             Связанный
                                         </span>
@@ -779,13 +771,13 @@ const createProductFromIngredient = (ing) => {
                                     <button 
                                         v-for="t in dictionaries.dishTypes" 
                                         :key="t.id" 
-                                        @click="formData.dish_type_id = t.id"
+                                        @click="formData.dish_type = t.id"
                                         type="button"
                                         class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
-                                        :class="formData.dish_type_id === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                        :class="formData.dish_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                                     >
                                         {{ t.name }}
-                                        <div v-if="formData.dish_type_id === t.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                                        <div v-if="formData.dish_type === t.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
                                     </button>
                                 </div>
 
@@ -793,13 +785,13 @@ const createProductFromIngredient = (ing) => {
                                      <button 
                                         v-for="t in dictionaries.mealTypes" 
                                         :key="t.id" 
-                                        @click="toggleMealType(t.id)"
+                                        @click="selectMealType(t.id)"
                                         type="button"
                                         class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
-                                        :class="formData.meal_type_ids.includes(t.id) ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                        :class="formData.meal_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
                                     >
                                         {{ t.name }}
-                                        <span v-if="formData.meal_type_ids.includes(t.id)" class="material-icons-round text-[10px]">check</span>
+                                        <span v-if="formData.meal_type === t.id" class="material-icons-round text-[10px]">check</span>
                                     </button>
                                 </div>
                             </div>
@@ -842,7 +834,7 @@ const createProductFromIngredient = (ing) => {
                             <div class="space-y-2">
                                 <div class="text-[10px] font-bold text-slate-400 pl-2">Состав на {{ formData.batch_yield || 1 }} порц.</div>
                                 <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1">
-                                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border shadow-sm" :class="ing.product_id === null ? 'border-yellow-400 bg-yellow-50' : 'border-slate-100'">
+                                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border shadow-sm" :class="ing.product === null ? 'border-yellow-400 bg-yellow-50' : 'border-slate-100'">
                                         <div class="w-1.5 h-1.5 rounded-full bg-slate-900 ml-1"></div>
                                         <div class="flex-1 font-bold text-slate-700 text-sm truncate">{{ ing.name }}</div>
                                         
@@ -865,7 +857,7 @@ const createProductFromIngredient = (ing) => {
                                             {{ ing.amount }} {{ ing.unit }}
                                         </button>
 
-                                        <button v-if="ing.product_id === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
+                                        <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
                                             Создать в базе
                                         </button>
 
@@ -929,10 +921,10 @@ const createProductFromIngredient = (ing) => {
                                             >
                                                 <span class="material-icons-round text-sm">add</span> Тег
                                             </button>
-                                            <span v-for="tag in formData.tags" :key="tag.id" class="h-9 px-3 rounded-xl bg-white border border-slate-200 flex items-center gap-1.5 text-xs font-bold text-slate-600 shadow-sm">
-                                                <span>{{ tag.icon }}</span>
-                                                <span>{{ tag.name }}</span>
-                                                <button @click="toggleTag(tag)" class="ml-1 text-slate-300 hover:text-slate-900"><span class="material-icons-round text-sm">close</span></button>
+                                            <span v-for="tagId in formData.tags" :key="tagId" class="h-9 px-3 rounded-xl bg-white border border-slate-200 flex items-center gap-1.5 text-xs font-bold text-slate-600 shadow-sm">
+                                                <span>{{ tagById.get(tagId)?.icon }}</span>
+                                                <span>{{ tagById.get(tagId)?.name }}</span>
+                                                <button @click="tagById.get(tagId) && toggleTag(tagById.get(tagId))" class="ml-1 text-slate-300 hover:text-slate-900"><span class="material-icons-round text-sm">close</span></button>
                                             </span>
                                         </div>
                                     </div>
@@ -1030,7 +1022,7 @@ const createProductFromIngredient = (ing) => {
                                 <span class="material-icons-round text-slate-300 text-xl">search</span>
                                 <input 
                                     v-model="productSearchQuery" 
-                                    @blur="setTimeout(() => showProductDropdown = false, 200)"
+                                    @blur="handleBlur"
                                     placeholder="Поиск продуктов..." 
                                     class="w-full p-3.5 bg-transparent font-bold text-slate-700 outline-none border-none text-base placeholder:text-slate-300"
                                     autofocus

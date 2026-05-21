@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
+import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
-import { useDishStore } from './dishes'
 import { withRetry, withTimeout } from '../lib/utils'
-
-import { useUIStore } from './ui'
 
 export const useProductStore = defineStore('products', () => {
   const products = ref([])
@@ -15,7 +12,6 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     const auth = useAuthStore()
-    const ui = useUIStore()
     
     if (!auth.householdId) {
        console.warn('Нет householdId, пропускаем загрузку продуктов')
@@ -24,18 +20,16 @@ export const useProductStore = defineStore('products', () => {
     }
 
     try {
-        const { data, error } = await withRetry(async () => {
+        const data = await withRetry(async () => {
           return await withTimeout(
-            supabase
-              .from('products')
-              .select('*')
-              .eq('household_id', auth.householdId) // Явно фильтруем по семье
-              .order('name'),
+            pb.collection('products').getFullList({
+              filter: `household="${auth.householdId}"`,
+              sort: 'name'
+            }),
             15000
           )
         })
-        
-        if (error) throw error
+
         products.value = data || []
     } catch (e) {
         console.error('Ошибка загрузки продуктов:', e)
@@ -53,26 +47,17 @@ export const useProductStore = defineStore('products', () => {
         throw new Error('Учётная запись не авторизована или ID семьи не найден.')
     }
 
-    const { data, error } = await withRetry(async () => {
+    const data = await withRetry(async () => {
       return await withTimeout(
-        supabase
-          .from('products')
-          .insert([{
-            name: product.name,
-            category: product.category,
-            unit: product.unit,
-            household_id: auth.householdId
-          }])
-          .select()
-          .single(),
+        pb.collection('products').create({
+          name: product.name,
+          category: product.category,
+          unit: product.unit,
+          household: auth.householdId
+        }),
         15000
       )
     })
-
-    if (error) {
-        console.error('Supabase insert error:', error)
-        throw error
-    }
     
     await fetchProducts() // <--- Заново загружаем список
     return data
@@ -91,14 +76,12 @@ export const useProductStore = defineStore('products', () => {
         unit: updates.unit
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .update(cleanUpdates)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
+    const data = await withRetry(async () => {
+      return await withTimeout(
+        pb.collection('products').update(id, cleanUpdates),
+        15000
+      )
+    })
     
     await fetchProducts()
     return data
@@ -108,31 +91,54 @@ export const useProductStore = defineStore('products', () => {
   const deleteProduct = async (id) => {
     const auth = useAuthStore()
     try {
-      await supabase.from('plan').delete().eq('product_id', id).eq('household_id', auth.householdId)
-
-      const dishStore = useDishStore()
-      const dishesToUpdate = dishStore.dishes.filter(dish =>
-        (dish.ingredients || []).some(ingredient => ingredient.product_id === id)
-      )
-
-      for (const dish of dishesToUpdate) {
-        dish.ingredients = (dish.ingredients || []).filter(ingredient => ingredient.product_id !== id)
-        await supabase
-          .from('ingredients')
-          .delete()
-          .eq('dish_id', dish.id)
-          .eq('product_id', id)
+      if (!auth.householdId) {
+        throw new Error('Учётная запись не авторизована. Удаление невозможно.')
       }
 
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id)
-        .eq('household_id', auth.householdId)
-      if (error) throw error
+      const planItems = await withRetry(async () => {
+        return await withTimeout(
+          pb.collection('plan').getFullList({
+            filter: `product="${id}" && household="${auth.householdId}"`
+          }),
+          15000
+        )
+      })
+
+      for (const item of planItems) {
+        await withRetry(async () => {
+          return await withTimeout(pb.collection('plan').delete(item.id), 15000)
+        })
+      }
+
+      const ingredients = await withRetry(async () => {
+        return await withTimeout(
+          pb.collection('ingredients').getFullList({
+            filter: `product="${id}" && household="${auth.householdId}"`
+          }),
+          15000
+        )
+      })
+
+      for (const ingredient of ingredients) {
+        await withRetry(async () => {
+          return await withTimeout(pb.collection('ingredients').delete(ingredient.id), 15000)
+        })
+      }
+
+      const productRecord = await withRetry(async () => {
+        return await withTimeout(
+          pb.collection('products').getFirstListItem(
+            `id="${id}" && household="${auth.householdId}"`
+          ),
+          15000
+        )
+      })
+
+      await withRetry(async () => {
+        return await withTimeout(pb.collection('products').delete(productRecord.id), 15000)
+      })
 
       await fetchProducts()
-      await dishStore.fetchDishes()
       return true
     } catch (e) {
       console.error('Ошибка удаления:', e)

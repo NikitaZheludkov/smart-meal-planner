@@ -68,7 +68,7 @@ const yesterdayDishIds = computed(() => {
     const ids = new Set()
     if (props.yesterdayItems && props.yesterdayItems.length > 0) {
         props.yesterdayItems.forEach(item => {
-            if (item.dish_id) ids.add(item.dish_id)
+            if (item.dish) ids.add(item.dish)
         })
     }
     return ids
@@ -79,10 +79,10 @@ const recommendedDishes = computed(() => {
     
     return dishStore.dishes.filter(d => {
         // Не показываем уже выбранные
-        if (props.existingItems.some(i => i.dish_id === d.id)) return false
+        if (props.existingItems.some(i => i.dish === d.id)) return false
         
         // Вчерашние или подходящие по слоту
-        return yesterdayDishIds.value.has(d.id) || d.meal_type_id === props.slotId
+        return yesterdayDishIds.value.has(d.id) || d.meal_type === props.slotId
     }).sort((a, b) => {
         // Сначала вчерашние, потом по слоту
         const isAYesterday = yesterdayDishIds.value.has(a.id)
@@ -100,7 +100,7 @@ const dropdownSearchResults = computed(() => {
     let list = dishStore.dishes
 
     if (props.existingItems.length > 0) {
-        const selectedIds = new Set(props.existingItems.map(i => i.dish_id).filter(Boolean))
+        const selectedIds = new Set(props.existingItems.map(i => i.dish).filter(Boolean))
         list = list.filter(d => !selectedIds.has(d.id))
     }
 
@@ -111,7 +111,7 @@ const filteredDishes = computed(() => {
     let list = dishStore.dishes
 
     if (props.existingItems.length > 0) {
-        const selectedIds = new Set(props.existingItems.map(i => i.dish_id).filter(Boolean))
+        const selectedIds = new Set(props.existingItems.map(i => i.dish).filter(Boolean))
         list = list.filter(d => !selectedIds.has(d.id))
     }
 
@@ -122,7 +122,7 @@ const filteredDishes = computed(() => {
     }
 
     if (activeCategory.value !== 'all') {
-        list = list.filter(d => d.dish_type_id === activeCategory.value)
+        list = list.filter(d => d.dish_type === activeCategory.value)
     }
 
     return list
@@ -132,7 +132,7 @@ const groupedProducts = computed(() => {
     let list = productStore.products
 
     if (props.existingItems.length > 0) {
-        const selectedIds = new Set(props.existingItems.map(i => i.product_id).filter(Boolean))
+        const selectedIds = new Set(props.existingItems.map(i => i.product).filter(Boolean))
         list = list.filter(p => !selectedIds.has(p.id))
     }
     
@@ -263,7 +263,7 @@ const getDishSlotName = (id) => {
                             class="flex-shrink-0 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-sm animate-fade-in"
                         >
                             <span class="text-[11px] font-bold text-slate-700 max-w-[100px] truncate">
-                                {{ item.dishes ? item.dishes.name : item.products?.name }}
+                                {{ item.dish ? item.dishData?.name : item.productData?.name }}
                             </span>
                             <button @click="removeItem(item)" class="text-slate-300 hover:text-red-500 transition-colors">
                                 <span class="material-icons-round text-sm">cancel</span>
@@ -343,7 +343,7 @@ const getDishSlotName = (id) => {
                                 <div class="card-title text-sm truncate">{{ dish.name }}</div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
+                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}</span>
                                 <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
                             </div>
                         </div>
@@ -375,7 +375,7 @@ const getDishSlotName = (id) => {
                         <div class="flex-1 min-w-0">
                             <div class="card-title text-sm truncate mb-0.5">{{ dish.name }}</div>
                             <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dish.dish_type_name }}</span>
+                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}</span>
                                 <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
                             </div>
                         </div>

@@ -42,6 +42,7 @@ watch(() => uiStore.dishes.activeTag, (newId, oldId) => {
 const showDetailModal = ref(false)
 const showFilterModal = ref(false)
 const viewingDish = ref(null)
+const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
 
 const openDish = (dish) => {
   viewingDish.value = dish
@@ -52,8 +53,8 @@ const openCreateDish = () => {
   viewingDish.value = {
       id: null, 
       name: '',
-      dish_type_id: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
-      meal_type_ids: uiStore.dishes.activeTag ? [uiStore.dishes.activeTag] : [dictionaries.mealTypes[1]?.id], 
+      dish_type: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
+      meal_type: uiStore.dishes.activeTag ? uiStore.dishes.activeTag : (dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id), 
       kcal: null, protein: null, fat: null, carbs: null,
       tags: [],
       ingredients: []
@@ -86,23 +87,18 @@ const filteredDishes = computed(() => {
 
   // 2. Прием пищи (Завтрак/Обед...)
   if (uiStore.dishes.activeTag) {
-    result = result.filter(d => {
-        if (d.meal_types && d.meal_types.length > 0) {
-            return d.meal_types.some(m => m.id === uiStore.dishes.activeTag)
-        }
-        return d.meal_type_id === uiStore.dishes.activeTag
-    })
+    result = result.filter(d => d.meal_type === uiStore.dishes.activeTag)
   }
 
   // 3. Категория (Суп/Второе...)
   if (uiStore.dishes.activeCategory !== 'all') {
-    result = result.filter(d => d.dish_type_id === uiStore.dishes.activeCategory)
+    result = result.filter(d => d.dish_type === uiStore.dishes.activeCategory)
   }
 
   // 4. ТЕГИ (Множественный выбор, логика AND)
   if (uiStore.dishes.filterTags.length > 0) {
       result = result.filter(dish => {
-          const dishTagIds = dish.tags.map(t => t.id)
+          const dishTagIds = Array.isArray(dish.tags) ? dish.tags : []
           return uiStore.dishes.filterTags.every(tagId => dishTagIds.includes(tagId))
       })
   }
@@ -134,31 +130,22 @@ const filteredDishes = computed(() => {
                 <div class="flex justify-between items-start">
                 <span class="card-title leading-tight pr-8">{{ dish.name }}</span>
                 <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
-                    {{ dish.dish_type_name }}
+                    {{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}
                 </span>
                 </div>
                 
                 <div class="flex flex-wrap gap-1 mt-1">
-                    <div v-if="dish.meal_types && dish.meal_types.length > 0" class="flex flex-wrap gap-1">
-                        <span 
-                            v-for="mt in dish.meal_types" 
-                            :key="mt.id"
-                            class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-indigo-50 border-indigo-100"
-                        >
-                            {{ mt.name }}
-                        </span>
-                    </div>
-                    <span v-else class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
-                        {{ dish.meal_type_name }}
+                    <span class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
+                        {{ dictionaries.getMealTypeById(dish.meal_type)?.name || '...' }}
                     </span>
                     <span 
-                        v-for="tag in dish.tags.slice(0, 3)" 
-                        :key="tag.id" 
+                        v-for="tagId in (dish.tags || []).slice(0, 3)" 
+                        :key="tagId" 
                         class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-50 border-slate-100 flex items-center gap-1" 
                     >
-                    {{ tag.icon }} {{ tag.name }}
+                    {{ tagById.get(tagId)?.icon }} {{ tagById.get(tagId)?.name }}
                     </span>
-                    <span v-if="dish.tags.length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ dish.tags.length - 3 }}</span>
+                    <span v-if="(dish.tags || []).length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ (dish.tags || []).length - 3 }}</span>
                 </div>
                 
                 <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">

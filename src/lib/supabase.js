@@ -1,24 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import PocketBase from 'pocketbase'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const pocketbaseUrl = import.meta.env.VITE_POCKETBASE_URL || 'http://147.45.161.168'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase credentials missing! Check .env file.')
-} else {
-  console.log('Supabase client initialized with URL:', supabaseUrl.substring(0, 15) + '...')
-}
+export const pb = new PocketBase(pocketbaseUrl)
+pb.autoCancellation(false)
 
-// Добавляем настройки auth, чтобы отключить проблемные блокировки
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    lock: false,
-    persistSession: true,
-    detectSessionInUrl: false, // Отключаем, так как авторизация идет через initData
-    autoRefreshToken: true,
-    storageKey: 'sb-smart-meal-auth'
-  },
-  global: {
-    headers: { 'x-application-name': 'smart-meal-planner' }
-  }
-})
+export const supabase = pb

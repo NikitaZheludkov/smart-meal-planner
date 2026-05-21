@@ -1,0 +1,22 @@
+[
+  {
+    "id": "e6029bc3-cd0c-427b-a278-cf8b726f8d65",
+    "name": "Завтрак",
+    "sort_order": 10
+  },
+  {
+    "id": "507a3605-a0c5-485e-af6f-77eabf2c8cb0",
+    "name": "Обед",
+    "sort_order": 20
+  },
+  {
+    "id": "b1bbee08-4495-4671-8f9c-3ccd63cd88a5",
+    "name": "Ужин",
+    "sort_order": 30
+  },
+  {
+    "id": "829f8631-8112-427f-bcd0-cdba9e5d58c9",
+    "name": "Перекус",
+    "sort_order": 40
+  }
+]

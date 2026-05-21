@@ -34,7 +34,7 @@ const isJoining = ref(false)
 
 const isOwner = computed(() => {
     if (!settingsStore.household || !authStore.user) return false
-    return settingsStore.household.owner_id === authStore.user.id
+    return settingsStore.household.owner === authStore.user.id
 })
 
 // Хелпер: Получить инициалы (Никита -> Н, Ivan Ivanov -> II)
@@ -146,10 +146,10 @@ const periods = [
 
       <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-              {{ getInitials(authStore.user?.user_metadata?.first_name || authStore.user?.email) }}
+              {{ getInitials(authStore.user?.first_name || authStore.user?.username || authStore.user?.email) }}
           </div>
           <p class="text-sm font-bold text-slate-500 truncate">
-              {{ authStore.user?.user_metadata?.first_name || authStore.user?.email?.split('@')[0] || 'Пользователь' }}
+              {{ authStore.user?.first_name || authStore.user?.username || authStore.user?.email?.split('@')[0] || 'Пользователь' }}
           </p>
       </div>
     </div>
@@ -190,7 +190,7 @@ const periods = [
                             <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
                         </div>
                         <div class="text-[10px] font-normal text-secondary">
-                            {{ member.id === settingsStore.household?.owner_id ? 'Администратор' : 'Участник' }}
+                            {{ member.id === settingsStore.household?.owner ? 'Администратор' : 'Участник' }}
                         </div>
                     </div>
                 </div>

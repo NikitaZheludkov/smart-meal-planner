@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { supabase } from '../lib/supabase'
+import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useUIStore } from './ui'
-import { withTimeout } from '../lib/utils'
+import { withRetry, withTimeout } from '../lib/utils'
 
 export const usePlanStore = defineStore('plan', () => {
   const plan = ref([])
@@ -22,32 +22,46 @@ export const usePlanStore = defineStore('plan', () => {
     if (isFirstLoad) loading.value = true
     
     try {
-        const { data, error } = await withTimeout(
-          supabase
-        .from('plan')
-        .select(`
-            *,
-            meal_types (id, name), 
-            dishes (
-                *,
-                ingredients (
-                    product_id, amount,
-                    products ( * )
-                )
-            ),
-            products ( * )
-        `)
-        .eq('household_id', auth.householdId),
-        20000
-        )
-        
-        if (error) throw error
-        
-        plan.value = data.map(item => ({
+        const data = await withRetry(async () => {
+          return await withTimeout(
+            pb.collection('plan').getFullList({
+              filter: `household="${auth.householdId}"`,
+              sort: 'date,meal_type',
+              expand: 'meal_type,dish,product,dish.dish_type,dish.meal_type,dish.tags,dish.ingredients_via_dish,dish.ingredients_via_dish.product'
+            }),
+            20000
+          )
+        })
+
+        plan.value = (data || []).map((item) => {
+          const mealType = item.expand?.meal_type || null
+          const dish = item.expand?.dish || null
+          const product = item.expand?.product || null
+
+          const dishData = dish
+            ? {
+                ...dish,
+                dish_typeData: dish.expand?.dish_type || null,
+                meal_typeData: dish.expand?.meal_type || null,
+                tagsData: dish.expand?.tags || [],
+                ingredients:
+                  dish.expand?.ingredients_via_dish?.map((ing) => ({
+                    product: ing.product,
+                    productData: ing.expand?.product || null,
+                    name: ing.expand?.product?.name || 'Неизвестно',
+                    amount: ing.amount,
+                    unit: ing.expand?.product?.unit || ''
+                  })) || []
+              }
+            : null
+
+          return {
             ...item,
-            slot: item.meal_types?.name || 'Неизвестно',
-            slot_id: item.meal_type_id
-        })) || []
+            slot: mealType?.name || 'Неизвестно',
+            dishData,
+            productData: product
+          }
+        })
 
         ui.addLog(`План загружен: ${plan.value.length} записей`)
 
@@ -72,16 +86,16 @@ export const usePlanStore = defineStore('plan', () => {
 
     const payload = {
       date,
-      meal_type_id: slotId,
-      household_id: auth.householdId,
+      meal_type: slotId,
+      household: auth.householdId,
       ignore_shopping: item.ignore_shopping || false,
       portions: finalPortions
     }
 
     if (item.type === 'dish') {
-      payload.dish_id = item.id
+      payload.dish = item.id
     } else {
-      payload.product_id = item.id
+      payload.product = item.id
     }
 
     // Оптимистичное добавление
@@ -89,22 +103,19 @@ export const usePlanStore = defineStore('plan', () => {
     const optimisticItem = {
         ...payload,
         id: tempId,
-        slot_id: slotId,
-        // Сохраняем вложенные объекты для UI
-        dishes: item.type === 'dish' ? item : null,
-        products: item.type === 'product' ? item : null
+        slot: '',
+        dishData: item.type === 'dish' ? item : null,
+        productData: item.type === 'product' ? item : null
     }
     
     plan.value.push(optimisticItem)
 
-    const { data, error } = await supabase
-        .from('plan')
-        .insert(payload)
-        .select()
-        .single()
+    const data = await withRetry(async () => {
+        return await withTimeout(pb.collection('plan').create(payload), 15000)
+    }).catch((e) => ({ error: e }))
         
-    if (error) {
-        console.error('Ошибка сохранения:', error)
+    if (data?.error) {
+        console.error('Ошибка сохранения:', data.error)
         alert('Не удалось сохранить в план')
         // Откат
         plan.value = plan.value.filter(p => p.id !== tempId)
@@ -114,7 +125,7 @@ export const usePlanStore = defineStore('plan', () => {
         if (index !== -1) {
              plan.value[index] = {
                  ...plan.value[index],
-                 ...data // Подменяем ID и другие поля из базы
+                 ...data
              }
         }
         alert('Добавлено в план')
@@ -133,11 +144,8 @@ export const usePlanStore = defineStore('plan', () => {
         Object.assign(item, updates)
     }
 
-    const { error } = await withTimeout(
-      supabase
-        .from('plan')
-        .update(updates)
-        .eq('id', id),
+    const error = await withTimeout(
+      pb.collection('plan').update(id, updates).then(() => null).catch((e) => e),
       5000
     )
 
@@ -159,7 +167,7 @@ export const usePlanStore = defineStore('plan', () => {
         plan.value.splice(itemIndex, 1)
     }
 
-    const { error } = await supabase.from('plan').delete().eq('id', id)
+    const error = await pb.collection('plan').delete(id).then(() => null).catch((e) => e)
     
     if (error) {
       console.error('Ошибка удаления из плана:', error)
