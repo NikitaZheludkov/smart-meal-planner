@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useDictionariesStore } from './stores/dictionaries'
 import { useSettingsStore } from './stores/settings'
-import { useTelegramStore } from './stores/telegram'
+import { usePlatformStore } from './stores/platform'
 import { useRealtimeStore } from './stores/realtime'
 import { useUIStore } from './stores/ui'
 
@@ -13,11 +13,13 @@ import CatalogView from './views/CatalogView.vue'
 import ShoppingView from './views/ShoppingView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AuthView from './views/AuthView.vue' 
+import ToastContainer from './components/ToastContainer.vue'
+import ConfirmModal from './components/ConfirmModal.vue'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
 const settings = useSettingsStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const realtime = useRealtimeStore()
 const ui = useUIStore()
 
@@ -62,10 +64,10 @@ const handleSync = async () => {
     isSyncing.value = true
     try {
         await loadUserData()
-        alert('Синхронизация выполнена')
+        ui.showToast('Синхронизация выполнена', 'success')
     } catch (e) {
         console.error('Ошибка синхронизации:', e)
-        alert('Ошибка синхронизации')
+        ui.showToast('Ошибка синхронизации', 'error')
     } finally {
         isSyncing.value = false
     }
@@ -154,7 +156,7 @@ onMounted(async () => {
         }
     }, 8000)
     try {
-        telegram.init() 
+        platform.init()
         await auth.init() 
         
         if (auth.isAuth) {
@@ -212,7 +214,7 @@ onUnmounted(() => {
       </main>
 
       <nav class="pb-safe bg-white z-50 absolute bottom-0 w-full rounded-t-[30px] border-t border-slate-100 transition-transform duration-300"
-           :class="{ 'translate-y-full': telegram.isKeyboardOpen || ui.isModalOpen }">
+           :class="{ 'translate-y-full': platform.isKeyboardOpen || ui.isModalOpen || ui.isConfirmOpen }">
         <div class="h-[76px] grid grid-cols-5 items-center px-2">
           <button 
             v-for="tab in tabs" 
@@ -243,6 +245,8 @@ onUnmounted(() => {
         </div>
       </nav>
     </template>
+    <ToastContainer />
+    <ConfirmModal />
   </div>
 </template>
 

@@ -4,7 +4,7 @@ import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 import ProductDetailModal from './ProductDetailModal.vue'
 
@@ -18,7 +18,7 @@ const dishStore = useDishStore()
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
 const planStore = usePlanStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const ui = useUIStore()
 
 const isEditing = ref(false)
@@ -111,7 +111,7 @@ const isProductSelected = (productId) => {
 }
 
 const toggleProductSelection = (prod) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     if (isProductSelected(prod.id)) {
         selectedProductsInOverlay.value = selectedProductsInOverlay.value.filter(p => p.id !== prod.id)
         delete productAmounts.value[prod.id]
@@ -129,7 +129,7 @@ const toggleProductSelection = (prod) => {
 }
 
 const removeSelectedProduct = (prod) => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     selectedProductsInOverlay.value = selectedProductsInOverlay.value.filter(p => p.id !== prod.id)
     delete productAmounts.value[prod.id]
 }
@@ -164,7 +164,7 @@ const confirmIngredients = () => {
     showProductDropdown.value = false
     showIngredientOverlay.value = false
     ingredientLinkIndex.value = null
-    telegram.haptic.notification('success')
+    platform.haptic.notification('success')
 }
 
 const closeIngredientOverlay = () => {
@@ -198,13 +198,13 @@ const linkIngredientToProduct = (prod) => {
 
 const removeIngredient = (index) => {
     formData.value.ingredients.splice(index, 1)
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
 }
 
 const startEditingIngredient = (index, amount) => {
     editingIngredientIndex.value = index
     tempAmount.value = amount
-    telegram.haptic.selection()
+    platform.haptic.selection()
     
     nextTick(() => {
         const input = document.querySelector('.ing-edit-input')
@@ -218,11 +218,11 @@ const saveIngredientAmount = (index) => {
     }
     editingIngredientIndex.value = null
     tempAmount.value = ''
-    telegram.haptic.notification('success')
+    platform.haptic.notification('success')
 }
 
 const selectMealType = (id) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     formData.value.meal_type = id
 }
 
@@ -257,7 +257,7 @@ const isTagSelected = (tag) => {
 }
 
 const toggleTag = (tag) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     if (isTagSelected(tag)) {
         formData.value.tags = formData.value.tags.filter(tid => tid !== tag.id)
     } else {
@@ -266,12 +266,12 @@ const toggleTag = (tag) => {
 }
 
 const openTagSelector = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     showTagSelection.value = true
 }
 
 const closeTagSelector = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     showTagSelection.value = false
 }
 
@@ -360,8 +360,8 @@ const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
   
   if (!formData.value.meal_type) {
-      alert('Выберите прием пищи')
-      telegram.haptic.notification('error')
+      ui.showToast('Выберите прием пищи', 'warn')
+      platform.haptic.notification('error')
       return
   }
   
@@ -371,7 +371,7 @@ const handleSave = async () => {
   ui.addLog(`Попытка сохранения блюда: ${formData.value.name}`, 'info', formData.value)
   
   try {
-    telegram.haptic.notification('success')
+    platform.haptic.notification('success')
     
     if (formData.value.id) {
       await dishStore.updateDish(formData.value.id, formData.value)
@@ -389,16 +389,16 @@ const handleSave = async () => {
       code: e.code
     })
     console.error('Save error:', e)
-    telegram.haptic.notification('error')
-    alert(e.message || 'Не удалось сохранить блюдо. Проверьте соединение.')
+    platform.haptic.notification('error')
+    ui.showToast(e.message || 'Не удалось сохранить блюдо. Проверьте соединение.', 'error')
   } finally {
     isSaving.value = false
   }
 }
 
 const handleDelete = async () => {
-    telegram.haptic.notification('warning')
-    if(confirm('Удалить блюдо?')) {
+    platform.haptic.notification('warning')
+    if (await ui.confirm('Удалить блюдо?', { okText: 'Удалить', cancelText: 'Отмена' })) {
         await dishStore.deleteDish(formData.value.id)
         await planStore.fetchPlan()
         emit('close')
@@ -406,7 +406,7 @@ const handleDelete = async () => {
 }
 
 const handleCancel = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     
     if (!formData.value.id) {
         emit('close')
@@ -489,7 +489,7 @@ const toggleVoiceRecord = async () => {
 
     } catch (error) {
         console.error('Failed to access microphone:', error)
-        alert('Не удалось получить доступ к микрофону')
+        ui.showToast('Не удалось получить доступ к микрофону', 'error')
     }
 }
 
@@ -575,7 +575,7 @@ const processAudioWithAI = async (audioBlob) => {
         
     } catch (error) {
         console.error('Ошибка обработки аудио:', error)
-        alert('Не удалось обработать аудио')
+        ui.showToast('Не удалось обработать аудио', 'error')
     } finally {
         isProcessingVoice.value = false
     }
@@ -809,7 +809,7 @@ const createProductFromIngredient = (ing) => {
                                  
                                 <div class="flex items-center gap-2">
                                     <button 
-                                        @click="formData.batch_yield = Math.max(1, (formData.batch_yield || 1) - 1); telegram.haptic.selection()"
+                                        @click="formData.batch_yield = Math.max(1, (formData.batch_yield || 1) - 1); platform.haptic.selection()"
                                         class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
                                     >
                                         <span class="material-icons-round text-base">remove</span>
@@ -823,7 +823,7 @@ const createProductFromIngredient = (ing) => {
                                         @focus="$event.target.select()"
                                     >
                                     <button 
-                                        @click="formData.batch_yield = (formData.batch_yield || 1) + 1; telegram.haptic.selection()"
+                                        @click="formData.batch_yield = (formData.batch_yield || 1) + 1; platform.haptic.selection()"
                                         class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
                                     >
                                         <span class="material-icons-round text-base">add</span>

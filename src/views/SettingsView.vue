@@ -2,12 +2,12 @@
 import { onMounted, ref, computed, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const ui = useUIStore()
 
 const selectedStartDay = ref(1)
@@ -53,69 +53,74 @@ const isMe = (memberId) => {
 const handleGenerateCode = async () => {
     if (isGenerating.value) return
     isGenerating.value = true
-    telegram.haptic.impact('medium')
+    platform.haptic.impact('medium')
     try {
         await settingsStore.generateInviteCode()
     } catch (e) {
-        alert(e.message)
+        ui.showToast(e.message || 'Не удалось сгенерировать код', 'error')
     } finally {
         isGenerating.value = false
     }
 }
 
-const copyCode = () => {
+const copyCode = async () => {
     if (settingsStore.household?.invite_code) {
-        navigator.clipboard.writeText(settingsStore.household.invite_code)
-        telegram.haptic.notification('success')
-        alert('Код скопирован!')
+        const ok = await platform.copyText(settingsStore.household.invite_code)
+        if (ok) {
+            platform.haptic.notification('success')
+            ui.showToast('Код скопирован', 'success')
+        } else {
+            platform.haptic.notification('error')
+            ui.showToast('Не удалось скопировать код', 'error')
+        }
     }
 }
 
 const handleJoin = async () => {
     if (!joinCodeInput.value) {
-        alert('Введите код')
+        ui.showToast('Введите код', 'warn')
         return
     }
     
     isJoining.value = true
-    telegram.haptic.notification('success')
+    platform.haptic.notification('success')
     
     try {
         await settingsStore.joinHousehold(joinCodeInput.value)
     } catch (e) {
-        telegram.haptic.notification('error')
-        alert('Ошибка: ' + e.message)
+        platform.haptic.notification('error')
+        ui.showToast(e?.message ? `Ошибка: ${e.message}` : 'Ошибка при вступлении в семью', 'error')
         isJoining.value = false
     }
 }
 
 const handleLeave = async () => {
-    telegram.haptic.notification('warning')
-    if(confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.')) {
+    platform.haptic.notification('warning')
+    if (await ui.confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.', { okText: 'Покинуть', cancelText: 'Отмена' })) {
         try {
             await settingsStore.leaveHousehold()
         } catch (e) {
-            alert(e.message)
+            ui.showToast(e.message || 'Не удалось покинуть семью', 'error')
         }
     }
 }
 
 const handleSave = async () => {
     try {
-        telegram.haptic.notification('success')
+        platform.haptic.notification('success')
         // Force period to 7 days
         await settingsStore.saveSettings(selectedStartDay.value, 7, selectedPortions.value)
-        alert('Настройки сохранены')
+        ui.showToast('Настройки сохранены', 'success')
     } catch (e) {
         console.error('Settings save error:', e)
-        telegram.haptic.notification('error')
-        alert(e.message || 'Не удалось сохранить настройки. Проверьте соединение.')
+        platform.haptic.notification('error')
+        ui.showToast(e.message || 'Не удалось сохранить настройки. Проверьте соединение.', 'error')
     }
 }
 
 const handleLogout = async () => {
-    telegram.haptic.impact('medium')
-    if (confirm('Выйти из аккаунта?')) {
+    platform.haptic.impact('medium')
+    if (await ui.confirm('Выйти из аккаунта?', { okText: 'Выйти', cancelText: 'Отмена' })) {
         await authStore.signOut()
         window.location.reload()
     }

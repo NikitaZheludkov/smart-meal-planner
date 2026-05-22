@@ -26,13 +26,5 @@ function mountApp() {
   app.mount('#app')
 }
 
-// Проверяем, доступен ли объект Telegram WebApp
-if (window.Telegram && window.Telegram.WebApp) {
-  // Если да, ждем события ready
-  window.Telegram.WebApp.ready()
-  mountApp()
-} else {
-  // Если нет (например, открыто в обычном браузере), монтируем сразу
-  mountApp()
-}
+mountApp()
 

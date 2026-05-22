@@ -4,7 +4,7 @@ import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import DishDetailModal from '../components/DishDetailModal.vue'
 import DishFilterModal from '../components/DishFilterModal.vue'
 
@@ -19,7 +19,7 @@ const dishStore = useDishStore()
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 
 // Анимация перелистывания
 const transitionName = ref('slide-left')
@@ -63,7 +63,7 @@ const openCreateDish = () => {
 }
 
 const openFilters = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     showFilterModal.value = true
 }
 

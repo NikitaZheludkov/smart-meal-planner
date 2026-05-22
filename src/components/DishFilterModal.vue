@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 
 const props = defineProps({
   isOpen: Boolean
@@ -12,7 +12,7 @@ const emit = defineEmits(['close'])
 
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 
 watch(() => props.isOpen, (newVal) => {
     uiStore.isModalOpen = newVal
@@ -49,7 +49,7 @@ const isSelected = (tagId) => {
 }
 
 const toggleFilter = (tagId) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     
     const idx = uiStore.dishes.filterTags.indexOf(tagId)
     if (idx > -1) {
@@ -60,12 +60,12 @@ const toggleFilter = (tagId) => {
 }
 
 const resetFilters = () => {
-    telegram.haptic.notification('warning')
+    platform.haptic.notification('warning')
     uiStore.dishes.filterTags = []
 }
 
 const close = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     emit('close')
 }
 </script>

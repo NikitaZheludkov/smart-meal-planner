@@ -112,15 +112,16 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const joinHousehold = async (code) => {
       const auth = useAuthStore()
+      const ui = useUIStore()
       if (!code || code.length < 6) {
-          alert('Код должен состоять из 6 цифр')
+          ui.showToast('Код должен состоять из 6 цифр', 'error')
           throw new Error('Неверный код')
       }
       
       const targetHousehold = await pb.collection('households').getFirstListItem(`invite_code="${code}"`, { fields: 'id' })
       
       if (!targetHousehold) {
-          alert('Семья с таким кодом не найдена')
+          ui.showToast('Семья с таким кодом не найдена', 'error')
           throw new Error('Неверный код')
       }
 
@@ -129,7 +130,7 @@ export const useSettingsStore = defineStore('settings', () => {
       auth.user = updatedUser
       auth.householdId = targetHousehold.id
       
-      alert('Вы присоединились к семье!')
+      ui.showToast('Вы присоединились к семье!', 'success')
       
       // Даем пользователю прочитать сообщение перед перезагрузкой
       setTimeout(() => {
@@ -162,7 +163,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 const updatedUser = await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
                 auth.user = updatedUser
                 auth.householdId = newHousehold.id
-                alert('Создана новая семья')
+                ui.showToast('Создана новая семья', 'success')
                 setTimeout(() => window.location.reload(), 1000)
                 return
            }
@@ -173,7 +174,7 @@ export const useSettingsStore = defineStore('settings', () => {
       auth.user = updatedUser
       auth.householdId = myOwnHousehold.id
       
-      alert('Вы вернулись в свою семью')
+      ui.showToast('Вы вернулись в свою семью', 'success')
       setTimeout(() => window.location.reload(), 1000)
   }
 

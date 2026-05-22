@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
 import { useShoppingStore } from '../stores/shopping' // <-- Added
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 import { startOfWeek, addDays, format, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -11,7 +11,7 @@ import { ru } from 'date-fns/locale'
 const planStore = usePlanStore()
 const settingsStore = useSettingsStore()
 const shoppingStore = useShoppingStore() // <-- Added
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const uiStore = useUIStore()
 
 const activeTab = ref('list') 
@@ -56,7 +56,7 @@ const periodLabel = computed(() => {
 })
 
 const changePeriod = (dir) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     // Shift by periodLength
     const length = settingsStore.periodLength || 7
     currentWeekStart.value = addDays(currentWeekStart.value, dir * length)
@@ -71,7 +71,7 @@ const showTodayBtn = computed(() => {
 const goToToday = () => {
     const day = settingsStore.startDay !== null ? settingsStore.startDay : 1
     currentWeekStart.value = startOfWeek(new Date(), { weekStartsOn: day })
-    telegram.haptic.selection()
+    platform.haptic.selection()
 }
 
 // --- 2. ЛОГИКА ГАЛОЧЕК ---
@@ -96,7 +96,7 @@ onMounted(async () => {
 })
 
 const toggleCheck = (id) => {
-    telegram.haptic.impact('medium')
+    platform.haptic.impact('medium')
     const newState = !shoppingStore.isChecked(id)
     shoppingStore.toggleProduct(id, newState)
 }
@@ -106,7 +106,7 @@ const toggleExpand = (id) => {
     if (expandedProductIds.value.has(id)) expandedProductIds.value.delete(id)
     else {
         expandedProductIds.value.add(id)
-        telegram.haptic.selection()
+        platform.haptic.selection()
     }
 }
 
@@ -146,14 +146,14 @@ const countChecked = computed(() => shoppingList.value.filter(i => checkedIds.va
 const switchViewTab = (mode) => {
     if(activeTab.value !== mode) {
         transitionName.value = mode === 'departments' ? 'slide-left' : 'slide-right'
-        telegram.haptic.selection()
+        platform.haptic.selection()
         activeTab.value = mode
     }
 }
-const resetChecks = () => {
-    if (confirm('Снять все отметки?')) {
-        shoppingStore.clearList() // Use store action
-        telegram.haptic.impact('medium')
+const resetChecks = async () => {
+    if (await uiStore.confirm('Снять все отметки?', { okText: 'Снять', cancelText: 'Отмена' })) {
+        await shoppingStore.clearList()
+        platform.haptic.impact('medium')
     }
 }
 
@@ -162,9 +162,14 @@ const copyList = () => {
         .map(item => `${item.name} - ${formatAmount(item.amount)} ${item.unit}`)
         .join('\n')
     
-    navigator.clipboard.writeText(text).then(() => {
-        telegram.haptic.notification('success')
-        alert('Список скопирован!')
+    platform.copyText(text).then((ok) => {
+        if (ok) {
+            platform.haptic.notification('success')
+            uiStore.showToast('Список скопирован', 'success')
+        } else {
+            platform.haptic.notification('error')
+            uiStore.showToast('Не удалось скопировать список', 'error')
+        }
     })
 }
 

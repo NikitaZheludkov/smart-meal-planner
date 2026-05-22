@@ -1,10 +1,8 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useTelegramStore } from '../stores/telegram'
 
 const auth = useAuthStore()
-const telegram = useTelegramStore()
 
 const email = ref('')
 const password = ref('')
@@ -43,13 +41,12 @@ const handleSubmit = async () => {
 
       <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Meal Planner</h1>
       <p class="text-slate-400 text-sm font-bold mb-8">
-        {{ telegram.initData ? 'Загрузка профиля...' : 'Добро пожаловать!' }}
+        Добро пожаловать!
       </p>
 
-      <!-- Состояние загрузки TG (только если мы в TMA) -->
-      <div v-if="telegram.initData && (auth.loading || auth.authStatus === 'loading')" class="flex flex-col items-center gap-3">
+      <div v-if="auth.loading || auth.authStatus === 'loading'" class="flex flex-col items-center gap-3">
         <span class="material-icons-outlined animate-spin text-3xl text-indigo-500">donut_large</span>
-        <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Синхронизация с Telegram</p>
+        <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest animate-pulse">Загрузка...</p>
       </div>
 
       <!-- Ошибка входа (TG или Web) -->
@@ -75,7 +72,7 @@ const handleSubmit = async () => {
       </div>
 
       <!-- Форма входа (Web) -->
-      <div v-else-if="!telegram.initData" class="w-full space-y-4 relative overflow-hidden">
+      <div v-else class="w-full space-y-4 relative overflow-hidden">
         <div class="bg-white/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-100 shadow-xl shadow-indigo-100/20 space-y-4">
             <div class="flex bg-slate-100 p-1 rounded-xl mb-2">
                 <button 
@@ -150,19 +147,13 @@ const handleSubmit = async () => {
             </button>
         </div>
         
-        <button 
-          @click="auth.loginAsTestUser()" 
-          class="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-colors"
-        >
-          Войти как Dev User
-        </button>
       </div>
 
     </div>
     
     <div class="p-6 text-center z-10">
         <p class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-            {{ telegram.initData ? 'Secure Telegram Auth' : 'Meal Planner Cloud' }} • v1.1
+            Meal Planner Cloud • v1.1
         </p>
     </div>
   </div>

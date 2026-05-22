@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useProductStore } from '../stores/products'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import ProductDetailModal from '../components/ProductDetailModal.vue'
@@ -14,7 +14,7 @@ const props = defineProps({
 })
 
 const productStore = useProductStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 
@@ -37,13 +37,13 @@ const getCategoryIcon = (categoryName) => {
 }
 
 const createProduct = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     selectedProduct.value = {} 
     showProductModal.value = true
 }
 
 const openProduct = (product) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     selectedProduct.value = product
     showProductModal.value = true
 }

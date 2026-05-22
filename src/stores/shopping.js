@@ -60,6 +60,7 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const toggleProduct = async (productId, newState) => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) return
 
     // 1. Оптимистичное обновление
@@ -72,7 +73,7 @@ export const useShoppingStore = defineStore('shopping', () => {
 
     if (error) {
       console.error('Ошибка сохранения:', error)
-      alert('Не удалось обновить статус')
+      ui.showToast('Не удалось обновить статус', 'error')
       
       if (wasChecked) checkedIds.value.add(productId)
       else checkedIds.value.delete(productId)
@@ -81,6 +82,7 @@ export const useShoppingStore = defineStore('shopping', () => {
 
   const clearList = async () => {
     const auth = useAuthStore()
+    const ui = useUIStore()
     if (!auth.householdId) return
 
     try {
@@ -91,10 +93,10 @@ export const useShoppingStore = defineStore('shopping', () => {
         15000
       )
       await Promise.all((rows || []).map((r) => pb.collection('shopping_cart').delete(r.id).catch(() => null)))
-      alert('Список очищен')
+      ui.showToast('Список очищен', 'success')
     } catch (e) {
       console.error('Ошибка очистки списка:', e)
-      alert('Не удалось очистить список')
+      ui.showToast('Не удалось очистить список', 'error')
     }
 
     checkedIds.value.clear()

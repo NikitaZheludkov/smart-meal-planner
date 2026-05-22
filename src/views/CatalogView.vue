@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useProductStore } from '../stores/products'
 import { useUIStore } from '../stores/ui'
 import DishesView from './DishesView.vue'
 import ProductsView from './ProductsView.vue'
 
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const dictionaries = useDictionariesStore()
 const productStore = useProductStore()
 const uiStore = useUIStore()
@@ -33,7 +33,7 @@ const productCategories = computed(() => {
 // Установка категории для блюд
 const setDishCategory = (id) => {
   if (uiStore.dishes.activeCategory !== id) {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     uiStore.dishes.activeCategory = id
   }
 }
@@ -41,7 +41,7 @@ const setDishCategory = (id) => {
 // Установка категории для продуктов
 const setProductCategory = (cat) => {
   if (uiStore.products.activeCategory !== cat) {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     uiStore.products.activeCategory = cat
   }
 }
@@ -49,7 +49,7 @@ const setProductCategory = (cat) => {
 // Установка приема пищи
 const setMealType = (id) => {
   if (uiStore.dishes.activeTag !== id) {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     uiStore.dishes.activeTag = id
   }
 }
@@ -80,14 +80,14 @@ const setMealType = (id) => {
       <div class="flex gap-2 mb-3">
         <div class="flex-1 bg-slate-100 p-1 rounded-xl flex font-bold text-[10px]">
           <button 
-            @click="activeMode = 'dishes'; telegram.haptic.selection()" 
+            @click="activeMode = 'dishes'; platform.haptic.selection()" 
             class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
             :class="activeMode === 'dishes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
           >
             <span>🥘</span> Рецепты
           </button>
           <button 
-            @click="activeMode = 'products'; telegram.haptic.selection()" 
+            @click="activeMode = 'products'; platform.haptic.selection()" 
             class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
             :class="activeMode === 'products' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
           >

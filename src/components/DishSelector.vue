@@ -4,7 +4,7 @@ import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { usePlanStore } from '../stores/plan'
 import { useDictionariesStore } from '../stores/dictionaries'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -29,7 +29,7 @@ const dishStore = useDishStore()
 const productStore = useProductStore()
 const planStore = usePlanStore()
 const dictionaries = useDictionariesStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const ui = useUIStore()
 
 const activeMode = ref('dish') 
@@ -152,25 +152,25 @@ const groupedProducts = computed(() => {
 })
 
 const selectItem = (item, type) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     emit('select', { item, type })
 }
 
 const updatePortions = (item, delta) => {
-    telegram.haptic.selection()
+    platform.haptic.selection()
     const newPortions = Math.max(1, (item.portions || 1) + delta)
     planStore.updatePlanItem(item.id, { portions: newPortions })
 }
 
 const toggleShopping = (item) => {
-    telegram.haptic.impact('medium')
+    platform.haptic.impact('medium')
     planStore.updatePlanItem(item.id, { 
         ignore_shopping: !item.ignore_shopping 
     })
 }
 
 const removeItem = (item) => {
-    telegram.haptic.notification('warning')
+    platform.haptic.notification('warning')
     planStore.removeFromPlan(item.id)
 }
 
@@ -229,7 +229,7 @@ const getDishSlotName = (id) => {
                     >
                     <button 
                         v-if="searchQuery" 
-                        @click="searchQuery = ''; telegram.haptic.selection()"
+                        @click="searchQuery = ''; platform.haptic.selection()"
                         class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 tap-effect"
                     >
                         <span class="material-icons-round text-lg">close</span>
@@ -277,14 +277,14 @@ const getDishSlotName = (id) => {
             <div class="px-4 pb-3 flex gap-2">
                 <div class="flex-1 bg-slate-100 p-1 rounded-xl flex font-bold text-[10px]">
                     <button 
-                        @click="activeMode = 'dish'; telegram.haptic.selection()" 
+                        @click="activeMode = 'dish'; platform.haptic.selection()" 
                         class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         :class="activeMode === 'dish' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                     >
                         <span>🥘</span> Рецепты
                     </button>
                     <button 
-                        @click="activeMode = 'product'; telegram.haptic.selection()" 
+                        @click="activeMode = 'product'; platform.haptic.selection()" 
                         class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         :class="activeMode === 'product' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                     >
@@ -297,7 +297,7 @@ const getDishSlotName = (id) => {
         <!-- Filter Row (Horizontal Scroll) -->
         <div v-if="activeMode === 'dish'" class="shrink-0 bg-white px-4 py-2 border-b border-slate-50 flex overflow-x-auto gap-2 no-scrollbar">
             <button 
-                @click="activeCategory = 'all'; telegram.haptic.selection()" 
+                @click="activeCategory = 'all'; platform.haptic.selection()" 
                 class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
                 :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
             >
@@ -306,7 +306,7 @@ const getDishSlotName = (id) => {
             <button 
                 v-for="cat in dictionaries.dishTypes" 
                 :key="cat.id" 
-                @click="activeCategory = cat.id; telegram.haptic.selection()" 
+                @click="activeCategory = cat.id; platform.haptic.selection()"
                 class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
                 :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
             >

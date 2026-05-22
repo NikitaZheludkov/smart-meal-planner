@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 
 const props = defineProps({
@@ -18,7 +18,7 @@ const emit = defineEmits(['close', 'saved', 'deleted'])
 
 const productStore = useProductStore()
 const dictionaries = useDictionariesStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 const ui = useUIStore()
 
 const isEditing = ref(false)
@@ -78,7 +78,7 @@ const handleSave = async () => {
   if (!formData.value.name || isSaving.value) return
   
   isSaving.value = true
-  telegram.haptic.notification('success')
+  platform.haptic.notification('success')
   ui.addLog(`Попытка сохранения продукта: ${formData.value.name}`, 'info', formData.value)
   
   try {
@@ -101,29 +101,29 @@ const handleSave = async () => {
         code: e.code
       })
       console.error('Save error:', e)
-      telegram.haptic.notification('error')
-      alert('Не удалось сохранить продукт. Проверьте соединение и попробуйте ещё раз.')
+      platform.haptic.notification('error')
+      ui.showToast('Не удалось сохранить продукт. Проверьте соединение и попробуйте ещё раз.', 'error')
   } finally {
       isSaving.value = false
   }
 }
 
 const handleDelete = async () => {
-    telegram.haptic.notification('warning')
-    if(confirm('Удалить продукт? Это может повлиять на рецепты, где он используется.')) {
+    platform.haptic.notification('warning')
+    if (await ui.confirm('Удалить продукт? Это может повлиять на рецепты, где он используется.', { okText: 'Удалить', cancelText: 'Отмена' })) {
         try {
           await productStore.deleteProduct(formData.value.id)
           emit('close')
         } catch (e) {
           console.error('Delete error:', e)
-          telegram.haptic.notification('error')
-          alert('Не удалось удалить продукт. Попробуйте ещё раз.')
+          platform.haptic.notification('error')
+          ui.showToast('Не удалось удалить продукт. Попробуйте ещё раз.', 'error')
         }
     }
 }
 
 const handleCancel = () => {
-    telegram.haptic.impact('light')
+    platform.haptic.impact('light')
     if (!formData.value.id) {
         emit('close')
     } else if (isEditing.value) {

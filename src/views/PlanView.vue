@@ -8,7 +8,7 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { useSettingsStore } from '../stores/settings'
 import { useDishStore } from '../stores/dishes'
 import { useUIStore } from '../stores/ui' 
-import { useTelegramStore } from '../stores/telegram'
+import { usePlatformStore } from '../stores/platform'
 import DishSelector from '../components/DishSelector.vue'
 import DishDetailModal from '../components/DishDetailModal.vue'
 
@@ -18,7 +18,7 @@ const dictionaries = useDictionariesStore()
 const settingsStore = useSettingsStore()
 const dishStore = useDishStore()
 const uiStore = useUIStore()
-const telegram = useTelegramStore()
+const platform = usePlatformStore()
 
 const transitionName = ref('slide-left')
 const switchTab = (tab) => {
@@ -30,7 +30,7 @@ const switchTab = (tab) => {
         transitionName.value = 'slide-right'
     }
     
-    telegram.haptic.selection()
+    platform.haptic.selection()
     uiStore.plan.activeTab = tab
 }
 
@@ -214,7 +214,7 @@ const onDishSelected = async ({ item, type }) => {
       // Если мы переходим границу батча (начинаем новый)
       if (newBatchCount > currentBatchCount && totalUsed > 0) {
           const confirmMsg = `Блюдо закончится. Добавить новую готовку?`
-          if (!confirm(confirmMsg)) return
+          if (!(await uiStore.confirm(confirmMsg, { okText: 'Добавить', cancelText: 'Отмена' }))) return
       }
   }
 
@@ -235,7 +235,7 @@ const showDishModal = ref(false)
 const viewingDish = ref(null)
 
 const openDishDetails = async (item) => {
-  telegram.haptic.impact('light')
+  platform.haptic.impact('light')
   if (item.dish) {
     if (dishStore.dishes.length === 0) await dishStore.fetchDishes()
     const fullDish = dishStore.dishes.find(d => d.id === item.dish)

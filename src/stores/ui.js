@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export const useUIStore = defineStore('ui', () => {
   
@@ -38,6 +38,9 @@ export const useUIStore = defineStore('ui', () => {
   const isLogOpen = ref(false)
   const isOffline = ref(!navigator.onLine)
   const isModalOpen = ref(false) // Глобальный флаг открытого модального окна
+
+  const confirmState = ref(null)
+  const isConfirmOpen = computed(() => Boolean(confirmState.value))
   
   const showToast = (message, type = 'info', duration = 3000) => {
     const id = Date.now()
@@ -45,6 +48,24 @@ export const useUIStore = defineStore('ui', () => {
     setTimeout(() => {
       toasts.value = toasts.value.filter(t => t.id !== id)
     }, duration)
+  }
+
+  const confirm = (message, options = {}) => {
+    const title = options.title || 'Подтверждение'
+    const okText = options.okText || 'ОК'
+    const cancelText = options.cancelText || 'Отмена'
+
+    return new Promise((resolve) => {
+      confirmState.value = { title, message, okText, cancelText, resolve }
+    })
+  }
+
+  const resolveConfirm = (result) => {
+    const state = confirmState.value
+    confirmState.value = null
+    try {
+      state?.resolve?.(result)
+    } catch {}
   }
 
   const setOffline = (value) => {
@@ -98,6 +119,8 @@ export const useUIStore = defineStore('ui', () => {
   return { 
       plan, dishes, products, shopping, 
       logs, toasts, isLogOpen, isOffline, isModalOpen,
-      setOffline, addLog, showToast, initNetworkListeners 
+      confirmState, isConfirmOpen,
+      setOffline, addLog, showToast, initNetworkListeners,
+      confirm, resolveConfirm
   }
 })

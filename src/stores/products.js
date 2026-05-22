@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { useUIStore } from './ui'
 import { withRetry, withTimeout } from '../lib/utils'
 
 export const useProductStore = defineStore('products', () => {
@@ -12,6 +13,7 @@ export const useProductStore = defineStore('products', () => {
   const fetchProducts = async () => {
     loading.value = true
     const auth = useAuthStore()
+    const ui = useUIStore()
     
     if (!auth.householdId) {
        console.warn('Нет householdId, пропускаем загрузку продуктов')
@@ -33,7 +35,7 @@ export const useProductStore = defineStore('products', () => {
         products.value = data || []
     } catch (e) {
         console.error('Ошибка загрузки продуктов:', e)
-        alert('Ошибка загрузки продуктов')
+        ui.showToast('Ошибка загрузки продуктов', 'error')
         products.value = [] 
     } finally {
         loading.value = false

@@ -12,7 +12,7 @@ const toggleLog = (id) => {
 const copyLogs = () => {
   const text = ui.logs.map(l => `[${l.time}] [${l.type.toUpperCase()}] ${l.message} ${l.data ? JSON.stringify(l.data) : ''}`).join('\n')
   navigator.clipboard.writeText(text)
-  alert('Логи скопированы в буфер обмена')
+  ui.showToast('Логи скопированы', 'success')
 }
 </script>
 

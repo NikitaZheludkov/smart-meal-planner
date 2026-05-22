@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useTelegramStore } from './telegram'
 import { useUIStore } from './ui'
 import { withTimeout, withRetry, isNetworkError } from '../lib/utils'
 import { pb } from '../lib/supabase'
@@ -14,9 +13,6 @@ export const useAuthStore = defineStore('auth', () => {
   const authError = ref(null) // { message, type: 'network'|'auth', canRetry: boolean }
 
   const ui = useUIStore()
-
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || import.meta.env.ADMIN_EMAIL
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || import.meta.env.ADMIN_PASSWORD
 
   const resetState = () => {
     user.value = null
@@ -144,11 +140,6 @@ export const useAuthStore = defineStore('auth', () => {
             return
         }
 
-        const telegramStore = useTelegramStore()
-        if (telegramStore.initData) {
-            ui.addLog('Вход через Telegram не поддерживается в PocketBase версии', 'warn')
-        }
-
         authStatus.value = 'idle'
     } catch (e) {
         ui.addLog('Ошибка инициализации Auth', 'error', e)
@@ -181,19 +172,6 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
         ui.addLog('❌ [Refresh] Критическая ошибка', 'error', e)
     }
-  }
-
-  const loginWithTelegram = async () => {
-    const telegramStore = useTelegramStore()
-    
-    if (!telegramStore.initData) {
-        ui.addLog('Авто-вход через TG пропущен (не в TMA)')
-        authStatus.value = 'idle'
-        return
-    }
-    
-    authStatus.value = 'error'
-    authError.value = { message: 'Telegram Auth сейчас отключен (PocketBase)', type: 'auth', canRetry: false }
   }
 
   const signOut = async () => {
@@ -253,22 +231,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const loginAsTestUser = async () => {
-    if (import.meta.env.PROD && !import.meta.env.VITE_ENABLE_TEST_USER) {
-        alert('Тестовый вход недоступен в PROD')
-        return
-    }
-
-    try {
-        if (!adminEmail || !adminPassword) {
-            throw new Error('ADMIN_EMAIL/ADMIN_PASSWORD не заданы в env')
-        }
-        await signIn(adminEmail, adminPassword)
-    } catch (e) { 
-        console.error(e)
-    }
-  }
-
   return { 
     user, 
     householdId, 
@@ -278,8 +240,6 @@ export const useAuthStore = defineStore('auth', () => {
     authError,
     init, 
     refreshSession, 
-    loginWithTelegram, 
-    loginAsTestUser, 
     signIn,
     signUp,
     signOut, 

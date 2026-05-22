@@ -74,7 +74,7 @@ export const usePlanStore = defineStore('plan', () => {
     } catch (e) {
         console.error('Ошибка загрузки плана:', e)
         ui.addLog('Ошибка загрузки плана', 'error', e)
-        alert('Ошибка загрузки плана')
+        ui.showToast('Ошибка загрузки плана', 'error')
     } finally {
         loading.value = false
     }
