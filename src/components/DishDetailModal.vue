@@ -685,20 +685,13 @@ const createProductFromIngredient = (ing) => {
                             </h4>
                             <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                                 <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product === null ? 'bg-yellow-50' : ''">
-                                    <div class="flex items-center gap-2">
-                                        <span class="card-title text-sm">{{ ing.name }}</span>
-                                        <span v-if="ing.product !== null" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
-                                            <span class="material-icons-round text-[14px]">check_circle</span>
-                                            Связанный
-                                        </span>
-                                        <button v-else @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="card-title text-sm truncate flex-1 min-w-0">{{ ing.name }}</span>
+                                        <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="shrink-0 text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
                                             Создать
                                         </button>
-                                        <button @click="openIngredientSearch(idx)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
-                                            <span class="material-icons-round text-base">search</span>
-                                        </button>
                                     </div>
-                                    <span class="font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
+                                    <span class="shrink-0 font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
                                 </div>
                             </div>
                         </div>
@@ -859,6 +852,10 @@ const createProductFromIngredient = (ing) => {
 
                                         <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
                                             Создать в базе
+                                        </button>
+
+                                        <button @click="openIngredientSearch(idx)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+                                            <span class="material-icons-round text-base">search</span>
                                         </button>
 
                                         <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
