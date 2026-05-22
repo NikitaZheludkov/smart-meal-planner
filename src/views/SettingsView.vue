@@ -50,6 +50,38 @@ const isMe = (memberId) => {
     return authStore.user && memberId === authStore.user.id
 }
 
+const handleRemoveMember = async (member) => {
+    if (!member?.id) return
+    if (!isOwner.value) return
+    if (member.id === settingsStore.household?.owner) return
+
+    const label = member.displayName || member.email || member.username || 'участника'
+    const ok = await ui.confirm(`Исключить ${label} из семьи?`, { okText: 'Исключить', cancelText: 'Отмена' })
+    if (!ok) return
+
+    try {
+        await settingsStore.removeMember(member.id)
+    } catch (e) {
+        ui.showToast(e?.message || 'Не удалось исключить участника', 'error')
+    }
+}
+
+const handleMakeOwner = async (member) => {
+    if (!isOwner.value) return
+    if (!member?.id) return
+    if (member.id === settingsStore.household?.owner) return
+
+    const label = member.displayName || member.email || member.username || 'этого участника'
+    const ok = await ui.confirm('Передать права владельца этому пользователю? Вы станете обычным участником.', { okText: 'Передать', cancelText: 'Отмена' })
+    if (!ok) return
+
+    try {
+        await settingsStore.transferOwnership(member.id)
+    } catch (e) {
+        ui.showToast(e?.message || 'Не удалось передать права', 'error')
+    }
+}
+
 const handleGenerateCode = async () => {
     if (isGenerating.value) return
     isGenerating.value = true
@@ -96,6 +128,14 @@ const handleJoin = async () => {
 
 const handleLeave = async () => {
     platform.haptic.notification('warning')
+    if (settingsStore.familyMembers.length <= 1) {
+        ui.showToast('Вы единственный участник семьи', 'warn')
+        return
+    }
+    if (isOwner.value) {
+        ui.showToast('Сначала передайте права владельца другому участнику', 'warn')
+        return
+    }
     if (await ui.confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.', { okText: 'Покинуть', cancelText: 'Отмена' })) {
         try {
             await settingsStore.leaveHousehold()
@@ -191,12 +231,30 @@ const periods = [
                     
                     <div class="flex-1 min-w-0">
                         <div class="card-title text-sm truncate">
-                            {{ member.first_name || member.username }}
+                            {{ member.displayName || member.first_name || member.username || member.email }}
                             <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
                         </div>
                         <div class="text-[10px] font-normal text-secondary">
                             {{ member.id === settingsStore.household?.owner ? 'Администратор' : 'Участник' }}
                         </div>
+                        <div v-if="isMe(member.id) && member.email" class="text-[10px] font-bold text-slate-300 truncate">
+                            {{ member.email }}
+                        </div>
+                    </div>
+
+                    <div v-if="isOwner && member.id !== settingsStore.household?.owner" class="flex flex-col items-end gap-1 shrink-0">
+                        <button
+                            @click="handleMakeOwner(member)"
+                            class="px-3 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] tap-effect"
+                        >
+                            Сделать владельцем
+                        </button>
+                        <button
+                            @click="handleRemoveMember(member)"
+                            class="px-3 py-2 rounded-full bg-red-50 text-red-500 hover:bg-red-100 font-black text-[10px] tap-effect"
+                        >
+                            Исключить
+                        </button>
                     </div>
                 </div>
             </div>
@@ -237,7 +295,7 @@ const periods = [
                 </button>
             </div>
 
-            <div v-else-if="!isOwner && !settingsStore.household?.invite_code">
+            <div v-else-if="!isOwner && !settingsStore.household?.invite_code && settingsStore.familyMembers.length > 1">
                  <button 
                     @click="handleLeave"
                     class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-full font-bold text-xs tap-effect flex items-center justify-center gap-2"

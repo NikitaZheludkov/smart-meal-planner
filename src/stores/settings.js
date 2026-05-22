@@ -3,6 +3,10 @@ import { ref } from 'vue'
 import { useAuthStore } from './auth'
 import { useRealtimeStore } from './realtime' // <-- Импортируем Realtime
 import { useUIStore } from './ui'
+import { usePlanStore } from './plan'
+import { useDishStore } from './dishes'
+import { useProductStore } from './products'
+import { useShoppingStore } from './shopping'
 import { pb } from '../lib/supabase'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -62,10 +66,68 @@ export const useSettingsStore = defineStore('settings', () => {
       }
 
       const members = await pb.collection('users').getFullList({
-          filter: `household="${householdId}"`
+          filter: `household="${householdId}"`,
+          fields: 'id,email,first_name,username'
       })
 
-      familyMembers.value = members || []
+      familyMembers.value = (members || []).map((m) => {
+          const name = (m.first_name || m.username || '').toString().trim()
+          const email = (m.email || '').toString().trim()
+          return {
+              ...m,
+              displayName: name || (email ? email.split('@')[0] : 'Пользователь')
+          }
+      })
+  }
+
+  const removeMember = async (userId) => {
+      const auth = useAuthStore()
+      const ui = useUIStore()
+      const hh = household.value
+
+      if (!auth.user?.id) throw new Error('Пользователь не найден')
+      if (!hh?.id) throw new Error('Семья не найдена')
+      if (!userId) throw new Error('Участник не найден')
+
+      if (userId === auth.user.id) {
+          ui.showToast('Нельзя исключить самого себя', 'error')
+          return
+      }
+
+      if (userId === hh.owner) {
+          ui.showToast('Нельзя исключить владельца семьи', 'error')
+          return
+      }
+
+      await withTimeout(pb.collection('users').update(userId, { household: null }), 15000)
+      familyMembers.value = familyMembers.value.filter((m) => m.id !== userId)
+      ui.showToast('Участник исключён', 'success')
+  }
+
+  const transferOwnership = async (newOwnerId) => {
+      const auth = useAuthStore()
+      const ui = useUIStore()
+      const hh = household.value
+      const hhId = hh?.id
+
+      if (!auth.user?.id) throw new Error('Пользователь не найден')
+      if (!hhId) throw new Error('Семья не найдена')
+      if (!newOwnerId) throw new Error('Участник не найден')
+
+      if (newOwnerId === hh.owner) {
+          ui.showToast('Пользователь уже является владельцем', 'warn')
+          return
+      }
+
+      if (newOwnerId === auth.user.id) {
+          ui.showToast('Нельзя передать права самому себе', 'error')
+          return
+      }
+
+      await withTimeout(pb.collection('households').update(hhId, { owner: newOwnerId }), 15000)
+
+      household.value = { ...household.value, owner: newOwnerId }
+      ui.showToast('Права владельца переданы', 'success')
   }
 
   // --- ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
@@ -126,16 +188,27 @@ export const useSettingsStore = defineStore('settings', () => {
       }
 
       if (!auth.user?.id) throw new Error('Пользователь не найден')
-      const updatedUser = await pb.collection('users').update(auth.user.id, { household: targetHousehold.id })
-      auth.user = updatedUser
-      auth.householdId = targetHousehold.id
+      await pb.collection('users').update(auth.user.id, { household: targetHousehold.id })
       
       ui.showToast('Вы присоединились к семье!', 'success')
-      
-      // Даем пользователю прочитать сообщение перед перезагрузкой
-      setTimeout(() => {
-          window.location.reload()
-      }, 1500)
+
+      await auth.refreshSession()
+
+      const realtime = useRealtimeStore()
+      realtime.reconnect()
+
+      const plan = usePlanStore()
+      const dishes = useDishStore()
+      const products = useProductStore()
+      const shopping = useShoppingStore()
+
+      await Promise.allSettled([
+          fetchSettings(),
+          plan.fetchPlan(),
+          dishes.fetchDishes(),
+          products.fetchProducts(),
+          shopping.fetchChecklist()
+      ])
   }
 
   const leaveHousehold = async () => {
@@ -160,28 +233,59 @@ export const useSettingsStore = defineStore('settings', () => {
               default_portions: 2
           })
            if (newHousehold) {
-                const updatedUser = await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
-                auth.user = updatedUser
-                auth.householdId = newHousehold.id
+                await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
                 ui.showToast('Создана новая семья', 'success')
-                setTimeout(() => window.location.reload(), 1000)
+                await auth.refreshSession()
+
+                const realtime = useRealtimeStore()
+                realtime.reconnect()
+
+                const plan = usePlanStore()
+                const dishes = useDishStore()
+                const products = useProductStore()
+                const shopping = useShoppingStore()
+
+                await Promise.allSettled([
+                    fetchSettings(),
+                    plan.fetchPlan(),
+                    dishes.fetchDishes(),
+                    products.fetchProducts(),
+                    shopping.fetchChecklist()
+                ])
                 return
            }
            throw new Error('Не удалось создать новую семью')
       }
       
-      const updatedUser = await pb.collection('users').update(auth.user.id, { household: myOwnHousehold.id })
-      auth.user = updatedUser
-      auth.householdId = myOwnHousehold.id
+      await pb.collection('users').update(auth.user.id, { household: myOwnHousehold.id })
       
       ui.showToast('Вы вернулись в свою семью', 'success')
-      setTimeout(() => window.location.reload(), 1000)
+
+      await auth.refreshSession()
+
+      const realtime = useRealtimeStore()
+      realtime.reconnect()
+
+      const plan = usePlanStore()
+      const dishes = useDishStore()
+      const products = useProductStore()
+      const shopping = useShoppingStore()
+
+      await Promise.allSettled([
+          fetchSettings(),
+          plan.fetchPlan(),
+          dishes.fetchDishes(),
+          products.fetchProducts(),
+          shopping.fetchChecklist()
+      ])
   }
 
   return { 
       startDay, periodLength, defaultPortions, 
       household, familyMembers, loading,
       fetchSettings, saveSettings,
-      generateInviteCode, joinHousehold, leaveHousehold
+      generateInviteCode, joinHousehold, leaveHousehold,
+      removeMember,
+      transferOwnership
   }
 })

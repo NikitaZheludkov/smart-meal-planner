@@ -14,6 +14,35 @@ export const useAuthStore = defineStore('auth', () => {
 
   const ui = useUIStore()
 
+  const getDefaultUsernameFromEmail = (email) => {
+    const e = (email || '').toString().trim().toLowerCase()
+    if (!e.includes('@')) return ''
+    const local = e.split('@')[0].trim()
+    return local || ''
+  }
+
+  const ensurePublicUsername = async () => {
+    const model = pb.authStore.model
+    const userId = model?.id
+    if (!userId) return
+
+    const username = (model?.username || '').toString().trim()
+    if (username) return
+
+    const email = (model?.email || '').toString().trim()
+    const nextUsername = getDefaultUsernameFromEmail(email)
+    if (!nextUsername) return
+
+    try {
+      const updatedUser = await withRetry(async () => {
+        return await withTimeout(pb.collection('users').update(userId, { username: nextUsername }), 15000)
+      })
+      user.value = updatedUser
+    } catch (e) {
+      ui.addLog('Не удалось автоматически заполнить username', 'warn', e)
+    }
+  }
+
   const resetState = () => {
     user.value = null
     householdId.value = null
@@ -110,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!authModel) return
     user.value = authModel
     try {
+      await ensurePublicUsername()
       await ensureHouseholdId()
       isAuth.value = true
       authStatus.value = 'success'
@@ -204,13 +234,14 @@ export const useAuthStore = defineStore('auth', () => {
     authStatus.value = 'loading'
     authError.value = null
     try {
+        const username = getDefaultUsernameFromEmail(email)
         await withRetry(async () => {
             return await withTimeout(
-              pb.collection('users').create({
-                email,
-                password,
-                passwordConfirm: password
-              }),
+              pb.collection('users').create(
+                username
+                  ? { email, username, password, passwordConfirm: password }
+                  : { email, password, passwordConfirm: password }
+              ),
               15000
             )
         })
