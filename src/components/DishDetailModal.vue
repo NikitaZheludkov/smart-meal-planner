@@ -439,6 +439,43 @@ const onProductCreated = (product) => {
     toggleProductSelection(product)
 }
 
+const audioBufferTo16BitPCM = (audioBuffer) => {
+    const numberOfChannels = Math.max(1, audioBuffer.numberOfChannels || 1)
+    const length = audioBuffer.length || 0
+    const result = new ArrayBuffer(length * 2)
+    const view = new DataView(result)
+
+    for (let i = 0; i < length; i++) {
+        let sample = 0
+        for (let ch = 0; ch < numberOfChannels; ch++) {
+            sample += audioBuffer.getChannelData(ch)[i] || 0
+        }
+        sample /= numberOfChannels
+        sample = Math.max(-1, Math.min(1, sample))
+        view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+    }
+
+    return result
+}
+
+const resampleAudioBuffer = async (audioBuffer, targetSampleRate) => {
+    const targetRate = Number(targetSampleRate) || 16000
+    if (!audioBuffer || !audioBuffer.sampleRate || audioBuffer.sampleRate === targetRate) return audioBuffer
+
+    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext
+    if (!OfflineCtx) {
+        throw new Error('OfflineAudioContext не поддерживается в этом браузере')
+    }
+
+    const length = Math.ceil(audioBuffer.duration * targetRate)
+    const offlineContext = new OfflineCtx(1, length, targetRate)
+    const source = offlineContext.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(offlineContext.destination)
+    source.start(0)
+    return await offlineContext.startRendering()
+}
+
 const toggleVoiceRecord = async () => {
     if (isRecordingVoice.value) {
         if (audioRecorder && audioRecorder.state !== 'inactive') {
@@ -455,9 +492,17 @@ const toggleVoiceRecord = async () => {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
         audioChunks = []
         
-        audioRecorder = new MediaRecorder(mediaStream, {
-            mimeType: MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/wav'
-        })
+        const preferredMimeTypes = [
+            'audio/ogg; codecs=opus',
+            'audio/ogg;codecs=opus',
+            'audio/webm; codecs=opus',
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/wav'
+        ]
+        const selectedMimeType = preferredMimeTypes.find((t) => MediaRecorder.isTypeSupported(t))
+        audioRecorder = selectedMimeType ? new MediaRecorder(mediaStream, { mimeType: selectedMimeType }) : new MediaRecorder(mediaStream)
 
         audioRecorder.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
@@ -466,8 +511,9 @@ const toggleVoiceRecord = async () => {
         }
 
         audioRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: audioRecorder.mimeType })
-            console.log('Audio recorded:', audioBlob.size, 'bytes')
+            const blobType = audioRecorder.mimeType || audioChunks?.[0]?.type || selectedMimeType || 'application/octet-stream'
+            const audioBlob = new Blob(audioChunks, { type: blobType })
+            console.log('Audio recorded:', audioBlob.size, 'bytes', blobType)
             processAudioWithAI(audioBlob)
             
             if (mediaStream) {
@@ -497,53 +543,152 @@ const processAudioWithAI = async (audioBlob) => {
     isProcessingVoice.value = true
     
     try {
-        const base64Audio = await new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => {
-                const base64 = reader.result.split(',')[1]
-                resolve(base64)
-            }
-            reader.onerror = reject
-            reader.readAsDataURL(audioBlob)
-        })
+        const yandexApiKey = import.meta.env.VITE_YANDEX_API_KEY
+        const yandexFolderId = import.meta.env.VITE_YANDEX_FOLDER_ID
 
-        const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCPRxMnWOLolq0XZl4bnqisb9l3j7Hch_Y',
-            {
+        if (!yandexApiKey || !yandexFolderId) {
+            throw new Error('Не заданы VITE_YANDEX_API_KEY и/или VITE_YANDEX_FOLDER_ID')
+        }
+
+        let recognizedText = ''
+
+        try {
+            let audioBuffer = null
+            let lpcmData = null
+
+            try {
+                const audioArrayBuffer = await audioBlob.arrayBuffer()
+                const AudioCtx = window.AudioContext || window.webkitAudioContext
+                if (!AudioCtx) {
+                    throw new Error('AudioContext не поддерживается в этом браузере')
+                }
+                const audioContext = new AudioCtx()
+                try {
+                    audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer.slice(0))
+                } finally {
+                    await audioContext.close().catch(() => {})
+                }
+                audioBuffer = await resampleAudioBuffer(audioBuffer, 16000)
+                if (audioBuffer.sampleRate !== 16000) {
+                    throw new Error(`Не удалось привести sampleRate к 16000Hz (получилось ${audioBuffer.sampleRate})`)
+                }
+                lpcmData = audioBufferTo16BitPCM(audioBuffer)
+            } catch (e) {
+                console.error('Ошибка декодирования/конвертации аудио в LPCM:', e)
+                throw e
+            }
+
+            const sttUrl = new URL('/api/yandex-stt/speech/v1/stt:recognize', window.location.origin)
+            sttUrl.searchParams.set('folderId', yandexFolderId)
+            sttUrl.searchParams.set('lang', 'ru-RU')
+            sttUrl.searchParams.set('topic', 'general')
+            sttUrl.searchParams.set('format', 'lpcm')
+            sttUrl.searchParams.set('sampleRateHertz', '16000')
+
+            const sttResponse = await fetch(sttUrl.toString(), {
                 method: 'POST',
                 headers: {
+                    'Authorization': `Api-Key ${yandexApiKey}`,
+                    'Content-Type': 'application/octet-stream'
+                },
+                body: lpcmData
+            })
+
+            const sttRaw = await sttResponse.text()
+
+            if (!sttResponse.ok) {
+                console.error('Yandex SpeechKit STT error:', sttResponse.status, sttRaw)
+                throw new Error(`Yandex SpeechKit STT error: ${sttResponse.status}`)
+            }
+
+            let sttJson = null
+            try {
+                sttJson = JSON.parse(sttRaw)
+            } catch (e) {
+                sttJson = null
+            }
+
+            recognizedText = (sttJson?.result || '').toString().trim()
+
+            if (!recognizedText) {
+                console.error('Yandex SpeechKit STT empty result:', sttRaw)
+                throw new Error('Yandex SpeechKit STT вернул пустой результат')
+            }
+
+            console.log('SpeechKit recognized text:', recognizedText)
+        } catch (e) {
+            console.error('SpeechKit STT request failed:', e)
+            throw e
+        }
+
+        let yandexGptText = ''
+
+        try {
+            const gptResponse = await fetch('/api/yandex-llm/foundationModels/v1/completion', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Api-Key ${yandexApiKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            {
-                                text: 'Ты — кулинарный ассистент. Извлеки ингредиенты из аудио. Верни JSON: { "title": "...", "ingredients": [ { "name": "имя продукта в ед. числе" } ] }. Никаких описаний, только JSON.'
-                            },
-                            {
-                                inline_data: {
-                                    mime_type: audioBlob.type,
-                                    data: base64Audio
-                                }
-                            }
-                        ]
-                    }]
+                    modelUri: `gpt://${yandexFolderId}/yandexgpt/latest`,
+                    completionOptions: {
+                        stream: false,
+                        temperature: 0.2,
+                        maxTokens: 2000
+                    },
+                    messages: [
+                        {
+                            role: 'system',
+                            text: "Верни ответ строго в формате JSON: {'title': 'Название', 'ingredients': [{'name': 'продукт', 'amount': число, 'unit': 'строка'}]}. Никакого лишнего текста."
+                        },
+                        {
+                            role: 'user',
+                            text: recognizedText
+                        }
+                    ]
                 })
-            }
-        )
+            })
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`)
+            const gptRaw = await gptResponse.text()
+
+            if (!gptResponse.ok) {
+                console.error('YandexGPT error:', gptResponse.status, gptRaw)
+                throw new Error(`YandexGPT error: ${gptResponse.status}`)
+            }
+
+            let gptJson = null
+            try {
+                gptJson = JSON.parse(gptRaw)
+            } catch (e) {
+                gptJson = null
+            }
+
+            yandexGptText = (
+                gptJson?.result?.alternatives?.[0]?.message?.text ||
+                gptJson?.result?.alternatives?.[0]?.text ||
+                gptJson?.alternatives?.[0]?.text ||
+                ''
+            ).toString().trim()
+
+            if (!yandexGptText) {
+                console.error('YandexGPT empty text:', gptRaw)
+                throw new Error('YandexGPT вернул пустой ответ')
+            }
+        } catch (e) {
+            console.error('YandexGPT request failed:', e)
+            throw e
         }
 
-        const res = await response.json()
-        let responseText = res.candidates[0].content.parts[0].text
-        
-        responseText = responseText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
+        const cleaned = yandexGptText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
 
-        console.log('Ответ от Gemini:', JSON.parse(responseText))
-        
-        const parsed = JSON.parse(responseText)
+        let parsed = null
+        try {
+            parsed = JSON.parse(cleaned)
+        } catch (e) {
+            console.error('Не удалось распарсить JSON от YandexGPT:', cleaned)
+            throw e
+        }
         
         if (parsed.title) {
             formData.value.name = parsed.title
@@ -574,7 +719,7 @@ const processAudioWithAI = async (audioBlob) => {
         }
         
     } catch (error) {
-        console.error('Ошибка обработки аудио:', error)
+        console.error('Ошибка обработки аудио (Yandex):', error)
         ui.showToast('Не удалось обработать аудио', 'error')
     } finally {
         isProcessingVoice.value = false
