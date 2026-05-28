@@ -348,11 +348,12 @@ const periods = [
     
 
     <Transition name="modal">
-    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex flex-col" @click.self="showJoinModal = false">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
+    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="showJoinModal = false">
+        <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
         
-        <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-            <div class="flex-1 bg-white rounded-t-[32px] p-8 flex flex-col items-center justify-center">
+        <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
+            <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
+            <div class="flex-1 p-8 flex flex-col items-center justify-center">
                 <div class="text-center mb-8">
                     <div class="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm border border-slate-100">🔑</div>
                     <h3 class="text-2xl font-black text-slate-900">Вход в семью</h3>

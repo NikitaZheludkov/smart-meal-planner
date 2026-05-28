@@ -589,15 +589,13 @@ const createProductFromIngredient = (ing) => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-[60] flex flex-col" @click.self="$emit('close')">
-      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="$emit('close')">
+      <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
       
-      <div class="relative h-[calc(100%-48px)] mt-auto bg-white rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up" style="isolation: isolate;">
-            <div class="absolute top-3 left-0 right-0 flex justify-center z-30">
-                <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
-            </div>
+      <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content" style="isolation: isolate;">
+            <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
 
-            <div class="px-5 pt-10 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white rounded-t-[32px] z-20 min-h-[50px]">
+            <div class="px-5 pt-2 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
             
                 <div class="w-20 flex justify-start">
                     <button 

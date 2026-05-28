@@ -137,14 +137,11 @@ const handleCancel = () => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 flex flex-col" :style="{ zIndex: zIndex }" @click.self="$emit('close')">
-      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
-      <div class="relative flex-1 mt-[var(--app-header-pt)] bg-slate-200 rounded-t-[32px] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-        <div class="flex-1 bg-white rounded-t-[32px] flex flex-col overflow-hidden relative">
-          <!-- Handle -->
-          <div class="w-full pt-3 pb-1 shrink-0 z-20">
-            <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto"></div>
-          </div>
+    <div v-if="isOpen" class="fixed inset-0 flex flex-col justify-end" :style="{ zIndex: zIndex }" @click.self="$emit('close')">
+      <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
+      <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
+        <div class="flex-1 flex flex-col overflow-hidden relative">
+          <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
           <!-- Header -->
           <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
             <div class="w-20 flex justify-start">
