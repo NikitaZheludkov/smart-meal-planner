@@ -12,8 +12,7 @@ routerAdd(
       return ''
     }
 
-    const buildQueryString = (queryValues) => {
-      const obj = JSON.parse(toString(queryValues || {})) || {}
+    const buildQueryString = (queryValues) => {      const obj = JSON.parse(toString(queryValues || {})) || {}
       const parts = []
       for (const [key, value] of Object.entries(obj)) {
         const k = encodeURIComponent(String(key))
