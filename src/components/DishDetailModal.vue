@@ -543,11 +543,10 @@ const processAudioWithAI = async (audioBlob) => {
     isProcessingVoice.value = true
     
     try {
-        const yandexApiKey = import.meta.env.VITE_YANDEX_API_KEY
         const yandexFolderId = import.meta.env.VITE_YANDEX_FOLDER_ID
 
-        if (!yandexApiKey || !yandexFolderId) {
-            throw new Error('Не заданы VITE_YANDEX_API_KEY и/или VITE_YANDEX_FOLDER_ID')
+        if (!yandexFolderId) {
+            throw new Error('Не задан VITE_YANDEX_FOLDER_ID')
         }
 
         let recognizedText = ''
@@ -588,7 +587,6 @@ const processAudioWithAI = async (audioBlob) => {
             const sttResponse = await fetch(sttUrl.toString(), {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Api-Key ${yandexApiKey}`,
                     'Content-Type': 'application/octet-stream'
                 },
                 body: lpcmData
@@ -627,7 +625,6 @@ const processAudioWithAI = async (audioBlob) => {
             const gptResponse = await fetch('/api/yandex-llm/foundationModels/v1/completion', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Api-Key ${yandexApiKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({

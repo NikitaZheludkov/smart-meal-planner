@@ -1,8 +1,16 @@
+const getYandexApiKey = () => {
+  const key = ($os.getenv('YANDEX_API_KEY') || '').trim()
+  if (!key) {
+    throw new InternalServerError('YANDEX_API_KEY не задана в окружении сервера PocketBase')
+  }
+  return key
+}
+
 routerAdd(
   'POST',
   '/api/yandex-stt/speech/v1/stt:recognize',
   (e) => {
-    const yandexKey = 'AQVN16WoIcHgyVDYFNJn2PFU4eGHUjYczdfOq1SK'
+    const yandexKey = getYandexApiKey()
 
     const pickHeader = (headers, name) => {
       const direct = headers?.[name]
@@ -55,7 +63,7 @@ routerAdd(
   'POST',
   '/api/yandex-llm/foundationModels/v1/completion',
   (e) => {
-    const yandexKey = 'AQVN16WoIcHgyVDYFNJn2PFU4eGHUjYczdfOq1SK'
+    const yandexKey = getYandexApiKey()
 
     const pickHeader = (headers, name) => {
       const direct = headers?.[name]
