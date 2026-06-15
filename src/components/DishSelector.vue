@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { usePlanStore } from '../stores/plan'
@@ -38,6 +38,7 @@ const modes = ['dish', 'product']
 const searchQuery = ref('')
 const activeCategory = ref('all')
 const showSearchDropdown = ref(false)
+const modalRegistryId = `dish-selector-${Math.random().toString(36).slice(2)}`
 
 watch(activeMode, (newVal, oldVal) => {
   const oldIndex = modes.indexOf(oldVal)
@@ -51,7 +52,11 @@ onMounted(async () => {
 })
 
 watch(() => props.isOpen, (newVal) => {
-    ui.isModalOpen = newVal
+    ui.syncModalState(modalRegistryId, newVal)
+})
+
+onUnmounted(() => {
+    ui.clearModalState(modalRegistryId)
 })
 
 watch(searchQuery, (newValue) => {

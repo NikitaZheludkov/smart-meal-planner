@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlatformStore } from '../stores/platform'
@@ -47,13 +47,18 @@ const getCategoryIcon = (categoryName) => {
 }
 
 const units = ['Кг', 'Л', 'Шт', 'Упак']
+const modalRegistryId = `product-detail-${Math.random().toString(36).slice(2)}`
 
 watch(() => props.isOpen, (newVal) => {
-    ui.isModalOpen = newVal
+    ui.syncModalState(modalRegistryId, newVal)
     if (newVal) {
         isSaving.value = false // Reset loading state
     }
 }, { immediate: true })
+
+onUnmounted(() => {
+    ui.clearModalState(modalRegistryId)
+})
 
 watch(() => props.product, (newVal) => {
   if (newVal) {

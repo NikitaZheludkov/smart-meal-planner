@@ -41,13 +41,16 @@ routerAdd(
     const contentType = e.request.header.get('Content-Type') || 'application/octet-stream'
 
     const bodyBytes = toBytes(e.request.body)
+    const contentLength = Array.isArray(bodyBytes) ? bodyBytes.length : (bodyBytes?.length || bodyBytes?.byteLength || 0)
 
     const res = $http.send({
       url,
       method: 'POST',
       headers: {
         Authorization: `Api-Key ${yandexKey}`,
-        'Content-Type': contentType
+        'Content-Type': contentType,
+        'Content-Length': String(contentLength),
+        Accept: 'application/json'
       },
       body: bodyBytes,
       timeout: 180

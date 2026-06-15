@@ -1,11 +1,12 @@
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue'
+import { ref, watch, computed, nextTick, onUnmounted } from 'vue'
 import { useDishStore } from '../stores/dishes'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
+import { parseAiDishResponse, normalizeAiIngredient, matchIngredientToProduct, toFormIngredient } from '../lib/aiIngredients'
 import ProductDetailModal from './ProductDetailModal.vue'
 
 const props = defineProps({
@@ -25,20 +26,29 @@ const isEditing = ref(false)
 const isSaving = ref(false)
 const showTagSelection = ref(false)
 const showIngredientOverlay = ref(false)
-const editingIngredientIndex = ref(null)
+const editingIngredientKey = ref(null)
 const tempAmount = ref('')
 const showCreateProductModal = ref(false)
 const newProductTarget = ref(null)
+const newProductIngredientKey = ref(null)
 const showAdditionalDetails = ref(false)
 const showProductDropdown = ref(false)
 const lastSelectedProductId = ref(null)
 const isRecordingVoice = ref(false)
 const isProcessingVoice = ref(false)
+const isAiNutritionEstimated = ref(false)
 const voiceText = ref('')
+let ingredientLocalKeySeed = 0
 let audioRecorder = null
 let audioChunks = []
 let mediaStream = null
 let productSearchBlurTimeout = null
+let isComponentUnmounted = false
+let aiRequestId = 0
+let voiceAutoStopTimeout = null
+const initialFormSnapshot = ref('')
+const MAX_VOICE_RECORDING_MS = 12000
+const modalRegistryId = `dish-detail-${Math.random().toString(36).slice(2)}`
 
 const formData = ref({
     id: null,
@@ -58,26 +68,95 @@ const selectedProductsInOverlay = ref([])
 const productAmounts = ref({})
 const ingredientLinkIndex = ref(null)
 
-const unitMap = { "г": "Кг", "грамм": "Кг", "гр": "Кг", "кг": "Кг", "л": "Л", "мл": "Л", "шт": "Шт", "упак": "Упак" }
+const createIngredientLocalKey = () => `ing_${Date.now()}_${ingredientLocalKeySeed++}`
 
-const normalizeUnit = (unitString) => {
-    if (!unitString) return unitString
-    const key = unitString.toString().toLowerCase().trim()
-    return unitMap[key] || unitString
+const normalizeIngredientRecord = (ingredient = {}) => ({
+    localKey: ingredient.localKey || createIngredientLocalKey(),
+    product: ingredient.product ?? null,
+    name: formatIngredientName(ingredient.name || 'Неизвестно'),
+    amount: Number.isFinite(Number(ingredient.amount)) ? Number(ingredient.amount) : 1,
+    unit: ingredient.unit || 'Шт',
+    needsAmountCheck: !!ingredient.needsAmountCheck,
+    amountCheckReason: ingredient.amountCheckReason || null
+})
+
+const formatIngredientName = (value) => {
+    const text = (value || '').toString().trim()
+    if (!text) return 'Неизвестно'
+    return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-const normalizeName = (value) => (value || '').toString().toLowerCase().trim()
+const serializeFormDataForCompare = (data = {}) => JSON.stringify({
+    id: data.id || null,
+    name: data.name || '',
+    dish_type: data.dish_type || '',
+    meal_type: data.meal_type || '',
+    description: data.description || '',
+    kcal: data.kcal ?? null,
+    protein: data.protein ?? null,
+    fat: data.fat ?? null,
+    carbs: data.carbs ?? null,
+    batch_yield: Number(data.batch_yield) || 1,
+    tags: Array.isArray(data.tags) ? [...data.tags] : [],
+    ingredients: Array.isArray(data.ingredients)
+        ? data.ingredients.map((ing) => ({
+            product: ing.product ?? null,
+            name: formatIngredientName(ing.name),
+            amount: Number.isFinite(Number(ing.amount)) ? Number(ing.amount) : 1,
+            unit: ing.unit || 'Шт'
+        }))
+        : []
+})
 
-const findMatch = (aiName, productsBase) => {
-    const q = normalizeName(aiName)
-    if (!q) return null
-    for (const p of (productsBase || [])) {
-        const pn = normalizeName(p?.name)
-        if (!pn) continue
-        if (pn.includes(q) || q.includes(pn)) return p
+const hasUnsavedChanges = () => {
+    if (!isEditing.value) return false
+    return serializeFormDataForCompare(formData.value) !== initialFormSnapshot.value
+}
+
+const getAmountCheckLabel = (ingredient) => {
+    switch (ingredient?.amountCheckReason) {
+        case 'unit_mismatch':
+            return 'Проверьте единицу'
+        case 'unit_converted':
+            return 'Проверьте количество'
+        case 'amount_anomaly':
+            return 'Проверьте количество'
+        default:
+            return 'Проверьте количество/единицу'
     }
-    return null
 }
+
+const appendIngredients = (ingredientsToAdd = []) => {
+    if (!ingredientsToAdd.length) return
+    formData.value.ingredients = [
+        ...formData.value.ingredients,
+        ...ingredientsToAdd.map((ing) => normalizeIngredientRecord(ing))
+    ]
+}
+
+const clearVoiceAutoStopTimeout = () => {
+    if (voiceAutoStopTimeout) {
+        window.clearTimeout(voiceAutoStopTimeout)
+        voiceAutoStopTimeout = null
+    }
+}
+
+const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 45000) => {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(new Error('Request timeout')), timeoutMs)
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        })
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+}
+
+const findIngredientIndexByKey = (localKey) => formData.value.ingredients.findIndex((ing) => ing.localKey === localKey)
 
 const filteredProducts = computed(() => {
     const q = productSearchQuery.value.toLowerCase().trim()
@@ -147,10 +226,11 @@ const focusNextProductInput = (currentProdId) => {
 }
 
 const confirmIngredients = () => {
+    const newIngredients = []
     selectedProductsInOverlay.value.forEach(prod => {
         const amount = productAmounts.value[prod.id]
         if (amount) {
-            formData.value.ingredients.push({
+            newIngredients.push({
                 product: prod.id,
                 name: prod.name,
                 unit: prod.unit,
@@ -158,6 +238,7 @@ const confirmIngredients = () => {
             })
         }
     })
+    appendIngredients(newIngredients)
     selectedProductsInOverlay.value = []
     productAmounts.value = {}
     productSearchQuery.value = ''
@@ -193,30 +274,42 @@ const linkIngredientToProduct = (prod) => {
     ing.product = prod.id
     ing.unit = prod.unit || ing.unit
     ing.name = prod.name || ing.name
+    ing.needsAmountCheck = false
+    ing.amountCheckReason = null
     closeIngredientOverlay()
 }
 
 const removeIngredient = (index) => {
+    if (editingIngredientKey.value === formData.value.ingredients[index]?.localKey) {
+        editingIngredientKey.value = null
+        tempAmount.value = ''
+    }
     formData.value.ingredients.splice(index, 1)
     platform.haptic.impact('light')
 }
 
-const startEditingIngredient = (index, amount) => {
-    editingIngredientIndex.value = index
+const startEditingIngredient = (ingredient, amount) => {
+    editingIngredientKey.value = ingredient.localKey
     tempAmount.value = amount
     platform.haptic.selection()
     
     nextTick(() => {
-        const input = document.querySelector('.ing-edit-input')
+        const input = document.querySelector(`[data-ingredient-key="${ingredient.localKey}"]`)
         if (input) input.focus()
     })
 }
 
-const saveIngredientAmount = (index) => {
+const saveIngredientAmount = (localKey) => {
+    const index = findIngredientIndexByKey(localKey)
+    if (index === -1) {
+        editingIngredientKey.value = null
+        tempAmount.value = ''
+        return
+    }
     if (tempAmount.value) {
         formData.value.ingredients[index].amount = parseFloat(tempAmount.value)
     }
-    editingIngredientIndex.value = null
+    editingIngredientKey.value = null
     tempAmount.value = ''
     platform.haptic.notification('success')
 }
@@ -284,14 +377,14 @@ const initForm = (dishData) => {
     
     formData.value.ingredients = formData.value.ingredients.map(ing => {
         if (ing.productData && !ing.name) {
-            return {
+            return normalizeIngredientRecord({
                 product: ing.product,
                 name: ing.productData.name || 'Неизвестно',
                 unit: ing.productData.unit || '',
                 amount: ing.amount
-            }
+            })
         }
-        return ing
+        return normalizeIngredientRecord(ing)
     })
 
     if (!formData.value.tags) formData.value.tags = []
@@ -318,17 +411,19 @@ const initForm = (dishData) => {
     showTagSelection.value = false 
     showIngredientOverlay.value = false
     showAdditionalDetails.value = false
+    isAiNutritionEstimated.value = false
     
     if (productStore.products.length === 0) {
         productStore.fetchProducts()
     }
     
-    editingIngredientIndex.value = null
+    editingIngredientKey.value = null
     tempAmount.value = ''
+    initialFormSnapshot.value = serializeFormDataForCompare(formData.value)
 }
 
 watch(() => props.isOpen, (newVal) => {
-    ui.isModalOpen = newVal
+    ui.syncModalState(modalRegistryId, newVal)
     if (newVal) {
         isSaving.value = false
         if (props.dish) {
@@ -347,6 +442,11 @@ watch(() => props.isOpen, (newVal) => {
                 ingredients: []
             })
         }
+    } else {
+        aiRequestId += 1
+        editingIngredientKey.value = null
+        tempAmount.value = ''
+        newProductIngredientKey.value = null
     }
 })
 
@@ -405,9 +505,14 @@ const handleDelete = async () => {
     }
 }
 
-const handleCancel = () => {
+const handleCancel = async () => {
     platform.haptic.impact('light')
-    
+
+    if (hasUnsavedChanges()) {
+        const confirmed = await ui.confirm('Изменения не сохранятся, выйти?', { okText: 'Выйти', cancelText: 'Остаться' })
+        if (!confirmed) return
+    }
+
     if (!formData.value.id) {
         emit('close')
         return
@@ -415,7 +520,7 @@ const handleCancel = () => {
 
     if (isEditing.value) {
         isEditing.value = false
-        formData.value = JSON.parse(JSON.stringify(props.dish))
+        initForm(props.dish)
         return
     }
 
@@ -431,11 +536,25 @@ const getMealTypeName = computed(() => {
 
 const openCreateProduct = () => {
     newProductTarget.value = {}
+    newProductIngredientKey.value = null
     showCreateProductModal.value = true
 }
 
 const onProductCreated = (product) => {
     showCreateProductModal.value = false
+    if (newProductIngredientKey.value) {
+        const index = findIngredientIndexByKey(newProductIngredientKey.value)
+        if (index !== -1) {
+            const ing = formData.value.ingredients[index]
+            ing.product = product.id
+            ing.name = product.name || ing.name
+            ing.unit = product.unit || ing.unit
+            ing.needsAmountCheck = false
+            ing.amountCheckReason = null
+        }
+        newProductIngredientKey.value = null
+        return
+    }
     toggleProductSelection(product)
 }
 
@@ -478,6 +597,7 @@ const resampleAudioBuffer = async (audioBuffer, targetSampleRate) => {
 
 const toggleVoiceRecord = async () => {
     if (isRecordingVoice.value) {
+        clearVoiceAutoStopTimeout()
         if (audioRecorder && audioRecorder.state !== 'inactive') {
             audioRecorder.stop()
         }
@@ -511,6 +631,8 @@ const toggleVoiceRecord = async () => {
         }
 
         audioRecorder.onstop = () => {
+            clearVoiceAutoStopTimeout()
+            isRecordingVoice.value = false
             const blobType = audioRecorder.mimeType || audioChunks?.[0]?.type || selectedMimeType || 'application/octet-stream'
             const audioBlob = new Blob(audioChunks, { type: blobType })
             console.log('Audio recorded:', audioBlob.size, 'bytes', blobType)
@@ -519,19 +641,29 @@ const toggleVoiceRecord = async () => {
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop())
             }
+            mediaStream = null
         }
 
         audioRecorder.onerror = (event) => {
             console.error('Audio recording error:', event.error)
+            clearVoiceAutoStopTimeout()
             isRecordingVoice.value = false
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop())
             }
+            mediaStream = null
         }
 
         audioRecorder.start()
         isRecordingVoice.value = true
         voiceText.value = ''
+        clearVoiceAutoStopTimeout()
+        voiceAutoStopTimeout = window.setTimeout(() => {
+            if (audioRecorder && audioRecorder.state !== 'inactive') {
+                audioRecorder.stop()
+                ui.showToast('Запись остановлена автоматически. Говорите короче, до 10-12 секунд.', 'warn')
+            }
+        }, MAX_VOICE_RECORDING_MS)
 
     } catch (error) {
         console.error('Failed to access microphone:', error)
@@ -540,6 +672,7 @@ const toggleVoiceRecord = async () => {
 }
 
 const processAudioWithAI = async (audioBlob) => {
+    const requestId = ++aiRequestId
     isProcessingVoice.value = true
     
     try {
@@ -584,20 +717,37 @@ const processAudioWithAI = async (audioBlob) => {
             sttUrl.searchParams.set('format', 'lpcm')
             sttUrl.searchParams.set('sampleRateHertz', '16000')
 
-            const sttResponse = await fetch(sttUrl.toString(), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/octet-stream'
-                },
-                body: lpcmData
-            })
+            const sttRequest = async (attempt = 0) => {
+                const sttResponse = await fetchWithTimeout(sttUrl.toString(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/octet-stream'
+                    },
+                    body: lpcmData
+                }, 45000)
 
-            const sttRaw = await sttResponse.text()
+                const sttRaw = await sttResponse.text()
 
-            if (!sttResponse.ok) {
-                console.error('Yandex SpeechKit STT error:', sttResponse.status, sttRaw)
-                throw new Error(`Yandex SpeechKit STT error: ${sttResponse.status}`)
+                if (!sttResponse.ok) {
+                    const retryableTimeout = /timeout|i\/o timeout|timed out/i.test(sttRaw)
+                    console.error('Yandex SpeechKit STT error:', sttResponse.status, sttRaw)
+                    if (retryableTimeout && attempt === 0) {
+                        await wait(700)
+                        return sttRequest(1)
+                    }
+                    if (sttResponse.status === 400) {
+                        ui.showToast(retryableTimeout
+                            ? 'Проблема сети при распознавании. Повторите фразу короче.'
+                            : 'Не удалось распознать запись. Попробуйте ещё раз.'
+                        , 'warn')
+                    }
+                    throw new Error(`Yandex SpeechKit STT error: ${sttResponse.status}`)
+                }
+
+                return sttRaw
             }
+
+            const sttRaw = await sttRequest()
 
             let sttJson = null
             try {
@@ -622,7 +772,7 @@ const processAudioWithAI = async (audioBlob) => {
         let yandexGptText = ''
 
         try {
-            const gptResponse = await fetch('/api/yandex-llm/foundationModels/v1/completion', {
+            const gptResponse = await fetchWithTimeout('/api/yandex-llm/foundationModels/v1/completion', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -637,7 +787,7 @@ const processAudioWithAI = async (audioBlob) => {
                     messages: [
                         {
                             role: 'system',
-                            text: "Верни ответ строго в формате JSON: {'title': 'Название', 'ingredients': [{'name': 'продукт', 'amount': число, 'unit': 'строка'}]}. Никакого лишнего текста."
+                            text: "Верни ответ строго в формате JSON: {'title':'Название','description':'Краткий рецепт','kcal':число,'protein':число,'fat':число,'carbs':число,'ingredients':[{'name':'продукт','amount':число,'unit':'строка'}]}. КБЖУ укажи для всего блюда целиком, без единиц измерения в значениях. Никакого лишнего текста."
                         },
                         {
                             role: 'user',
@@ -645,7 +795,7 @@ const processAudioWithAI = async (audioBlob) => {
                         }
                     ]
                 })
-            })
+            }, 45000)
 
             const gptRaw = await gptResponse.text()
 
@@ -677,42 +827,41 @@ const processAudioWithAI = async (audioBlob) => {
             throw e
         }
 
-        const cleaned = yandexGptText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
-
         let parsed = null
         try {
-            parsed = JSON.parse(cleaned)
+            parsed = parseAiDishResponse(yandexGptText)
         } catch (e) {
-            console.error('Не удалось распарсить JSON от YandexGPT:', cleaned)
+            console.error('Не удалось распарсить JSON от YandexGPT:', yandexGptText)
             throw e
         }
         
         if (parsed.title) {
+            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
             formData.value.name = parsed.title
         }
         
         if (parsed.description) {
+            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
             formData.value.description = parsed.description
         }
+
+        const hasAiNutrition = parsed.kcal !== null || parsed.protein !== null || parsed.fat !== null || parsed.carbs !== null
+        if (parsed.kcal !== null) formData.value.kcal = parsed.kcal
+        if (parsed.protein !== null) formData.value.protein = parsed.protein
+        if (parsed.fat !== null) formData.value.fat = parsed.fat
+        if (parsed.carbs !== null) formData.value.carbs = parsed.carbs
+        isAiNutritionEstimated.value = hasAiNutrition
         
         if (parsed.ingredients && Array.isArray(parsed.ingredients)) {
             if (productStore.products.length === 0) {
                 await productStore.fetchProducts()
             }
-            parsed.ingredients.forEach(ing => {
-                const aiName = (typeof ing === 'string' ? ing : (ing?.name || ing?.product || 'Неизвестно'))
-                const match = findMatch(aiName, productStore.products)
-                const amount = (typeof ing === 'object' && ing !== null && ing.amount !== undefined && ing.amount !== null)
-                    ? (parseFloat(ing.amount) || 1)
-                    : 1
-                const aiUnit = (typeof ing === 'object' && ing !== null) ? normalizeUnit(ing.unit) : undefined
-                formData.value.ingredients.push({
-                    product: match?.id || null,
-                    name: match?.name || aiName,
-                    amount,
-                    unit: aiUnit || match?.unit || 'Шт'
-                })
-            })
+            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
+            const aiIngredients = parsed.ingredients
+                .map((ing) => normalizeAiIngredient(ing))
+                .map((ing) => matchIngredientToProduct(ing, productStore.products))
+                .map((ing) => toFormIngredient(ing))
+            appendIngredients(aiIngredients)
         }
         
     } catch (error) {
@@ -725,13 +874,25 @@ const processAudioWithAI = async (audioBlob) => {
 
 const createProductFromIngredient = (ing) => {
     newProductTarget.value = { name: ing.name }
+    newProductIngredientKey.value = ing.localKey || null
     showCreateProductModal.value = true
 }
+
+onUnmounted(() => {
+    isComponentUnmounted = true
+    aiRequestId += 1
+    if (productSearchBlurTimeout) {
+        window.clearTimeout(productSearchBlurTimeout)
+        productSearchBlurTimeout = null
+    }
+    clearVoiceAutoStopTimeout()
+    ui.clearModalState(modalRegistryId)
+})
 </script>
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="$emit('close')">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="handleCancel">
       <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
       
       <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content" style="isolation: isolate;">
@@ -780,9 +941,7 @@ const createProductFromIngredient = (ing) => {
 
             <div class="flex-1 overflow-hidden relative bg-white">
                 
-                <transition name="slide-fade">
-                
-                <div v-if="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-[120px] pt-4 no-scrollbar">
+                <div v-show="!showTagSelection" class="absolute inset-0 overflow-y-auto px-6 pb-[120px] pt-4 no-scrollbar">
                     
                     <div v-if="!isEditing" class="flex flex-col space-y-6">
                         <div class="text-center">
@@ -818,20 +977,36 @@ const createProductFromIngredient = (ing) => {
                                 <span class="text-[9px] font-bold text-slate-400 uppercase">Угле</span>
                             </div>
                         </div>
+                        <div v-if="isAiNutritionEstimated" class="flex justify-center -mt-3">
+                            <span class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                Оценка AI
+                            </span>
+                        </div>
 
                         <div v-if="formData.ingredients?.length" class="w-full">
                             <h4 class="card-title text-sm mb-3 ml-1">
                                 Состав <span v-if="(formData.batch_yield || 1) > 1" class="text-[9px] font-normal text-secondary opacity-70">(На {{ formData.batch_yield }} порц.)</span>
                             </h4>
                             <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex justify-between items-center p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product === null ? 'bg-yellow-50' : ''">
-                                    <div class="flex items-center gap-2 min-w-0">
-                                        <span class="card-title text-sm truncate flex-1 min-w-0">{{ ing.name }}</span>
-                                        <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="shrink-0 text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
-                                            Создать
-                                        </button>
+                                <div v-for="(ing, idx) in formData.ingredients" :key="ing.localKey" class="flex justify-between items-start p-3 border-b border-slate-50 last:border-0 text-sm" :class="ing.product === null ? 'bg-yellow-50' : ''">
+                                    <div class="flex items-start gap-2 min-w-0 flex-1">
+                                        <div class="flex-1 min-w-0">
+                                            <span class="card-title text-sm whitespace-normal break-words block">{{ ing.name }}</span>
+                                            <div class="mt-1 min-h-[18px]">
+                                                <div v-if="ing.product !== null && ing.needsAmountCheck" class="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200 inline-flex">
+                                                    {{ getAmountCheckLabel(ing) }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="shrink-0 min-w-[62px] flex justify-end">
+                                            <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors">
+                                                Создать
+                                            </button>
+                                        </div>
                                     </div>
-                                    <span class="shrink-0 font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md">{{ ing.amount }} {{ ing.unit }}</span>
+                                    <div class="shrink-0 min-w-[72px] flex justify-end">
+                                        <span class="font-normal px-2 py-0.5 rounded-md" :class="ing.needsAmountCheck ? 'text-orange-700 bg-orange-100 border border-orange-200' : 'text-secondary bg-slate-50'">{{ ing.amount }} {{ ing.unit }}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -873,7 +1048,6 @@ const createProductFromIngredient = (ing) => {
                                         v-model="formData.name" 
                                         placeholder="Название блюда"
                                         class="flex-1 text-center text-xl font-bold bg-slate-50 border-none rounded-2xl px-4 py-3 w-full focus:ring-0 placeholder:text-slate-300"
-                                        autofocus
                                     >
                                     <button 
                                         v-if="isProcessingVoice"
@@ -966,41 +1140,58 @@ const createProductFromIngredient = (ing) => {
 
                             <div class="space-y-2">
                                 <div class="text-[10px] font-bold text-slate-400 pl-2">Состав на {{ formData.batch_yield || 1 }} порц.</div>
-                                <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-2 space-y-1">
-                                    <div v-for="(ing, idx) in formData.ingredients" :key="idx" class="flex items-center gap-3 p-2 bg-white rounded-xl border shadow-sm" :class="ing.product === null ? 'border-yellow-400 bg-yellow-50' : 'border-slate-100'">
-                                        <div class="w-1.5 h-1.5 rounded-full bg-slate-900 ml-1"></div>
-                                        <div class="flex-1 font-bold text-slate-700 text-sm truncate">{{ ing.name }}</div>
-                                        
-                                        <div v-if="editingIngredientIndex === idx" class="flex items-center gap-1">
-                                            <input 
-                                                v-model="tempAmount" 
-                                                type="number" 
-                                                inputmode="decimal"
-                                                class="ing-edit-input w-16 p-1 bg-slate-50 rounded-lg font-bold text-center outline-none border border-slate-200 focus:border-slate-400 text-base"
-                                                @keydown.enter="saveIngredientAmount(idx)"
-                                                @blur="saveIngredientAmount(idx)"
-                                            >
-                                            <span class="text-[10px] font-bold text-slate-400">{{ ing.unit }}</span>
+                                <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-1.5 space-y-1">
+                                    <div v-for="(ing, idx) in formData.ingredients" :key="ing.localKey" class="p-1.5 bg-white rounded-xl border shadow-sm" :class="ing.product === null ? 'border-yellow-400 bg-yellow-50' : (ing.needsAmountCheck ? 'border-orange-300 bg-white' : 'border-slate-100')">
+                                        <div class="flex items-start gap-2.5">
+                                            <div class="w-1.5 h-1.5 rounded-full bg-slate-900 ml-1 mt-1 shrink-0"></div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-bold text-slate-700 text-[13px] whitespace-normal break-words leading-[18px]">{{ ing.name }}</div>
+                                                <div class="mt-0.5 min-h-[16px]">
+                                                    <div v-show="ing.product !== null && ing.needsAmountCheck" class="text-[9px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded-md border border-orange-200 inline-flex">
+                                                        {{ getAmountCheckLabel(ing) }}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button 
-                                            v-else
-                                            @click="startEditingIngredient(idx, ing.amount)"
-                                            class="font-bold text-slate-500 text-xs bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"
-                                        >
-                                            {{ ing.amount }} {{ ing.unit }}
-                                        </button>
+                                        
+                                        <div class="mt-1 pl-4 flex flex-wrap items-center gap-1.5">
+                                            <div class="min-h-[28px] flex items-center gap-1">
+                                                <input 
+                                                    v-show="editingIngredientKey === ing.localKey"
+                                                    v-model="tempAmount" 
+                                                    :data-ingredient-key="ing.localKey"
+                                                    type="number" 
+                                                    inputmode="decimal"
+                                                    class="ing-edit-input w-14 px-1.5 py-0.5 rounded-lg font-bold text-center outline-none border text-sm"
+                                                    :class="ing.needsAmountCheck ? 'bg-orange-50 border-orange-300 text-orange-700 focus:border-orange-500' : 'bg-slate-50 border-slate-200 text-slate-700 focus:border-slate-400'"
+                                                    @keydown.enter="saveIngredientAmount(ing.localKey)"
+                                                    @blur="saveIngredientAmount(ing.localKey)"
+                                                >
+                                                <span v-show="editingIngredientKey === ing.localKey" class="text-[9px] font-bold" :class="ing.needsAmountCheck ? 'text-orange-500' : 'text-slate-400'">{{ ing.unit }}</span>
+                                                <button 
+                                                    v-show="editingIngredientKey !== ing.localKey"
+                                                    @click="startEditingIngredient(ing, ing.amount)"
+                                                    class="font-bold text-[11px] px-1.5 py-0.5 rounded-lg border transition-colors"
+                                                    :class="ing.needsAmountCheck ? 'text-orange-700 bg-orange-100 border-orange-200 hover:bg-orange-200' : 'text-slate-500 bg-slate-50 border-slate-100 hover:bg-slate-100'"
+                                                >
+                                                    {{ ing.amount }} {{ ing.unit }}
+                                                </button>
+                                            </div>
 
-                                        <button v-if="ing.product === null" @click="createProductFromIngredient(ing)" class="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
-                                            Создать в базе
-                                        </button>
+                                            <div class="min-h-[28px] flex items-center gap-1.5">
+                                                <button v-show="ing.product === null" @click="createProductFromIngredient(ing)" class="text-[9px] font-bold text-yellow-600 bg-yellow-100 px-1.5 py-0.5 rounded-lg border border-yellow-200 hover:bg-yellow-200 transition-colors whitespace-nowrap">
+                                                    Создать в базе
+                                                </button>
 
-                                        <button @click="openIngredientSearch(idx)" class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
-                                            <span class="material-icons-round text-base">search</span>
-                                        </button>
+                                                <button v-show="ing.product === null || ing.needsAmountCheck" @click="openIngredientSearch(idx)" class="text-[9px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-lg border border-slate-200 hover:bg-slate-200 transition-colors whitespace-nowrap">
+                                                    Подобрать
+                                                </button>
 
-                                        <button @click="removeIngredient(idx)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
-                                            <span class="material-icons-round text-sm">close</span>
-                                        </button>
+                                                <button @click="removeIngredient(idx)" class="w-5 h-5 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-lg hover:bg-red-50">
+                                                    <span class="material-icons-round text-sm">close</span>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div v-else class="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
@@ -1030,6 +1221,11 @@ const createProductFromIngredient = (ing) => {
                                 <div v-if="showAdditionalDetails" class="space-y-4 pt-2">
                                     
                                     <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
+                                        <div v-if="isAiNutritionEstimated" class="mb-2 flex justify-end">
+                                            <span class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                                Оценка AI
+                                            </span>
+                                        </div>
                                         <div class="flex gap-2">
                                             <div class="flex-1">
                                                 <div class="text-[10px] font-bold text-slate-400 text-center mb-1">Ккал</div>
@@ -1089,38 +1285,33 @@ const createProductFromIngredient = (ing) => {
                                 </button>
                             </div>
                         </div>
-
                     </div>
 
-                </div>
-
-                <div v-else class="absolute inset-0 bg-slate-50 overflow-y-auto pb-20 pt-4 px-4 no-scrollbar">
-                    <div class="space-y-6">
-                         <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
-                            <div class="flex items-center gap-2 px-1">
-                                <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
-                                <div class="h-[1px] bg-slate-200 flex-1"></div>
+                    <div v-show="showTagSelection" class="absolute inset-0 bg-slate-50 overflow-y-auto pb-20 pt-4 px-4 no-scrollbar">
+                        <div class="space-y-6">
+                            <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
+                                <div class="flex items-center gap-2 px-1">
+                                    <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
+                                    <div class="h-[1px] bg-slate-200 flex-1"></div>
+                                </div>
+                                
+                                <div class="flex flex-wrap gap-2">
+                                     <button 
+                                        v-for="tag in group.tags" 
+                                        :key="tag.id" 
+                                        @click="toggleTag(tag)"
+                                        class="px-4 py-3 rounded-2xl text-sm font-bold transition-colors border tap-effect flex items-center gap-2"
+                                        :class="isTagSelected(tag) ? 'bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]' : 'bg-white text-slate-600 border-slate-200'"
+                                     >
+                                        <span>{{ tag.icon }}</span>
+                                        <span>{{ tag.name }}</span>
+                                        <span v-if="isTagSelected(tag)" class="material-icons-round text-sm ml-1">check</span>
+                                     </button>
+                                </div>
                             </div>
-                            
-                            <div class="flex flex-wrap gap-2">
-                                 <button 
-                                    v-for="tag in group.tags" 
-                                    :key="tag.id" 
-                                    @click="toggleTag(tag)"
-                                    class="px-4 py-3 rounded-2xl text-sm font-bold transition-colors border tap-effect flex items-center gap-2"
-                                    :class="isTagSelected(tag) ? 'bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]' : 'bg-white text-slate-600 border-slate-200'"
-                                 >
-                                    <span>{{ tag.icon }}</span>
-                                    <span>{{ tag.name }}</span>
-                                    <span v-if="isTagSelected(tag)" class="material-icons-round text-sm ml-1">check</span>
-                                 </button>
-                            </div>
-                         </div>
+                        </div>
+                        <div class="h-10"></div>
                     </div>
-                    <div class="h-10"></div>
-                </div>
-                
-                </transition>
             </div>
 
             <div v-show="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
@@ -1135,12 +1326,6 @@ const createProductFromIngredient = (ing) => {
                         </button>
                         
                         <div class="flex items-center gap-2">
-                            <button 
-                                @click="openCreateProduct"
-                                class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 tap-effect hover:bg-slate-200 active:scale-95 transition-transform"
-                            >
-                                <span class="material-icons-round text-xl">add</span>
-                            </button>
                             <button 
                                 @click="confirmIngredients"
                                 v-if="ingredientLinkIndex === null"
@@ -1162,7 +1347,6 @@ const createProductFromIngredient = (ing) => {
                                     @blur="handleBlur"
                                     placeholder="Поиск продуктов..." 
                                     class="w-full p-3.5 bg-transparent font-bold text-slate-700 outline-none border-none text-base placeholder:text-slate-300"
-                                    autofocus
                                 >
                             </div>
                             
@@ -1221,6 +1405,7 @@ const createProductFromIngredient = (ing) => {
           @saved="onProductCreated"
           @close="showCreateProductModal = false"
       />
+      </div>
     </div>
   </Transition>
 </template>

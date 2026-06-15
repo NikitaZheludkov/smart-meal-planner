@@ -208,7 +208,7 @@ onUnmounted(() => {
 
     <template v-else>
       <main class="flex-1 relative z-0 overflow-hidden bg-slate-50">
-        <transition :name="transitionName">
+        <transition :name="transitionName" mode="out-in">
            <component :is="activeComponent" :key="currentTab" class="absolute inset-0 w-full h-full" />
         </transition>
       </main>

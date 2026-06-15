@@ -37,7 +37,8 @@ export const useUIStore = defineStore('ui', () => {
   const toasts = ref([]) // Очередь уведомлений
   const isLogOpen = ref(false)
   const isOffline = ref(!navigator.onLine)
-  const isModalOpen = ref(false) // Глобальный флаг открытого модального окна
+  const modalStates = ref({})
+  const isModalOpen = computed(() => Object.keys(modalStates.value).length > 0)
 
   const confirmState = ref(null)
   const isConfirmOpen = computed(() => Boolean(confirmState.value))
@@ -66,6 +67,24 @@ export const useUIStore = defineStore('ui', () => {
     try {
       state?.resolve?.(result)
     } catch {}
+  }
+
+  const syncModalState = (modalId, isOpen) => {
+    if (!modalId) return
+    const next = { ...modalStates.value }
+    if (isOpen) {
+      next[modalId] = true
+    } else {
+      delete next[modalId]
+    }
+    modalStates.value = next
+  }
+
+  const clearModalState = (modalId) => {
+    if (!modalId || !modalStates.value[modalId]) return
+    const next = { ...modalStates.value }
+    delete next[modalId]
+    modalStates.value = next
   }
 
   const setOffline = (value) => {
@@ -121,6 +140,7 @@ export const useUIStore = defineStore('ui', () => {
       logs, toasts, isLogOpen, isOffline, isModalOpen,
       confirmState, isConfirmOpen,
       setOffline, addLog, showToast, initNetworkListeners,
-      confirm, resolveConfirm
+      confirm, resolveConfirm,
+      syncModalState, clearModalState
   }
 })

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
@@ -13,9 +13,14 @@ const emit = defineEmits(['close'])
 const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 const platform = usePlatformStore()
+const modalRegistryId = `dish-filter-${Math.random().toString(36).slice(2)}`
 
 watch(() => props.isOpen, (newVal) => {
-    uiStore.isModalOpen = newVal
+    uiStore.syncModalState(modalRegistryId, newVal)
+})
+
+onUnmounted(() => {
+    uiStore.clearModalState(modalRegistryId)
 })
 
 // Категории для группировки

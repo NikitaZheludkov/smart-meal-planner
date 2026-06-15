@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { usePlatformStore } from '../stores/platform'
@@ -24,9 +24,14 @@ onMounted(async () => {
 
 // --- ЛОГИКА СЕМЬИ ---
 const showJoinModal = ref(false)
+const modalRegistryId = `settings-join-${Math.random().toString(36).slice(2)}`
 
 watch(showJoinModal, (newVal) => {
-    ui.isModalOpen = newVal
+    ui.syncModalState(modalRegistryId, newVal)
+})
+
+onUnmounted(() => {
+    ui.clearModalState(modalRegistryId)
 })
 const joinCodeInput = ref('')
 const isGenerating = ref(false)
