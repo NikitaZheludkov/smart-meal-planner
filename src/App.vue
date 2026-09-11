@@ -7,6 +7,8 @@ import { usePlatformStore } from './stores/platform'
 import { useRealtimeStore } from './stores/realtime'
 import { useUIStore } from './stores/ui'
 import { usePlanStore } from './stores/plan'
+import { useDishStore } from './stores/dishes'
+import { useProductStore } from './stores/products'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -95,7 +97,9 @@ const loadUserData = () => {
                     await Promise.all([
                         settings.fetchSettings().catch(e => console.error('Settings load failed', e)),
                         dictionaries.fetchDictionaries().catch(e => console.error('Dictionaries load failed', e)),
-                        usePlanStore().fetchPlan().catch(e => console.error('Plan load failed', e))
+                        usePlanStore().fetchPlan().catch(e => console.error('Plan load failed', e)),
+                        useDishStore().fetchDishes().catch(e => console.error('Dishes load failed', e)),
+                        useProductStore().fetchProducts().catch(e => console.error('Products load failed', e))
                     ])
                 } catch (e) {
                     console.error('Parallel data load error', e)
