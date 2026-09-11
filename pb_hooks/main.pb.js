@@ -95,3 +95,29 @@ routerAdd(
   },
   $apis.bodyLimit(52428800)
 )
+
+// При создании НОВОЙ семьи (households) — а не при вступлении в чужую по
+// инвайт-коду, это отдельный путь без создания записи households —
+// копируем эталонный список product_templates в products новой семьи.
+// Так у каждой свежесозданной семьи сразу есть база продуктов для старта,
+// а у семей, которые просто пополняются новыми участниками, дублей не
+// появляется.
+onRecordAfterCreateSuccess((e) => {
+  try {
+    const templates = $app.findRecordsByFilter('product_templates', '', 'sort_order', 1000, 0)
+    const productsCollection = $app.findCollectionByNameOrId('products')
+
+    for (const tpl of templates) {
+      const record = new Record(productsCollection)
+      record.set('household', e.record.id)
+      record.set('name', tpl.get('name'))
+      record.set('category', tpl.get('category'))
+      record.set('unit', tpl.get('unit'))
+      $app.save(record)
+    }
+  } catch (err) {
+    console.log('Seed default products failed:', err)
+  }
+
+  e.next()
+}, 'households')
