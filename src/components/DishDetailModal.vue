@@ -490,9 +490,13 @@ const handleSave = async () => {
 const handleDelete = async () => {
     platform.haptic.notification('warning')
     if (await ui.confirm('Удалить блюдо?', { okText: 'Удалить', cancelText: 'Отмена' })) {
+        // Закрываем модалку до самого удаления: иначе вотчер в
+        // DishesView/PlanView, следящий за исчезновением просматриваемого
+        // блюда из списка (см. защиту от "зависшей" модалки при realtime-
+        // удалении), успевает сработать первым и показать дублирующий тост.
+        emit('close')
         await dishStore.deleteDish(formData.value.id)
         await planStore.fetchPlan()
-        emit('close')
     }
 }
 

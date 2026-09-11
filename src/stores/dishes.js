@@ -338,6 +338,15 @@ export const useDishStore = defineStore('dishes', () => {
           filter: `dish="${id}" && household="${auth.householdId}"`
         })
         await Promise.all((planItems || []).map((p) => withTimeout(pb.collection('plan').delete(p.id), 10000)))
+
+        // ingredients.dish — обязательная (required) связь без cascadeDelete,
+        // поэтому PocketBase отказывается удалять блюдо, пока на него
+        // ссылается хотя бы один ингредиент (см. deleteProduct — там уже
+        // так и было для ingredients.product).
+        const ingredientItems = await pb.collection('ingredients').getFullList({
+          filter: `dish="${id}" && household="${auth.householdId}"`
+        })
+        await Promise.all((ingredientItems || []).map((i) => withTimeout(pb.collection('ingredients').delete(i.id), 10000)))
       }
 
       await withTimeout(pb.collection('dishes').delete(id), 10000)

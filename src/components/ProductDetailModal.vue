@@ -116,9 +116,13 @@ const handleSave = async () => {
 const handleDelete = async () => {
     platform.haptic.notification('warning')
     if (await ui.confirm('Удалить продукт? Это может повлиять на рецепты, где он используется.', { okText: 'Удалить', cancelText: 'Отмена' })) {
+        // Закрываем модалку до самого удаления: иначе вотчер в ProductsView,
+        // следящий за исчезновением просматриваемого продукта из списка
+        // (защита от "зависшей" модалки при realtime-удалении), успевает
+        // сработать первым и показать дублирующий тост.
+        emit('close')
         try {
           await productStore.deleteProduct(formData.value.id)
-          emit('close')
         } catch (e) {
           console.error('Delete error:', e)
           platform.haptic.notification('error')

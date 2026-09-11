@@ -106,11 +106,9 @@ export const useProductStore = defineStore('products', () => {
         )
       })
 
-      for (const item of planItems) {
-        await withRetry(async () => {
-          return await withTimeout(pb.collection('plan').delete(item.id), 15000)
-        })
-      }
+      await Promise.all(planItems.map((item) => withRetry(async () => {
+        return await withTimeout(pb.collection('plan').delete(item.id), 15000)
+      })))
 
       const ingredients = await withRetry(async () => {
         return await withTimeout(
@@ -121,11 +119,25 @@ export const useProductStore = defineStore('products', () => {
         )
       })
 
-      for (const ingredient of ingredients) {
-        await withRetry(async () => {
-          return await withTimeout(pb.collection('ingredients').delete(ingredient.id), 15000)
-        })
-      }
+      await Promise.all(ingredients.map((ingredient) => withRetry(async () => {
+        return await withTimeout(pb.collection('ingredients').delete(ingredient.id), 15000)
+      })))
+
+      // shopping_cart.product — тоже обязательная (required) связь без
+      // cascadeDelete, поэтому PocketBase отказывается удалять продукт,
+      // пока на него ссылается хотя бы одна строка списка покупок.
+      const shoppingRows = await withRetry(async () => {
+        return await withTimeout(
+          pb.collection('shopping_cart').getFullList({
+            filter: `product="${id}" && household="${auth.householdId}"`
+          }),
+          15000
+        )
+      })
+
+      await Promise.all(shoppingRows.map((row) => withRetry(async () => {
+        return await withTimeout(pb.collection('shopping_cart').delete(row.id), 15000)
+      })))
 
       const productRecord = await withRetry(async () => {
         return await withTimeout(
