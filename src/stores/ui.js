@@ -56,6 +56,12 @@ export const useUIStore = defineStore('ui', () => {
     const okText = options.okText || 'ОК'
     const cancelText = options.cancelText || 'Отмена'
 
+    // Если уже есть незакрытый диалог — отменяем его, иначе его resolve()
+    // никогда не будет вызван и await на его стороне повиснет навсегда.
+    if (confirmState.value?.resolve) {
+      confirmState.value.resolve(false)
+    }
+
     return new Promise((resolve) => {
       confirmState.value = { title, message, okText, cancelText, resolve }
     })

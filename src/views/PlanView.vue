@@ -155,13 +155,23 @@ const getSlotIcon = (slotName) => {
     return '🥘'
 }
 
+// Группируем план по "дата_слот" один раз за пересчёт planStore.plan,
+// вместо того чтобы гонять .filter() по всему массиву на каждый вызов
+// getSlotItems — а он вызывается десятки раз за рендер сетки недели.
+const planByDateSlot = computed(() => {
+  const map = new Map()
+  for (const p of planStore.plan) {
+    const key = `${p.date}_${p.meal_type}`
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(p)
+  }
+  return map
+})
+
 const getSlotItems = (date, slotId) => {
   if (!date) return []
   const dStr = format(date, 'yyyy-MM-dd')
-  
-  return planStore.plan.filter(p => {
-    return p.date === dStr && p.meal_type === slotId
-  })
+  return planByDateSlot.value.get(`${dStr}_${slotId}`) || []
 }
 
 const openSelector = (date, slot) => {
@@ -244,6 +254,20 @@ const openDishDetails = async (item) => {
   }
 }
 
+// Если открытое блюдо удалили (например, с другого устройства через
+// realtime), закрываем модалку — иначе она останется открытой на
+// удалённой записи.
+watch(() => dishStore.dishes, (dishes) => {
+  const openedId = viewingDish.value?.id
+  if (!showDishModal.value || !openedId) return
+  const stillExists = dishes.some((d) => d.id === openedId)
+  if (!stillExists) {
+    showDishModal.value = false
+    viewingDish.value = null
+    uiStore.showToast('Это блюдо было удалено', 'info')
+  }
+})
+
 const mealSlots = computed(() => dictionaries.mealTypes)
 const dishTypeNameById = computed(() => new Map((dictionaries.dishTypes || []).map((t) => [t.id, t.name])))
 
@@ -295,20 +319,31 @@ const dailyTotals = computed(() => {
   return totals
 })
 
-const getDailyTotals = (day) => {
-  let totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 }
-  mealSlots.value.forEach(slot => {
-    const items = getSlotItems(day, slot.id)
-    items.forEach(item => {
-      if (item.dish && item.dishData) {
-        totals.kcal += (Number(item.dishData.kcal) || 0)
-        totals.protein += (Number(item.dishData.protein) || 0)
-        totals.fat += (Number(item.dishData.fat) || 0)
-        totals.carbs += (Number(item.dishData.carbs) || 0)
-      }
+// Считаем итоги КБЖУ по всем видимым дням один раз (а не по 5 раз на
+// день — отдельно для каждого макроса в шаблоне сетки недели).
+const dailyTotalsByDate = computed(() => {
+  const map = new Map()
+  for (const day of weekDays.value) {
+    const dStr = format(day, 'yyyy-MM-dd')
+    const totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 }
+    mealSlots.value.forEach(slot => {
+      getSlotItems(day, slot.id).forEach(item => {
+        if (item.dish && item.dishData) {
+          totals.kcal += (Number(item.dishData.kcal) || 0)
+          totals.protein += (Number(item.dishData.protein) || 0)
+          totals.fat += (Number(item.dishData.fat) || 0)
+          totals.carbs += (Number(item.dishData.carbs) || 0)
+        }
+      })
     })
-  })
-  return totals
+    map.set(dStr, totals)
+  }
+  return map
+})
+
+const getDailyTotals = (day) => {
+  const dStr = format(day, 'yyyy-MM-dd')
+  return dailyTotalsByDate.value.get(dStr) || { kcal: 0, protein: 0, fat: 0, carbs: 0 }
 }
 
 const displayDateLabel = computed(() => {
@@ -468,7 +503,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
             </div>
 
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
-                <div v-for="day in weekDays" :key="day" 
+                <div v-for="day in weekDays" :key="format(day, 'yyyy-MM-dd')"
                     class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-colors duration-300"
                     :class="isToday(day) ? 'shadow-md ring-2 ring-slate-900/5 border-slate-900' : 'shadow-sm border border-slate-100'"
                 >

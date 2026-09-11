@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useProductStore } from '../stores/products'
 import { usePlatformStore } from '../stores/platform'
 import { useDictionariesStore } from '../stores/dictionaries'
@@ -47,6 +47,20 @@ const openProduct = (product) => {
     selectedProduct.value = product
     showProductModal.value = true
 }
+
+// Если открытый продукт удалили (например, с другого устройства через
+// realtime), закрываем модалку, иначе сохранение/удаление будет бить в
+// несуществующий id.
+watch(() => productStore.products, (products) => {
+  const openedId = selectedProduct.value?.id
+  if (!showProductModal.value || !openedId) return
+  const stillExists = products.some((p) => p.id === openedId)
+  if (!stillExists) {
+    showProductModal.value = false
+    selectedProduct.value = null
+    uiStore.showToast('Этот продукт был удалён', 'info')
+  }
+})
 
 const filteredProducts = computed(() => {
     let result = productStore.products

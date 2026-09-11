@@ -88,7 +88,9 @@ export const usePlanStore = defineStore('plan', () => {
         throw new Error('Сессия потеряна. Перезагрузите страницу.')
     }
     
-    const finalPortions = item.portions || item.amount || 1
+    const finalPortions = Number.isFinite(item.portions)
+      ? item.portions
+      : (Number.isFinite(item.amount) ? item.amount : 1)
 
     const payload = {
       date,

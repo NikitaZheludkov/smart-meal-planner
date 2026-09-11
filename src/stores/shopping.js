@@ -6,15 +6,16 @@ import { useUIStore } from './ui'
 import { usePlanStore } from './plan'
 import { useSettingsStore } from './settings'
 import { addDays, parseISO, isWithinInterval } from 'date-fns'
+import { withTimeout } from '../lib/utils'
 
 export const useShoppingStore = defineStore('shopping', () => {
   const checkedIds = ref(new Set())
   const loading = ref(false)
-  
-  const withTimeout = async (promise, ms) => {
-    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-    return Promise.race([promise, t])
-  }
+
+  // Сериализует upsert по одному и тому же product, чтобы конкурентные
+  // toggle-запросы не порождали дублирующиеся строки shopping_cart
+  // (check-then-act между getFirstListItem и create не атомарен).
+  const upsertLocks = new Map()
 
   const fetchChecklist = async () => {
     const auth = useAuthStore()
@@ -35,27 +36,36 @@ export const useShoppingStore = defineStore('shopping', () => {
     loading.value = false
   }
 
-  const upsertShoppingRow = async (household, product, isChecked) => {
+  const upsertShoppingRow = (household, product, isChecked) => {
     const now = new Date().toISOString()
     const payload = { household, product, is_checked: isChecked, updated_at: now }
 
-    let existing = null
-    try {
-      existing = await withTimeout(
-        pb.collection('shopping_cart').getFirstListItem(`household="${household}" && product="${product}"`, {
-          fields: 'id'
-        }),
-        5000
-      )
-    } catch {
-      existing = null
+    const doUpsert = async () => {
+      let existing = null
+      try {
+        existing = await withTimeout(
+          pb.collection('shopping_cart').getFirstListItem(`household="${household}" && product="${product}"`, {
+            fields: 'id'
+          }),
+          5000
+        )
+      } catch {
+        existing = null
+      }
+
+      if (existing?.id) {
+        return await withTimeout(pb.collection('shopping_cart').update(existing.id, payload), 5000)
+      }
+
+      return await withTimeout(pb.collection('shopping_cart').create(payload), 5000)
     }
 
-    if (existing?.id) {
-      return await withTimeout(pb.collection('shopping_cart').update(existing.id, payload), 5000)
-    }
-
-    return await withTimeout(pb.collection('shopping_cart').create(payload), 5000)
+    // Ждём завершения предыдущего upsert для этого же product, прежде чем
+    // начинать свой собственный getFirstListItem → create/update.
+    const previous = upsertLocks.get(product) || Promise.resolve()
+    const chained = previous.catch(() => {}).then(doUpsert)
+    upsertLocks.set(product, chained.catch(() => {}))
+    return chained
   }
 
   const toggleProduct = async (productId, newState) => {
@@ -154,7 +164,7 @@ export const useShoppingStore = defineStore('shopping', () => {
     }
 
     activePlanItems.forEach(planItem => {
-        const portions = planItem.portions || 1
+        const portions = Number.isFinite(planItem.portions) ? planItem.portions : 1
 
         if (planItem.dish) {
             const dishId = planItem.dish

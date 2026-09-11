@@ -97,6 +97,22 @@ export const useAuthStore = defineStore('auth', () => {
     let created = null
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
+        // withTimeout не отменяет сам запрос — если предыдущая попытка в
+        // этом цикле "протухла" по таймауту, но на сервере всё же успешно
+        // создалась (а withRetry её повторил), у нас может уже быть семья.
+        // Перепроверяем перед каждой попыткой create(), чтобы не наплодить
+        // дубликаты вместо того, чтобы просто подхватить уже созданную.
+        if (attempt > 0) {
+          const maybeExisting = await pb
+            .collection('households')
+            .getFirstListItem(`owner="${ownerUserId}"`)
+            .catch(() => null)
+          if (maybeExisting?.id) {
+            created = maybeExisting
+            break
+          }
+        }
+
         const invite_code = generateInviteCode()
         created = await withRetry(async () => {
           return await withTimeout(

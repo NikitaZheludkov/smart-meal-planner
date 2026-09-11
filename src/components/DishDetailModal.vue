@@ -6,8 +6,8 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
-import { parseAiDishResponse, normalizeAiIngredient, matchIngredientToProduct, toFormIngredient } from '../lib/aiIngredients'
 import ProductDetailModal from './ProductDetailModal.vue'
+import { useVoiceDishInput } from '../composables/useVoiceDishInput'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -34,20 +34,9 @@ const newProductIngredientKey = ref(null)
 const showAdditionalDetails = ref(false)
 const showProductDropdown = ref(false)
 const lastSelectedProductId = ref(null)
-const isRecordingVoice = ref(false)
-const isProcessingVoice = ref(false)
-const isAiNutritionEstimated = ref(false)
-const voiceText = ref('')
 let ingredientLocalKeySeed = 0
-let audioRecorder = null
-let audioChunks = []
-let mediaStream = null
 let productSearchBlurTimeout = null
-let isComponentUnmounted = false
-let aiRequestId = 0
-let voiceAutoStopTimeout = null
 const initialFormSnapshot = ref('')
-const MAX_VOICE_RECORDING_MS = 12000
 const modalRegistryId = `dish-detail-${Math.random().toString(36).slice(2)}`
 
 const formData = ref({
@@ -134,27 +123,27 @@ const appendIngredients = (ingredientsToAdd = []) => {
     ]
 }
 
-const clearVoiceAutoStopTimeout = () => {
-    if (voiceAutoStopTimeout) {
-        window.clearTimeout(voiceAutoStopTimeout)
-        voiceAutoStopTimeout = null
-    }
-}
-
-const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
-
-const fetchWithTimeout = async (url, options = {}, timeoutMs = 45000) => {
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(new Error('Request timeout')), timeoutMs)
-    try {
-        return await fetch(url, {
-            ...options,
-            signal: controller.signal
-        })
-    } finally {
-        window.clearTimeout(timeoutId)
-    }
-}
+// Запись голоса → Yandex SpeechKit → YandexGPT → поля/ингредиенты блюда.
+// Реализация вынесена в composable (было ~300 строк аудио/AI-кода прямо
+// внутри этой модалки), здесь только подключение к форме.
+const {
+    isRecordingVoice,
+    isProcessingVoice,
+    isAiNutritionEstimated,
+    toggleVoiceRecord,
+    dispose: disposeVoiceInput
+} = useVoiceDishInput({
+    isOpen: computed(() => props.isOpen),
+    onDishFields: (patch) => Object.assign(formData.value, patch),
+    onIngredients: (ings) => appendIngredients(ings),
+    getProducts: async () => {
+        if (productStore.products.length === 0) {
+            await productStore.fetchProducts()
+        }
+        return productStore.products
+    },
+    showToast: (message, type) => ui.showToast(message, type)
+})
 
 const findIngredientIndexByKey = (localKey) => formData.value.ingredients.findIndex((ing) => ing.localKey === localKey)
 
@@ -443,7 +432,9 @@ watch(() => props.isOpen, (newVal) => {
             })
         }
     } else {
-        aiRequestId += 1
+        // useVoiceDishInput сам игнорирует результат, как только props.isOpen
+        // станет false (см. isStale() внутри composable) — отдельный счётчик
+        // здесь больше не нужен.
         editingIngredientKey.value = null
         tempAmount.value = ''
         newProductIngredientKey.value = null
@@ -558,320 +549,6 @@ const onProductCreated = (product) => {
     toggleProductSelection(product)
 }
 
-const audioBufferTo16BitPCM = (audioBuffer) => {
-    const numberOfChannels = Math.max(1, audioBuffer.numberOfChannels || 1)
-    const length = audioBuffer.length || 0
-    const result = new ArrayBuffer(length * 2)
-    const view = new DataView(result)
-
-    for (let i = 0; i < length; i++) {
-        let sample = 0
-        for (let ch = 0; ch < numberOfChannels; ch++) {
-            sample += audioBuffer.getChannelData(ch)[i] || 0
-        }
-        sample /= numberOfChannels
-        sample = Math.max(-1, Math.min(1, sample))
-        view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
-    }
-
-    return result
-}
-
-const resampleAudioBuffer = async (audioBuffer, targetSampleRate) => {
-    const targetRate = Number(targetSampleRate) || 16000
-    if (!audioBuffer || !audioBuffer.sampleRate || audioBuffer.sampleRate === targetRate) return audioBuffer
-
-    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext
-    if (!OfflineCtx) {
-        throw new Error('OfflineAudioContext не поддерживается в этом браузере')
-    }
-
-    const length = Math.ceil(audioBuffer.duration * targetRate)
-    const offlineContext = new OfflineCtx(1, length, targetRate)
-    const source = offlineContext.createBufferSource()
-    source.buffer = audioBuffer
-    source.connect(offlineContext.destination)
-    source.start(0)
-    return await offlineContext.startRendering()
-}
-
-const toggleVoiceRecord = async () => {
-    if (isRecordingVoice.value) {
-        clearVoiceAutoStopTimeout()
-        if (audioRecorder && audioRecorder.state !== 'inactive') {
-            audioRecorder.stop()
-        }
-        if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop())
-        }
-        isRecordingVoice.value = false
-        return
-    }
-
-    try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        audioChunks = []
-        
-        const preferredMimeTypes = [
-            'audio/ogg; codecs=opus',
-            'audio/ogg;codecs=opus',
-            'audio/webm; codecs=opus',
-            'audio/webm;codecs=opus',
-            'audio/webm',
-            'audio/mp4',
-            'audio/wav'
-        ]
-        const selectedMimeType = preferredMimeTypes.find((t) => MediaRecorder.isTypeSupported(t))
-        audioRecorder = selectedMimeType ? new MediaRecorder(mediaStream, { mimeType: selectedMimeType }) : new MediaRecorder(mediaStream)
-
-        audioRecorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-                audioChunks.push(event.data)
-            }
-        }
-
-        audioRecorder.onstop = () => {
-            clearVoiceAutoStopTimeout()
-            isRecordingVoice.value = false
-            const blobType = audioRecorder.mimeType || audioChunks?.[0]?.type || selectedMimeType || 'application/octet-stream'
-            const audioBlob = new Blob(audioChunks, { type: blobType })
-            console.log('Audio recorded:', audioBlob.size, 'bytes', blobType)
-            processAudioWithAI(audioBlob)
-            
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop())
-            }
-            mediaStream = null
-        }
-
-        audioRecorder.onerror = (event) => {
-            console.error('Audio recording error:', event.error)
-            clearVoiceAutoStopTimeout()
-            isRecordingVoice.value = false
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop())
-            }
-            mediaStream = null
-        }
-
-        audioRecorder.start()
-        isRecordingVoice.value = true
-        voiceText.value = ''
-        clearVoiceAutoStopTimeout()
-        voiceAutoStopTimeout = window.setTimeout(() => {
-            if (audioRecorder && audioRecorder.state !== 'inactive') {
-                audioRecorder.stop()
-                ui.showToast('Запись остановлена автоматически. Говорите короче, до 10-12 секунд.', 'warn')
-            }
-        }, MAX_VOICE_RECORDING_MS)
-
-    } catch (error) {
-        console.error('Failed to access microphone:', error)
-        ui.showToast('Не удалось получить доступ к микрофону', 'error')
-    }
-}
-
-const processAudioWithAI = async (audioBlob) => {
-    const requestId = ++aiRequestId
-    isProcessingVoice.value = true
-    
-    try {
-        const yandexFolderId = import.meta.env.VITE_YANDEX_FOLDER_ID
-
-        if (!yandexFolderId) {
-            throw new Error('Не задан VITE_YANDEX_FOLDER_ID')
-        }
-
-        let recognizedText = ''
-
-        try {
-            let audioBuffer = null
-            let lpcmData = null
-
-            try {
-                const audioArrayBuffer = await audioBlob.arrayBuffer()
-                const AudioCtx = window.AudioContext || window.webkitAudioContext
-                if (!AudioCtx) {
-                    throw new Error('AudioContext не поддерживается в этом браузере')
-                }
-                const audioContext = new AudioCtx()
-                try {
-                    audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer.slice(0))
-                } finally {
-                    await audioContext.close().catch(() => {})
-                }
-                audioBuffer = await resampleAudioBuffer(audioBuffer, 16000)
-                if (audioBuffer.sampleRate !== 16000) {
-                    throw new Error(`Не удалось привести sampleRate к 16000Hz (получилось ${audioBuffer.sampleRate})`)
-                }
-                lpcmData = audioBufferTo16BitPCM(audioBuffer)
-            } catch (e) {
-                console.error('Ошибка декодирования/конвертации аудио в LPCM:', e)
-                throw e
-            }
-
-            const sttUrl = new URL('/api/yandex-stt/speech/v1/stt:recognize', window.location.origin)
-            sttUrl.searchParams.set('folderId', yandexFolderId)
-            sttUrl.searchParams.set('lang', 'ru-RU')
-            sttUrl.searchParams.set('topic', 'general')
-            sttUrl.searchParams.set('format', 'lpcm')
-            sttUrl.searchParams.set('sampleRateHertz', '16000')
-
-            const sttRequest = async (attempt = 0) => {
-                const sttResponse = await fetchWithTimeout(sttUrl.toString(), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/octet-stream'
-                    },
-                    body: lpcmData
-                }, 45000)
-
-                const sttRaw = await sttResponse.text()
-
-                if (!sttResponse.ok) {
-                    const retryableTimeout = /timeout|i\/o timeout|timed out/i.test(sttRaw)
-                    console.error('Yandex SpeechKit STT error:', sttResponse.status, sttRaw)
-                    if (retryableTimeout && attempt === 0) {
-                        await wait(700)
-                        return sttRequest(1)
-                    }
-                    if (sttResponse.status === 400) {
-                        ui.showToast(retryableTimeout
-                            ? 'Проблема сети при распознавании. Повторите фразу короче.'
-                            : 'Не удалось распознать запись. Попробуйте ещё раз.'
-                        , 'warn')
-                    }
-                    throw new Error(`Yandex SpeechKit STT error: ${sttResponse.status}`)
-                }
-
-                return sttRaw
-            }
-
-            const sttRaw = await sttRequest()
-
-            let sttJson = null
-            try {
-                sttJson = JSON.parse(sttRaw)
-            } catch (e) {
-                sttJson = null
-            }
-
-            recognizedText = (sttJson?.result || '').toString().trim()
-
-            if (!recognizedText) {
-                console.error('Yandex SpeechKit STT empty result:', sttRaw)
-                throw new Error('Yandex SpeechKit STT вернул пустой результат')
-            }
-
-            console.log('SpeechKit recognized text:', recognizedText)
-        } catch (e) {
-            console.error('SpeechKit STT request failed:', e)
-            throw e
-        }
-
-        let yandexGptText = ''
-
-        try {
-            const gptResponse = await fetchWithTimeout('/api/yandex-llm/foundationModels/v1/completion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    modelUri: `gpt://${yandexFolderId}/yandexgpt/latest`,
-                    completionOptions: {
-                        stream: false,
-                        temperature: 0.2,
-                        maxTokens: 2000
-                    },
-                    messages: [
-                        {
-                            role: 'system',
-                            text: "Верни ответ строго в формате JSON: {'title':'Название','description':'Краткий рецепт','kcal':число,'protein':число,'fat':число,'carbs':число,'ingredients':[{'name':'продукт','amount':число,'unit':'строка'}]}. КБЖУ укажи для всего блюда целиком, без единиц измерения в значениях. Никакого лишнего текста."
-                        },
-                        {
-                            role: 'user',
-                            text: recognizedText
-                        }
-                    ]
-                })
-            }, 45000)
-
-            const gptRaw = await gptResponse.text()
-
-            if (!gptResponse.ok) {
-                console.error('YandexGPT error:', gptResponse.status, gptRaw)
-                throw new Error(`YandexGPT error: ${gptResponse.status}`)
-            }
-
-            let gptJson = null
-            try {
-                gptJson = JSON.parse(gptRaw)
-            } catch (e) {
-                gptJson = null
-            }
-
-            yandexGptText = (
-                gptJson?.result?.alternatives?.[0]?.message?.text ||
-                gptJson?.result?.alternatives?.[0]?.text ||
-                gptJson?.alternatives?.[0]?.text ||
-                ''
-            ).toString().trim()
-
-            if (!yandexGptText) {
-                console.error('YandexGPT empty text:', gptRaw)
-                throw new Error('YandexGPT вернул пустой ответ')
-            }
-        } catch (e) {
-            console.error('YandexGPT request failed:', e)
-            throw e
-        }
-
-        let parsed = null
-        try {
-            parsed = parseAiDishResponse(yandexGptText)
-        } catch (e) {
-            console.error('Не удалось распарсить JSON от YandexGPT:', yandexGptText)
-            throw e
-        }
-        
-        if (parsed.title) {
-            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
-            formData.value.name = parsed.title
-        }
-        
-        if (parsed.description) {
-            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
-            formData.value.description = parsed.description
-        }
-
-        const hasAiNutrition = parsed.kcal !== null || parsed.protein !== null || parsed.fat !== null || parsed.carbs !== null
-        if (parsed.kcal !== null) formData.value.kcal = parsed.kcal
-        if (parsed.protein !== null) formData.value.protein = parsed.protein
-        if (parsed.fat !== null) formData.value.fat = parsed.fat
-        if (parsed.carbs !== null) formData.value.carbs = parsed.carbs
-        isAiNutritionEstimated.value = hasAiNutrition
-        
-        if (parsed.ingredients && Array.isArray(parsed.ingredients)) {
-            if (productStore.products.length === 0) {
-                await productStore.fetchProducts()
-            }
-            if (isComponentUnmounted || !props.isOpen || requestId !== aiRequestId) return
-            const aiIngredients = parsed.ingredients
-                .map((ing) => normalizeAiIngredient(ing))
-                .map((ing) => matchIngredientToProduct(ing, productStore.products))
-                .map((ing) => toFormIngredient(ing))
-            appendIngredients(aiIngredients)
-        }
-        
-    } catch (error) {
-        console.error('Ошибка обработки аудио (Yandex):', error)
-        ui.showToast('Не удалось обработать аудио', 'error')
-    } finally {
-        isProcessingVoice.value = false
-    }
-}
-
 const createProductFromIngredient = (ing) => {
     newProductTarget.value = { name: ing.name }
     newProductIngredientKey.value = ing.localKey || null
@@ -879,13 +556,11 @@ const createProductFromIngredient = (ing) => {
 }
 
 onUnmounted(() => {
-    isComponentUnmounted = true
-    aiRequestId += 1
     if (productSearchBlurTimeout) {
         window.clearTimeout(productSearchBlurTimeout)
         productSearchBlurTimeout = null
     }
-    clearVoiceAutoStopTimeout()
+    disposeVoiceInput()
     ui.clearModalState(modalRegistryId)
 })
 </script>

@@ -6,6 +6,7 @@ import { useSettingsStore } from './stores/settings'
 import { usePlatformStore } from './stores/platform'
 import { useRealtimeStore } from './stores/realtime'
 import { useUIStore } from './stores/ui'
+import { usePlanStore } from './stores/plan'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -73,36 +74,48 @@ const handleSync = async () => {
     }
 }
 
-// Единая функция загрузки данных пользователя
-const loadUserData = async () => {
-    isAppInitializing.value = true 
-    initError.value = null
-    
-    try {
-        if (auth.isAuth) {
-            // Загружаем данные ПОСЛЕДОВАТЕЛЬНО, чтобы избежать ошибок сети (Load failed)
-            // на мобильных устройствах при одновременных запросах
-            // Параллельная загрузка данных для ускорения старта
-            try {
-                await Promise.all([
-                    settings.fetchSettings().catch(e => console.error('Settings load failed', e)),
-                    dictionaries.fetchDictionaries().catch(e => console.error('Dictionaries load failed', e)),
-                    import('./stores/plan').then(m => m.usePlanStore()).then(store => store.fetchPlan()).catch(e => console.error('Plan load failed', e))
-                ])
-            } catch (e) {
-                console.error('Parallel data load error', e)
+// Единая функция загрузки данных пользователя.
+// Гвард на конкурентный вызов: и watch(auth.isAuth), и onMounted могут
+// захотеть запустить загрузку почти одновременно (auth.init() меняет
+// isAuth изнутри, что планирует срабатывание watcher'а ещё до того, как
+// onMounted сам проверит auth.isAuth и вызовет эту функцию) — без гварда
+// это дублирует все запросы и повторно запускает realtime.init().
+let loadUserDataPromise = null
+const loadUserData = () => {
+    if (loadUserDataPromise) return loadUserDataPromise
+
+    loadUserDataPromise = (async () => {
+        isAppInitializing.value = true
+        initError.value = null
+
+        try {
+            if (auth.isAuth) {
+                // Параллельная загрузка данных для ускорения старта
+                try {
+                    await Promise.all([
+                        settings.fetchSettings().catch(e => console.error('Settings load failed', e)),
+                        dictionaries.fetchDictionaries().catch(e => console.error('Dictionaries load failed', e)),
+                        usePlanStore().fetchPlan().catch(e => console.error('Plan load failed', e))
+                    ])
+                } catch (e) {
+                    console.error('Parallel data load error', e)
+                }
+
+                // <-- ЗАПУСКАЕМ REALTIME СИНХРОНИЗАЦИЮ
+                // Это позволит получать обновления от других членов семьи
+                realtime.init()
             }
-            
-            // <-- ЗАПУСКАЕМ REALTIME СИНХРОНИЗАЦИЮ
-            // Это позволит получать обновления от других членов семьи
-            realtime.init()
+        } catch (e) {
+            console.error('Ошибка загрузки данных:', e)
+            error.value = e
+        } finally {
+            isAppInitializing.value = false
         }
-    } catch (e) {
-        console.error('Ошибка загрузки данных:', e)
-        error.value = e
-    } finally {
-        isAppInitializing.value = false
-    }
+    })()
+
+    return loadUserDataPromise.finally(() => {
+        loadUserDataPromise = null
+    })
 }
 
 // Если статус авторизации меняется (например, вошли), грузим данные
@@ -160,7 +173,7 @@ onMounted(async () => {
         await auth.init() 
         
         if (auth.isAuth) {
-            await loadUserData() 
+            await loadUserData()
         } else {
             // Если не авторизованы, просто убираем загрузчик (покажем AuthView)
             isAppInitializing.value = false 

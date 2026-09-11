@@ -67,6 +67,20 @@ const openFilters = () => {
     showFilterModal.value = true
 }
 
+// Если открытое блюдо удалили (в том числе с другого устройства через
+// realtime), закрываем модалку — иначе она останется открытой на
+// удалённой записи, и "Сохранить"/"Удалить" будут бить в несуществующий id.
+watch(() => dishStore.dishes, (dishes) => {
+  const openedId = viewingDish.value?.id
+  if (!showDetailModal.value || !openedId) return
+  const stillExists = dishes.some((d) => d.id === openedId)
+  if (!stillExists) {
+    showDetailModal.value = false
+    viewingDish.value = null
+    uiStore.showToast('Это блюдо было удалено', 'info')
+  }
+})
+
 onMounted(async () => {
   const promises = []
   if (dishStore.dishes.length === 0) promises.push(dishStore.fetchDishes())

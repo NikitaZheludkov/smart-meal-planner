@@ -8,20 +8,17 @@ import { useDishStore } from './dishes'
 import { useProductStore } from './products'
 import { useShoppingStore } from './shopping'
 import { pb } from '../lib/supabase'
+import { withTimeout, withRetry } from '../lib/utils'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const startDay = ref(1) 
+  const startDay = ref(1)
   const periodLength = ref(7)
   const defaultPortions = ref(1)
-  
-  const household = ref(null)      
+
+  const household = ref(null)
   const familyMembers = ref([])
   const loading = ref(false)
-  const withTimeout = async (promise, ms) => {
-    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-    return Promise.race([promise, t])
-  }
-  
+
   const fetchSettings = async () => {
     const auth = useAuthStore()
     const ui = useUIStore()

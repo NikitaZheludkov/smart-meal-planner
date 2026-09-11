@@ -39,7 +39,7 @@ const handleSubmit = async () => {
         <span class="text-5xl relative z-10 animate-bounce-slow">🥗</span>
       </div>
 
-      <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">Meal Planner</h1>
+      <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">MealMe</h1>
       <p class="text-slate-400 text-sm font-bold mb-8">
         Добро пожаловать!
       </p>
@@ -153,7 +153,7 @@ const handleSubmit = async () => {
     
     <div class="p-6 text-center z-10">
         <p class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-            Meal Planner Cloud • v1.1
+            MealMe Cloud • v1.1
         </p>
     </div>
   </div>
