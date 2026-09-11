@@ -1,16 +1,51 @@
-const SYSTEM_UNITS = ['Кг', 'Л', 'Шт', 'Упак']
+const SYSTEM_UNITS = ['Кг', 'Г', 'Л', 'Шт', 'Упак']
 const STOP_WORDS = new Set(['соус', 'масло', 'сыр'])
 const NAME_MATCH_MIN_SCORE = 84
-const MEASUREMENT_RE = /(\d+(?:[.,]\d+)?)\s*(кг|kg|килограмм(?:а|ов)?|кил|грамм(?:а|ов)?|гр|г|g|литр(?:а|ов)?|л|l|миллилитр(?:а|ов)?|мл|ml|шт|штука|штуки|штук|pcs?|pc|piece|pieces|упак|упаковка|упаковки|пачка|пачки|пачек|пакет|пакета|пакетов|pack|packs)\b/iu
+// \b — ASCII-only в JS (даже с флагом 'u'): после кириллической буквы граница
+// слова никогда не срабатывает, потому что кириллица не входит в \w. Поэтому
+// вместо \b используется ручной lookahead "не продолжается буквой/цифрой" —
+// иначе распознавание единиц на кириллице не работало бы вовсе.
+const MEASUREMENT_RE = /(\d+(?:[.,]\d+)?)\s*(кг|kg|килограмм(?:а|ов)?|кил|грамм(?:а|ов)?|гр|г|g|литр(?:а|ов)?|л|l|миллилитр(?:а|ов)?|мл|ml|шт|штука|штуки|штук|pcs?|pc|piece|pieces|упак|упаковка|упаковки|пачка|пачки|пачек|пакет|пакета|пакетов|pack|packs)(?![\p{L}\p{N}])/iu
 
+// Каждый алиас — это единица измерения, которую может произнести пользователь
+// или прислать AI. Мы не решаем здесь, в какую системную единицу её
+// переводить — это зависит от того, в чём хранится конкретный продукт
+// (например, "500 г" для курицы, которая хранится в Кг, и для соли, которая
+// хранится в Г, — это два разных пересчёта). Вместо этого каждый алиас несёт
+// "измерение" (масса/объём/счёт) и коэффициент к базовой единице этого
+// измерения (граммы для массы, миллилитры для объёма) — а фактический
+// пересчёт в единицу продукта происходит в convertToProductUnit(), когда
+// продукт уже известен.
 const UNIT_ALIASES = [
-  { re: /^(кг|kg|килограмм(а|ов)?|кил)\b/u, unit: 'Кг', multiplier: 1 },
-  { re: /^(г|гр|g|грамм(а|ов)?)\b/u, unit: 'Кг', multiplier: 0.001 },
-  { re: /^(л|l|литр(а|ов)?)\b/u, unit: 'Л', multiplier: 1 },
-  { re: /^(мл|ml|миллилитр(а|ов)?)\b/u, unit: 'Л', multiplier: 0.001 },
-  { re: /^(шт|pcs?|pc|piece|pieces|штука|штуки|штук)\b/u, unit: 'Шт', multiplier: 1 },
-  { re: /^(упак|упаковка|упаковки|пачка|пачки|пачек|пакет|пакета|пакетов|pack|packs)\b/u, unit: 'Упак', multiplier: 1 }
+  { re: /^(кг|kg|килограмм(а|ов)?|кил)(?![\p{L}\p{N}])/u, dimension: 'mass', toBase: 1000, defaultUnit: 'Кг', defaultMultiplier: 1 },
+  { re: /^(г|гр|g|грамм(а|ов)?)(?![\p{L}\p{N}])/u, dimension: 'mass', toBase: 1, defaultUnit: 'Кг', defaultMultiplier: 0.001 },
+  { re: /^(л|l|литр(а|ов)?)(?![\p{L}\p{N}])/u, dimension: 'volume', toBase: 1000, defaultUnit: 'Л', defaultMultiplier: 1 },
+  { re: /^(мл|ml|миллилитр(а|ов)?)(?![\p{L}\p{N}])/u, dimension: 'volume', toBase: 1, defaultUnit: 'Л', defaultMultiplier: 0.001 },
+  { re: /^(шт|pcs?|pc|piece|pieces|штука|штуки|штук)(?![\p{L}\p{N}])/u, dimension: 'count', unit: 'Шт', defaultUnit: 'Шт', defaultMultiplier: 1 },
+  { re: /^(упак|упаковка|упаковки|пачка|пачки|пачек|пакет|пакета|пакетов|pack|packs)(?![\p{L}\p{N}])/u, dimension: 'count', unit: 'Упак', defaultUnit: 'Упак', defaultMultiplier: 1 }
 ]
+
+// Пересчитывает распознанное количество (rawAmount в единице alias) в
+// единицу конкретного продукта. Возвращает null, если единицы физически
+// несовместимы (например, распознали объём, а продукт считается в штуках).
+const convertToProductUnit = (alias, rawAmount, productUnit) => {
+  if (!alias || !Number.isFinite(rawAmount)) return null
+  if (alias.dimension === 'mass') {
+    const grams = rawAmount * alias.toBase
+    if (productUnit === 'Кг') return grams / 1000
+    if (productUnit === 'Г') return grams
+    return null
+  }
+  if (alias.dimension === 'volume') {
+    const ml = rawAmount * alias.toBase
+    if (productUnit === 'Л') return ml / 1000
+    return null
+  }
+  if (alias.dimension === 'count') {
+    return productUnit === alias.unit ? rawAmount : null
+  }
+  return null
+}
 
 const parseNumericValue = (value) => {
   if (value === null || value === undefined) return null
@@ -49,9 +84,15 @@ const getUnitInfo = (unitString) => {
   return null
 }
 
+// Единица, буквально хранящаяся на продукте (например product.unit === 'Г'),
+// должна распознаваться как САМА СЕБЯ, а не через defaultUnit/multiplier
+// алиаса (иначе "Г" на продукте прочитался бы как "Кг" — тот же алиас,
+// который для голосовой фразы "5 г" по умолчанию означает 0.005 Кг).
 const normalizeSystemUnit = (value) => {
-  const info = getUnitInfo(value)
-  return info?.unit && SYSTEM_UNITS.includes(info.unit) ? info.unit : null
+  const raw = (value || '').toString().trim()
+  if (SYSTEM_UNITS.includes(raw)) return raw
+  const info = getUnitInfo(raw)
+  return info?.defaultUnit && SYSTEM_UNITS.includes(info.defaultUnit) ? info.defaultUnit : null
 }
 
 const normalizeName = (value) => {
@@ -155,8 +196,8 @@ const extractMeasurement = (value) => {
     rawAmount,
     rawUnitText: match[2],
     unitInfo,
-    amount: rawAmount * (unitInfo.multiplier || 1),
-    unit: unitInfo.unit
+    amount: rawAmount * (unitInfo.defaultMultiplier ?? 1),
+    unit: unitInfo.defaultUnit
   }
 }
 
@@ -205,16 +246,21 @@ export const normalizeAiIngredient = (ingredient) => {
 
   const rawAmount = explicitAmount ?? measurementFromName?.rawAmount ?? measurementFromUnit?.rawAmount ?? 1
   const unitInfo = measurementFromUnit?.unitInfo || measurementFromName?.unitInfo || fallbackUnitInfo || null
-  const normalizedAmount = rawAmount * (unitInfo?.multiplier || 1)
+  // Предварительная оценка "в лучшем известном виде" — используется, если
+  // подобрать продукт не получится (тогда product === null и точный
+  // пересчёт делать не от чего). Как только продукт найден, matchIngredientToProduct
+  // пересчитает amount/unit точно под его единицу через convertToProductUnit().
+  const normalizedAmount = rawAmount * (unitInfo?.defaultMultiplier ?? 1)
 
   return {
     rawName,
     name: capitalizeDisplayName(stripMeasurementFromName(rawName) || rawName),
     amount: Number.isFinite(normalizedAmount) ? normalizedAmount : 1,
-    unit: unitInfo?.unit || null,
+    unit: unitInfo?.defaultUnit || null,
     rawAmount,
+    aliasInfo: unitInfo || null,
     rawUnitText: unitField || measurementFromName?.rawUnitText || measurementFromUnit?.rawUnitText || null,
-    wasUnitConverted: !!unitInfo && (unitInfo.multiplier || 1) !== 1
+    wasUnitConverted: !!unitInfo && (unitInfo.defaultMultiplier ?? 1) !== 1
   }
 }
 
@@ -231,6 +277,7 @@ const isAmountAnomalous = (amount, unit) => {
   const normalizedUnit = normalizeSystemUnit(unit)
   if (!Number.isFinite(amount) || !normalizedUnit) return false
   if ((normalizedUnit === 'Кг' || normalizedUnit === 'Л') && amount >= 2) return true
+  if (normalizedUnit === 'Г' && amount >= 2000) return true
   if (normalizedUnit === 'Шт' && amount >= 30) return true
   return false
 }
@@ -253,19 +300,27 @@ export const matchIngredientToProduct = (normalizedIngredient, products = []) =>
     }
   }
 
-  const compatibility = getUnitCompatibility(
-    normalizedIngredient.unit,
-    best.product.unit,
-    normalizedIngredient.rawUnitText
-  )
+  const productUnit = best.product.unit || null
 
-  const finalUnit = best.product.unit || normalizedIngredient.unit || 'Шт'
-  const finalAmount = Number.isFinite(normalizedIngredient.amount) ? normalizedIngredient.amount : 1
+  // Продукт найден — теперь можно точно пересчитать распознанное количество
+  // в единицу ИМЕННО ЭТОГО продукта (а не в единицу "по умолчанию" для
+  // распознанного алиаса), например "500 г" → 0.5 для курицы в Кг, но 500
+  // для соли в Г.
+  const preciseAmount = productUnit
+    ? convertToProductUnit(normalizedIngredient.aliasInfo, normalizedIngredient.rawAmount, productUnit)
+    : null
+
+  const compatibility = preciseAmount !== null
+    ? 'compatible'
+    : getUnitCompatibility(normalizedIngredient.unit, productUnit, normalizedIngredient.rawUnitText)
+
+  const finalUnit = productUnit || normalizedIngredient.unit || 'Шт'
+  const finalAmount = preciseAmount ?? (Number.isFinite(normalizedIngredient.amount) ? normalizedIngredient.amount : 1)
   const hasAnomalousAmount = isAmountAnomalous(finalAmount, finalUnit)
   let amountCheckReason = null
   if (compatibility === 'incompatible') {
     amountCheckReason = 'unit_mismatch'
-  } else if (normalizedIngredient.wasUnitConverted) {
+  } else if (preciseAmount === null && normalizedIngredient.wasUnitConverted) {
     amountCheckReason = 'unit_converted'
   } else if (hasAnomalousAmount) {
     amountCheckReason = 'amount_anomaly'

@@ -20,7 +20,8 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
     { id: 'pcat_5', name: 'Заморозка' },
     { id: 'pcat_6', name: 'Напитки' },
     { id: 'pcat_7', name: 'Бытовая химия' },
-    { id: 'pcat_8', name: 'Разное' }
+    { id: 'pcat_8', name: 'Соусы' },
+    { id: 'pcat_9', name: 'Разное' }
   ])
 
   const loading = ref(false)

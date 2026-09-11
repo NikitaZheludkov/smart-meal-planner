@@ -39,6 +39,7 @@ const categoryIcons = {
     'Заморозка': '🧊',
     'Напитки': '🥤',
     'Бытовая химия': '🧼',
+    'Соусы': '🧂',
     'Разное': '📦'
 }
 
@@ -46,7 +47,7 @@ const getCategoryIcon = (categoryName) => {
     return categoryIcons[categoryName] || '📦'
 }
 
-const units = ['Кг', 'Л', 'Шт', 'Упак']
+const units = ['Кг', 'Г', 'Л', 'Шт', 'Упак']
 const modalRegistryId = `product-detail-${Math.random().toString(36).slice(2)}`
 
 watch(() => props.isOpen, (newVal) => {
