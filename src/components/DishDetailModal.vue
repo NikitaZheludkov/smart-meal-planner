@@ -773,95 +773,52 @@ onUnmounted(() => {
                                 <div v-if="isRecordingVoice" class="text-center text-xs font-bold text-red-500">
                                     Слушаю...
                                 </div>
-                            </div>
-
-                            <div class="space-y-3">
-                                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                    <button 
-                                        v-for="t in dictionaries.dishTypes" 
-                                        :key="t.id" 
-                                        @click="formData.dish_type = t.id"
-                                        type="button"
-                                        class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
-                                        :class="formData.dish_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
-                                    >
-                                        {{ t.name }}
-                                        <div v-if="formData.dish_type === t.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
-                                    </button>
-                                </div>
-
-                                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                     <button 
-                                        v-for="t in dictionaries.mealTypes" 
-                                        :key="t.id" 
-                                        @click="selectMealType(t.id)"
-                                        type="button"
-                                        class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
-                                        :class="formData.meal_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
-                                    >
-                                        {{ t.name }}
-                                        <span v-if="formData.meal_type === t.id" class="material-icons-round text-[10px]">check</span>
-                                    </button>
+                                <div v-else-if="!formData.id && !formData.ingredients.length" class="text-center text-[10px] font-bold text-slate-400 px-4">
+                                    Можно надиктовать рецепт целиком — название, состав и БЖУ заполнятся сами
                                 </div>
                             </div>
 
-                            <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900">
-                                            <span class="material-icons-round text-xl">kitchen</span>
-                                        </div>
-                                        <div>
-                                            <div class="text-sm font-black text-slate-900">Готовлю про запас</div>
-                                            <div class="text-[10px] font-bold text-slate-400">Одно приготовление — на несколько приёмов пищи</div>
-                                        </div>
+                            <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm space-y-3">
+                                <div>
+                                    <div class="text-[10px] font-bold text-slate-400 mb-1.5 pl-1">Тип блюда</div>
+                                    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                        <button
+                                            v-for="t in dictionaries.dishTypes"
+                                            :key="t.id"
+                                            @click="formData.dish_type = t.id"
+                                            type="button"
+                                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
+                                            :class="formData.dish_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                        >
+                                            {{ t.name }}
+                                            <div v-if="formData.dish_type === t.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                                        </button>
                                     </div>
-                                    <button
-                                        @click="toggleBatchMode"
-                                        class="w-11 h-6 rounded-full relative shrink-0 transition-colors"
-                                        :class="formData.batch_yield > 1 ? 'bg-slate-900' : 'bg-slate-200'"
-                                    >
-                                        <span
-                                            class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-                                            :class="formData.batch_yield > 1 ? 'translate-x-5' : 'translate-x-0'"
-                                        ></span>
-                                    </button>
                                 </div>
 
-                                <div v-if="formData.batch_yield > 1" class="mt-3 pt-3 border-t border-slate-100">
-                                    <div class="flex items-center justify-between">
-                                        <div class="text-[11px] font-bold text-slate-600 pr-2">Сколько порций получается за одно приготовление?</div>
-                                        <div class="flex items-center gap-1.5 shrink-0">
-                                            <button
-                                                @click="formData.batch_yield = Math.max(2, (formData.batch_yield || 2) - 1); platform.haptic.selection()"
-                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
-                                            >
-                                                <span class="material-icons-round text-base">remove</span>
-                                            </button>
-                                            <input
-                                                v-model.number="formData.batch_yield"
-                                                type="number"
-                                                inputmode="numeric"
-                                                min="2"
-                                                class="w-12 h-8 !p-0 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
-                                                @focus="$event.target.select()"
-                                            >
-                                            <button
-                                                @click="formData.batch_yield = (formData.batch_yield || 2) + 1; platform.haptic.selection()"
-                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
-                                            >
-                                                <span class="material-icons-round text-base">add</span>
-                                            </button>
-                                        </div>
+                                <div>
+                                    <div class="text-[10px] font-bold text-slate-400 mb-1.5 pl-1">Приём пищи</div>
+                                    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                         <button
+                                            v-for="t in dictionaries.mealTypes"
+                                            :key="t.id"
+                                            @click="selectMealType(t.id)"
+                                            type="button"
+                                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
+                                            :class="formData.meal_type === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                                        >
+                                            {{ t.name }}
+                                            <span v-if="formData.meal_type === t.id" class="material-icons-round text-[10px]">check</span>
+                                        </button>
                                     </div>
-                                    <p class="text-[10px] text-slate-400 leading-snug mt-2">
-                                        Мы будем считать остаток порций всю неделю и предупредим, когда он закончится — не нужно добавлять блюдо в план на каждый приём пищи вручную.
-                                    </p>
                                 </div>
                             </div>
 
                             <div class="space-y-2">
-                                <div class="text-[10px] font-bold text-slate-400 pl-2">Состав на {{ formData.batch_yield || 1 }} порц.</div>
+                                <h4 class="card-title text-sm ml-1 flex items-baseline gap-1.5">
+                                    Состав
+                                    <span class="text-[10px] font-normal text-secondary opacity-70">на {{ formData.batch_yield || 1 }} порц.</span>
+                                </h4>
                                 <div v-if="formData.ingredients.length > 0" class="bg-slate-50 rounded-2xl p-1.5 space-y-1">
                                     <div v-for="(ing, idx) in formData.ingredients" :key="ing.localKey" class="p-1.5 bg-white rounded-xl border shadow-sm" :class="ing.product === null ? 'border-yellow-400 bg-yellow-50' : (ing.needsAmountCheck ? 'border-orange-300 bg-white' : 'border-slate-100')">
                                         <div class="flex items-start gap-2.5">
@@ -929,13 +886,68 @@ onUnmounted(() => {
                                 Ингредиент
                             </button>
 
+                            <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900">
+                                            <span class="material-icons-round text-xl">kitchen</span>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-black text-slate-900">Готовлю про запас</div>
+                                            <div class="text-[10px] font-bold text-slate-400">Одно приготовление — на несколько приёмов пищи</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        @click="toggleBatchMode"
+                                        class="w-11 h-6 rounded-full relative shrink-0 transition-colors"
+                                        :class="formData.batch_yield > 1 ? 'bg-slate-900' : 'bg-slate-200'"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                                            :class="formData.batch_yield > 1 ? 'translate-x-5' : 'translate-x-0'"
+                                        ></span>
+                                    </button>
+                                </div>
+
+                                <div v-if="formData.batch_yield > 1" class="mt-3 pt-3 border-t border-slate-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-[11px] font-bold text-slate-600 pr-2">Сколько порций получается за одно приготовление?</div>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                @click="formData.batch_yield = Math.max(2, (formData.batch_yield || 2) - 1); platform.haptic.selection()"
+                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
+                                            >
+                                                <span class="material-icons-round text-base">remove</span>
+                                            </button>
+                                            <input
+                                                v-model.number="formData.batch_yield"
+                                                type="number"
+                                                inputmode="numeric"
+                                                min="2"
+                                                class="w-12 h-8 !p-0 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
+                                                @focus="$event.target.select()"
+                                            >
+                                            <button
+                                                @click="formData.batch_yield = (formData.batch_yield || 2) + 1; platform.haptic.selection()"
+                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
+                                            >
+                                                <span class="material-icons-round text-base">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 leading-snug mt-2">
+                                        Мы будем считать остаток порций всю неделю и предупредим, когда он закончится — не нужно добавлять блюдо в план на каждый приём пищи вручную.
+                                    </p>
+                                </div>
+                            </div>
+
                             <div class="border-t border-slate-100 pt-2">
-                                <button 
+                                <button
                                     @click="showAdditionalDetails = !showAdditionalDetails"
                                     class="w-full py-3 rounded-2xl bg-slate-50 text-slate-700 font-bold text-sm flex items-center justify-center gap-2 tap-effect active:bg-slate-100 transition-colors"
                                 >
                                     <span class="material-icons-round text-lg transition-transform" :class="showAdditionalDetails ? 'rotate-180' : ''">expand_more</span>
-                                    Дополнительно
+                                    БЖУ, теги и заметки
                                 </button>
                             </div>
 
