@@ -843,7 +843,7 @@ onUnmounted(() => {
                                                 type="number"
                                                 inputmode="numeric"
                                                 min="2"
-                                                class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
+                                                class="w-12 h-8 !p-0 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
                                                 @focus="$event.target.select()"
                                             >
                                             <button
