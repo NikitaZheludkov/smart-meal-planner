@@ -252,22 +252,41 @@ const getDishSlotName = (id) => {
                 </div>
             </div>
 
-            <!-- Existing Items (Horizontal or Compact vertical) -->
+            <!-- Existing Items: порции и "уже есть дома" можно поправить сразу тут -->
             <div v-if="existingItems.length > 0" class="px-4 pb-3">
                 <div class="bg-slate-50/80 rounded-2xl p-2 border border-slate-100">
-                    <div class="text-[9px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider flex justify-between items-center">
+                    <div class="text-[9px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider">
                         <span>Выбрано ({{ existingItems.length }})</span>
-                        <span class="material-icons-round text-xs">expand_more</span>
                     </div>
-                    <div class="flex overflow-x-auto gap-2 no-scrollbar pb-0.5">
-                        <div v-for="item in existingItems" :key="item.id" 
-                            class="flex-shrink-0 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-sm animate-fade-in"
+                    <div class="space-y-1.5">
+                        <div v-for="item in existingItems" :key="item.id"
+                            class="bg-white border border-slate-200 rounded-xl px-2.5 py-2 flex items-center gap-2 shadow-sm animate-fade-in"
                         >
-                            <span class="text-[11px] font-bold text-slate-700 max-w-[100px] truncate">
+                            <span class="flex-1 min-w-0 text-[11px] font-bold text-slate-700 truncate">
                                 {{ item.dish ? item.dishData?.name : item.productData?.name }}
                             </span>
-                            <button @click="removeItem(item)" class="text-slate-300 hover:text-red-500 transition-colors">
-                                <span class="material-icons-round text-sm">cancel</span>
+
+                            <div class="flex items-center gap-0.5 bg-slate-50 rounded-lg shrink-0">
+                                <button @click="updatePortions(item, -1)" class="w-6 h-6 flex items-center justify-center text-slate-500 active:scale-90 transition-transform">
+                                    <span class="material-icons-round text-sm">remove</span>
+                                </button>
+                                <span class="w-4 text-center text-[11px] font-black text-slate-900">{{ item.portions || 1 }}</span>
+                                <button @click="updatePortions(item, 1)" class="w-6 h-6 flex items-center justify-center text-slate-500 active:scale-90 transition-transform">
+                                    <span class="material-icons-round text-sm">add</span>
+                                </button>
+                            </div>
+
+                            <button
+                                @click="toggleShopping(item)"
+                                :title="item.ignore_shopping ? 'Не войдёт в список покупок — уже есть дома' : 'Войдёт в список покупок'"
+                                class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                                :class="item.ignore_shopping ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-300'"
+                            >
+                                <span class="material-icons-round text-sm">{{ item.ignore_shopping ? 'home' : 'shopping_cart' }}</span>
+                            </button>
+
+                            <button @click="removeItem(item)" class="text-slate-300 hover:text-red-500 transition-colors shrink-0">
+                                <span class="material-icons-round text-lg">cancel</span>
                             </button>
                         </div>
                     </div>
@@ -341,7 +360,10 @@ const getDishSlotName = (id) => {
                             <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
                                 <span v-if="isYesterday(dish.id)" class="text-[9px] font-black text-indigo-500 bg-indigo-50 px-1.5 rounded border border-indigo-100 uppercase">Вчера</span>
                                 <span v-else class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 rounded border border-emerald-100 uppercase">{{ getSlotName }}</span>
-                                <div class="card-title text-sm truncate">{{ dish.name }}</div>
+                                <div class="card-title text-sm truncate flex items-center gap-1">
+                                    <span v-if="dish.batch_yield > 1" title="Готовится про запас" class="material-icons-round text-xs text-indigo-500 shrink-0">kitchen</span>
+                                    {{ dish.name }}
+                                </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}</span>
@@ -374,7 +396,10 @@ const getDishSlotName = (id) => {
                         </div>
 
                         <div class="flex-1 min-w-0">
-                            <div class="card-title text-sm truncate mb-0.5">{{ dish.name }}</div>
+                            <div class="card-title text-sm truncate mb-0.5 flex items-center gap-1">
+                                <span v-if="dish.batch_yield > 1" title="Готовится про запас" class="material-icons-round text-xs text-indigo-500 shrink-0">kitchen</span>
+                                {{ dish.name }}
+                            </div>
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}</span>
                                 <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>

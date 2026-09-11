@@ -63,15 +63,14 @@ onUnmounted(() => {
 watch(() => props.product, (newVal) => {
   if (newVal) {
     formData.value = JSON.parse(JSON.stringify(newVal))
-    
-    if (!formData.value.category && dictionaries.productCategories.length) {
-        formData.value.category = dictionaries.productCategories[0].name
-    }
-    
+
     if (!formData.value.id) {
         isEditing.value = true
         formData.value.unit = 'Кг'
-        formData.value.category = dictionaries.productCategories[0]?.name || 'Разное'
+        // Категорию не выбираем за пользователя — иначе она молча остаётся
+        // "Овощи и фрукты" (первая в списке), даже если он про неё не думал,
+        // и данные по категориям тихо разъезжаются.
+        formData.value.category = ''
     } else {
         isEditing.value = false
     }
@@ -81,7 +80,11 @@ watch(() => props.product, (newVal) => {
 const handleSave = async () => {
   // Валидация
   if (!formData.value.name || isSaving.value) return
-  
+  if (!formData.value.category) {
+    ui.showToast('Выберите категорию продукта', 'error')
+    return
+  }
+
   isSaving.value = true
   platform.haptic.notification('success')
   ui.addLog(`Попытка сохранения продукта: ${formData.value.name}`, 'info', formData.value)
@@ -163,7 +166,7 @@ const handleCancel = () => {
             </h3>
             <div class="w-20 flex justify-end items-center gap-2">
               <template v-if="isEditing">
-                <button @click="handleSave" class="btn-primary text-xs font-bold shadow-lg flex items-center gap-2" :class="formData.name && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'" :disabled="!formData.name || isSaving">
+                <button @click="handleSave" class="btn-primary text-xs font-bold shadow-lg flex items-center gap-2" :class="formData.name && formData.category && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'" :disabled="!formData.name || !formData.category || isSaving">
                   <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
                   {{ isSaving ? 'Сохранение' : 'Готово' }}
                 </button>
@@ -201,7 +204,8 @@ const handleCancel = () => {
                 <div class="space-y-1">
                   <label class="text-[10px] font-bold text-slate-400 ml-1">Категория</label>
                   <div class="relative">
-                    <select v-model="formData.category" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
+                    <select v-model="formData.category" class="w-full p-3 bg-white rounded-xl font-bold outline-none border-none appearance-none text-sm shadow-sm" :class="formData.category ? 'text-slate-900' : 'text-slate-400'">
+                      <option value="" disabled>Выберите категорию</option>
                       <option v-for="cat in dictionaries.productCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
                       <option v-if="dictionaries.productCategories.length === 0" value="Разное">Разное</option>
                     </select>

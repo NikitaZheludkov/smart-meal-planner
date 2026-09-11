@@ -142,8 +142,11 @@ const filteredDishes = computed(() => {
                 class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
             >
                 <div class="flex justify-between items-start">
-                <span class="card-title leading-tight pr-8">{{ dish.name }}</span>
-                <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100">
+                <span class="card-title leading-tight pr-8 flex items-center gap-1.5">
+                    <span v-if="dish.batch_yield > 1" title="Готовится про запас на несколько приёмов пищи" class="material-icons-round text-sm text-indigo-500 shrink-0">kitchen</span>
+                    {{ dish.name }}
+                </span>
+                <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100 shrink-0">
                     {{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}
                 </span>
                 </div>

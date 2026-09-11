@@ -223,8 +223,11 @@ const onDishSelected = async ({ item, type }) => {
       
       // Если мы переходим границу батча (начинаем новый)
       if (newBatchCount > currentBatchCount && totalUsed > 0) {
-          const confirmMsg = `Блюдо закончится. Добавить новую готовку?`
-          if (!(await uiStore.confirm(confirmMsg, { okText: 'Добавить', cancelText: 'Отмена' }))) return
+          const remaining = currentBatchCount * yieldAmount - totalUsed
+          const confirmMsg = remaining > 0
+              ? `Из последней готовки «${item.name}» осталось ${remaining} порц. — на этот раз не хватит. Приготовить ещё раз (${yieldAmount} порц.)?`
+              : `Порции «${item.name}» из последней готовки закончились. Приготовить ещё раз (${yieldAmount} порц.)?`
+          if (!(await uiStore.confirm(confirmMsg, { okText: 'Готовить ещё', cancelText: 'Отмена' }))) return
       }
   }
 
@@ -475,15 +478,15 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                         <div class="flex-1 min-w-0 py-1">
                                             <div class="text-base card-title truncate leading-tight">
                                                 {{ item.dish ? item.dishData?.name : item.productData?.name }}
-                                                <span v-if="item.portions > 1" class="text-indigo-500 ml-1">x{{ item.portions }}</span>
                                             </div>
                                             <!-- Batch Indicator List View -->
                                             <div v-if="batchStatusMap.has(item.id)" class="inline-flex items-center gap-1 mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                                                <span class="text-[9px] font-black text-slate-900">Партия {{ batchStatusMap.get(item.id).batch }}</span>
+                                                <span class="text-[9px] font-black text-slate-900">Готовка {{ batchStatusMap.get(item.id).batch }}</span>
                                                 <span class="text-[9px] text-slate-400">|</span>
-                                                <span class="text-[9px] font-black text-slate-600">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</span>
+                                                <span class="text-[9px] font-black text-slate-600">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }} порций</span>
                                             </div>
                                             <div class="mt-1.5 flex flex-wrap gap-2">
+                                                <span v-if="item.portions > 1" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{{ item.portions }} порции</span>
                                                 <template v-if="item.dish">
                                                     <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ dishTypeNameById.get(item.dishData?.dish_type) || 'Блюдо' }}</span>
                                                     <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ item.dishData?.kcal }} ккал</span>
@@ -491,6 +494,10 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                                 <template v-else>
                                                     <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.productData?.unit }}</span>
                                                 </template>
+                                            </div>
+                                            <div v-if="item.ignore_shopping" class="mt-1 flex items-center gap-1 text-[9px] font-bold text-amber-600">
+                                                <span class="material-icons-round text-xs">home</span>
+                                                Уже есть дома, не в списке покупок
                                             </div>
                                         </div>
                                         <div v-if="item.dish" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>

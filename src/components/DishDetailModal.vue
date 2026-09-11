@@ -559,6 +559,11 @@ const createProductFromIngredient = (ing) => {
     showCreateProductModal.value = true
 }
 
+const toggleBatchMode = () => {
+    platform.haptic.selection()
+    formData.value.batch_yield = formData.value.batch_yield > 1 ? 1 : 2
+}
+
 onUnmounted(() => {
     if (productSearchBlurTimeout) {
         window.clearTimeout(productSearchBlurTimeout)
@@ -782,38 +787,58 @@ onUnmounted(() => {
                                 </div>
                             </div>
 
-                            <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900">
-                                        <span class="material-icons-round text-xl">restaurant_menu</span>
+                            <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900">
+                                            <span class="material-icons-round text-xl">kitchen</span>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-black text-slate-900">Готовлю про запас</div>
+                                            <div class="text-[10px] font-bold text-slate-400">Одно приготовление — на несколько приёмов пищи</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-black text-slate-900">Выход рецепта</div>
-                                        <div class="text-[10px] font-bold text-slate-400">На сколько порций этот состав?</div>
-                                    </div>
+                                    <button
+                                        @click="toggleBatchMode"
+                                        class="w-11 h-6 rounded-full relative shrink-0 transition-colors"
+                                        :class="formData.batch_yield > 1 ? 'bg-slate-900' : 'bg-slate-200'"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                                            :class="formData.batch_yield > 1 ? 'translate-x-[22px]' : 'translate-x-0.5'"
+                                        ></span>
+                                    </button>
                                 </div>
-                                 
-                                <div class="flex items-center gap-2">
-                                    <button 
-                                        @click="formData.batch_yield = Math.max(1, (formData.batch_yield || 1) - 1); platform.haptic.selection()"
-                                        class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
-                                    >
-                                        <span class="material-icons-round text-base">remove</span>
-                                    </button>
-                                    <input
-                                        v-model.number="formData.batch_yield" 
-                                        type="number" 
-                                        inputmode="numeric"
-                                        placeholder="1"
-                                        class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
-                                        @focus="$event.target.select()"
-                                    >
-                                    <button 
-                                        @click="formData.batch_yield = (formData.batch_yield || 1) + 1; platform.haptic.selection()"
-                                        class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
-                                    >
-                                        <span class="material-icons-round text-base">add</span>
-                                    </button>
+
+                                <div v-if="formData.batch_yield > 1" class="mt-3 pt-3 border-t border-slate-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-[11px] font-bold text-slate-600 pr-2">Сколько порций получается за одно приготовление?</div>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                @click="formData.batch_yield = Math.max(2, (formData.batch_yield || 2) - 1); platform.haptic.selection()"
+                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
+                                            >
+                                                <span class="material-icons-round text-base">remove</span>
+                                            </button>
+                                            <input
+                                                v-model.number="formData.batch_yield"
+                                                type="number"
+                                                inputmode="numeric"
+                                                min="2"
+                                                class="w-10 h-8 bg-transparent text-slate-900 font-black text-center outline-none border-none text-lg"
+                                                @focus="$event.target.select()"
+                                            >
+                                            <button
+                                                @click="formData.batch_yield = (formData.batch_yield || 2) + 1; platform.haptic.selection()"
+                                                class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform"
+                                            >
+                                                <span class="material-icons-round text-base">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 leading-snug mt-2">
+                                        Мы будем считать остаток порций всю неделю и предупредим, когда он закончится — не нужно добавлять блюдо в план на каждый приём пищи вручную.
+                                    </p>
                                 </div>
                             </div>
 
