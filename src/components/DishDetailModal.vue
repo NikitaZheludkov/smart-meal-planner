@@ -323,7 +323,7 @@ const groupedTags = computed(() => {
         groups[cat].push(tag)
     })
     
-    const order = ['time', 'context', 'diet']
+    const order = ['time', 'context', 'diet', 'other']
     
     return order.map(code => ({
         code,
@@ -529,8 +529,8 @@ const getMealTypeName = computed(() => {
     return dictionaries.getMealTypeById(formData.value.meal_type)?.name || '...'
 })
 
-const openCreateProduct = () => {
-    newProductTarget.value = {}
+const openCreateProduct = (name = '') => {
+    newProductTarget.value = name ? { name } : {}
     newProductIngredientKey.value = null
     showCreateProductModal.value = true
 }
@@ -548,9 +548,27 @@ const onProductCreated = (product) => {
             ing.amountCheckReason = null
         }
         newProductIngredientKey.value = null
+        closeIngredientOverlay()
         return
     }
     toggleProductSelection(product)
+}
+
+// Создание продукта прямо из поиска ингредиентов: если это обычный подбор
+// ингредиентов — новый продукт добавляется в выбранное (как обычный клик по
+// найденному продукту); если это режим "Подобрать" для конкретного
+// ингредиента (ingredientLinkIndex) — продукт сразу привязывается к нему.
+const handleCreateProductFromSearch = () => {
+    const name = productSearchQuery.value.trim()
+    if (!name) return
+    if (ingredientLinkIndex.value !== null) {
+        const ing = formData.value.ingredients[ingredientLinkIndex.value]
+        newProductTarget.value = { name }
+        newProductIngredientKey.value = ing?.localKey || null
+        showCreateProductModal.value = true
+    } else {
+        openCreateProduct(name)
+    }
 }
 
 const createProductFromIngredient = (ing) => {
@@ -603,8 +621,8 @@ onUnmounted(() => {
                 </div>
                 
                 <div class="flex-1 flex flex-col items-center justify-center px-2">
-                    <h3 v-if="!isEditing || showTagSelection" class="text-lg font-bold text-slate-900 truncate text-center leading-tight">
-                        {{ showTagSelection ? 'Свойства' : (formData.id ? 'Просмотр' : 'Новое блюдо') }}
+                    <h3 class="text-lg font-bold text-slate-900 truncate text-center leading-tight">
+                        {{ showTagSelection ? 'Свойства' : (formData.id ? (isEditing ? 'Редактирование' : 'Просмотр') : 'Новое блюдо') }}
                     </h3>
                 </div>
 
@@ -804,8 +822,8 @@ onUnmounted(() => {
                                         :class="formData.batch_yield > 1 ? 'bg-slate-900' : 'bg-slate-200'"
                                     >
                                         <span
-                                            class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-                                            :class="formData.batch_yield > 1 ? 'translate-x-[22px]' : 'translate-x-0.5'"
+                                            class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                                            :class="formData.batch_yield > 1 ? 'translate-x-5' : 'translate-x-0'"
                                         ></span>
                                     </button>
                                 </div>
@@ -925,8 +943,9 @@ onUnmounted(() => {
                                 <div v-if="showAdditionalDetails" class="space-y-4 pt-2">
                                     
                                     <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
-                                        <div v-if="isAiNutritionEstimated" class="mb-2 flex justify-end">
-                                            <span class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                        <div class="mb-2 flex items-center justify-between">
+                                            <span class="text-[10px] font-bold text-slate-400">На 1 порцию, не на весь объём</span>
+                                            <span v-if="isAiNutritionEstimated" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full shrink-0">
                                                 Оценка AI
                                             </span>
                                         </div>
@@ -990,6 +1009,7 @@ onUnmounted(() => {
                             </div>
                         </div>
                     </div>
+                    </div>
 
                     <div v-show="showTagSelection" class="absolute inset-0 bg-slate-50 overflow-y-auto pb-20 pt-4 px-4 no-scrollbar">
                         <div class="space-y-6">
@@ -1016,7 +1036,6 @@ onUnmounted(() => {
                         </div>
                         <div class="h-10"></div>
                     </div>
-            </div>
 
             <div v-show="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
                 <div class="absolute inset-0 bg-black/50" @click="closeIngredientOverlay"></div>
@@ -1093,6 +1112,17 @@ onUnmounted(() => {
                                     <span class="material-icons-round text-sm">close</span>
                                 </button>
                             </div>
+                        </div>
+                        <div v-else-if="productSearchQuery.trim() && filteredProducts.length === 0" class="text-center py-12">
+                            <span class="material-icons-round text-4xl text-slate-200 mb-2">search_off</span>
+                            <div class="text-slate-400 text-sm mb-4">Продукт «{{ productSearchQuery.trim() }}» не найден</div>
+                            <button
+                                @click="handleCreateProductFromSearch"
+                                class="px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs inline-flex items-center gap-1.5 tap-effect"
+                            >
+                                <span class="material-icons-round text-sm">add</span>
+                                Создать «{{ productSearchQuery.trim() }}»
+                            </button>
                         </div>
                         <div v-else class="text-center py-12 text-slate-400 text-sm">
                             <span class="material-icons-round text-4xl text-slate-200 mb-2">search</span>
