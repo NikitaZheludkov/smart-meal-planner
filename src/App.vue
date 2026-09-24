@@ -15,9 +15,11 @@ import PlanView from './views/PlanView.vue'
 import CatalogView from './views/CatalogView.vue'
 import ShoppingView from './views/ShoppingView.vue'
 import SettingsView from './views/SettingsView.vue'
-import AuthView from './views/AuthView.vue' 
+import AuthView from './views/AuthView.vue'
+import ResetPasswordView from './views/ResetPasswordView.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import TelegramLinkPromptModal from './components/TelegramLinkPromptModal.vue'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
@@ -33,6 +35,15 @@ const error = ref(null)
 // Глобальный флаг загрузки
 const isAppInitializing = ref(true)
 const initError = ref(null)
+
+// Ссылка для сброса пароля из письма PocketBase: /?resetToken=...
+const resetPasswordToken = ref(new URLSearchParams(window.location.search).get('resetToken'))
+const clearResetPasswordToken = () => {
+    resetPasswordToken.value = null
+    const url = new URL(window.location.href)
+    url.searchParams.delete('resetToken')
+    window.history.replaceState({}, '', url)
+}
 
 // Флаг синхронизации
 const isSyncing = ref(false)
@@ -174,13 +185,53 @@ onMounted(async () => {
     }, 8000)
     try {
         platform.init()
-        await auth.init() 
-        
+
+        // Разворачиваем Mini App на всю высоту сразу, независимо от того,
+        // есть ли уже сессия — иначе Telegram открывает приложение в
+        // свёрнутом виде и вёрстка (особенно шапка) уезжает.
+        const tgWebApp = window.Telegram?.WebApp
+        if (tgWebApp) {
+            tgWebApp.ready()
+            tgWebApp.expand()
+
+            // Собственная шапка Telegram (кнопка "Закрыть", свайп-стрелка)
+            // перекрывает верх нашего контента, если её высоту не учитывать
+            // в отступе — contentSafeAreaInset как раз даёт эту высоту.
+            // Значение может меняться (поворот экрана, апдейт клиента),
+            // поэтому подписываемся на событие, а не читаем один раз.
+            const applyTelegramHeaderInset = () => {
+                const top = tgWebApp.contentSafeAreaInset?.top ?? 0
+                document.documentElement.style.setProperty('--tg-header-inset', `${top}px`)
+            }
+            applyTelegramHeaderInset()
+            tgWebApp.onEvent?.('contentSafeAreaChanged', applyTelegramHeaderInset)
+        }
+
+        await auth.init()
+
+        // Если локальной сессии нет, но приложение открыто внутри Telegram
+        // Mini App — пробуем войти по initData вместо показа формы логина.
+        // Telegram уже подтвердил личность пользователя, пароль не нужен.
+        if (!auth.isAuth) {
+            const tg = tgWebApp
+            if (tg?.initData) {
+                try {
+                    await auth.signInWithTelegram(tg.initData)
+                } catch (e) {
+                    console.error('Автовход через Telegram не удался, показываем обычный вход:', e)
+                    // Не блокируем пользователя ошибкой одного конкретного способа
+                    // входа — просто откатываемся на обычную форму email/пароль.
+                    auth.authStatus = 'idle'
+                    auth.authError = null
+                }
+            }
+        }
+
         if (auth.isAuth) {
             await loadUserData()
         } else {
             // Если не авторизованы, просто убираем загрузчик (покажем AuthView)
-            isAppInitializing.value = false 
+            isAppInitializing.value = false
         }
     } catch (e) {
         console.error('Критическая ошибка старта:', e)
@@ -204,7 +255,11 @@ onUnmounted(() => {
         Нет соединения с интернетом
     </div>
 
-    <div v-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
+    <div v-if="resetPasswordToken" class="flex-1 bg-white">
+      <ResetPasswordView :token="resetPasswordToken" @done="clearResetPasswordToken" />
+    </div>
+
+    <div v-else-if="isAppInitializing" class="flex-1 flex flex-col items-center justify-center gap-4 bg-white z-[100]">
       <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl animate-bounce">🥗</div>
       <span class="material-icons-round animate-spin text-3xl text-slate-300">sync</span>
       <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Синхронизация...</p>
@@ -264,6 +319,7 @@ onUnmounted(() => {
     </template>
     <ToastContainer />
     <ConfirmModal />
+    <TelegramLinkPromptModal />
   </div>
 </template>
 

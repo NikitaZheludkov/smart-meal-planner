@@ -8,7 +8,7 @@ const ADMIN_PASS = process.env.PB_ADMIN_PASS;
 await pb.collection('_superusers').authWithPassword(ADMIN_EMAIL, ADMIN_PASS);
 
 const mealTypes = ['Завтрак', 'Обед', 'Ужин', 'Перекус'];
-const dishTypes = ['Суп', 'Горячее', 'Салат', 'Гарнир', 'Закуска', 'Десерт', 'Напиток'];
+const dishTypes = ['Горячее', 'Салат', 'Гарнир', 'Закуска', 'Прочее'];
 const dishTags = ['Быстро', 'Вегетарианское', 'Детское', 'Праздничное', 'Заготовка'];
 
 async function seed(collection, names) {

@@ -16,12 +16,12 @@ export const useDictionariesStore = defineStore('dictionaries', () => {
     { id: 'pcat_1', name: 'Овощи и фрукты' },
     { id: 'pcat_2', name: 'Молочные продукты' },
     { id: 'pcat_3', name: 'Мясо, птица, рыба' },
-    { id: 'pcat_4', name: 'Бакалея и хлеб' },
-    { id: 'pcat_5', name: 'Заморозка' },
-    { id: 'pcat_6', name: 'Напитки' },
-    { id: 'pcat_7', name: 'Бытовая химия' },
-    { id: 'pcat_8', name: 'Соусы' },
-    { id: 'pcat_9', name: 'Разное' }
+    { id: 'pcat_4', name: 'Хлеб' },
+    { id: 'pcat_5', name: 'Крупы, макароны' },
+    { id: 'pcat_6', name: 'Соусы' },
+    { id: 'pcat_7', name: 'Разное' },
+    { id: 'pcat_8', name: 'Напитки' },
+    { id: 'pcat_9', name: 'Бытовая химия' }
   ])
 
   const loading = ref(false)

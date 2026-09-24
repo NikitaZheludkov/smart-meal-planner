@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, onUnmounted } from 'vue'
+import { watch, onUnmounted } from 'vue'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
@@ -17,37 +17,18 @@ const modalRegistryId = `dish-filter-${Math.random().toString(36).slice(2)}`
 
 watch(() => props.isOpen, (newVal) => {
     uiStore.syncModalState(modalRegistryId, newVal)
-})
+}, { immediate: true })
 
 onUnmounted(() => {
     uiStore.clearModalState(modalRegistryId)
 })
 
-// Категории для группировки
-const categoryLabels = {
-    'time': 'Время',
-    'context': 'Сценарий',
-    'diet': 'Здоровье',
-    'other': 'Прочее'
-}
-
-// Группировка тегов
-const groupedTags = computed(() => {
-    const groups = {}
-    dictionaries.availableTags.forEach(tag => {
-        const cat = tag.category || 'other'
-        if (!groups[cat]) groups[cat] = []
-        groups[cat].push(tag)
-    })
-    
-    const order = ['time', 'context', 'diet']
-    
-    return order.map(code => ({
-        code,
-        label: categoryLabels[code],
-        tags: groups[code] || []
-    })).filter(g => g.tags.length > 0)
-})
+// Раньше теги пытались группировать по tag.category ("Время"/"Сценарий"/
+// "Здоровье"), но в коллекции dish_tags такого поля нет вообще — в итоге
+// каждый тег уходил в категорию "other", которую группировка молча
+// выбрасывала (order.map перебирал только 'time'/'context'/'diet'), и
+// список всегда был пустым. Тегов сейчас всего 5 и группировать их
+// пока не по чему — показываем плоским списком, как они есть.
 
 const isSelected = (tagId) => {
     return uiStore.dishes.filterTags.includes(tagId)
@@ -77,57 +58,43 @@ const close = () => {
 
 <template>
   <Transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="close">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="close">
       <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
-      
-      <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
-        
-        <div class="flex-1 flex flex-col overflow-hidden relative">
-          <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
 
-          <div class="px-5 pb-3 border-b border-slate-50 flex justify-between items-center bg-white">
-            <div class="flex items-center gap-2">
-                <h2 class="text-xl font-black text-slate-900">Фильтры</h2>
-                <span v-if="uiStore.dishes.filterTags.length > 0" class="bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {{ uiStore.dishes.filterTags.length }}
-                </span>
-            </div>
-            
-            <button @click="resetFilters" class="text-xs font-bold text-red-400 px-3 py-2 hover:bg-red-50 rounded-xl transition-colors" v-if="uiStore.dishes.filterTags.length > 0">
-                Сбросить
+      <div class="sheet modal-content">
+        <div class="sheet-handle"></div>
+
+        <div class="sheet-header">
+          <button @click="close" class="sheet-close tap-effect" aria-label="Закрыть">
+            <span class="material-icons-round text-xl">close</span>
+          </button>
+          <h2 class="sheet-title">
+            Теги<span v-if="uiStore.dishes.filterTags.length > 0" class="text-slate-400"> · {{ uiStore.dishes.filterTags.length }}</span>
+          </h2>
+          <div>
+            <button v-if="uiStore.dishes.filterTags.length > 0" @click="resetFilters" class="sheet-action-text tap-effect">
+              Сбросить
             </button>
+          </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-5 pt-4 pb-20 no-scrollbar">
-            <div class="space-y-6">
-                <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
-                    <div class="flex items-center gap-2 px-1">
-                    <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
-                    <div class="h-[1px] bg-slate-200 flex-1"></div>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button 
-                            v-for="tag in group.tags" 
-                            :key="tag.id" 
-                            @click="toggleFilter(tag.id)"
-                            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-colors border tap-effect flex items-center gap-1.5"
-                            :class="isSelected(tag.id) ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200'"
-                        >
-                            <span>{{ tag.icon }}</span>
-                            <span>{{ tag.name }}</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-5 border-t border-slate-50 bg-white pb-safe">
-            <button @click="close" class="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold shadow-lg tap-effect">
-                Применить
+        <div class="min-h-0 overflow-y-auto px-5 pt-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] no-scrollbar">
+          <div v-if="dictionaries.availableTags.length === 0" class="text-center text-sm text-secondary py-6">
+            Тегов пока нет
+          </div>
+          <div v-else class="flex flex-wrap gap-1.5">
+            <button
+              v-for="tag in dictionaries.availableTags"
+              :key="tag.id"
+              @click="toggleFilter(tag.id)"
+              class="chip tap-effect"
+              :class="isSelected(tag.id) ? 'chip-active' : ''"
+            >
+              {{ tag.name }}
             </button>
+          </div>
+          <p class="text-[11px] text-secondary mt-4">Показываются блюда, у которых есть все выбранные теги.</p>
         </div>
-
-      </div>
       </div>
     </div>
   </Transition>

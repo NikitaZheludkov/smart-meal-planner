@@ -11,6 +11,15 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const authStatus = ref('idle') // idle, loading, success, error
   const authError = ref(null) // { message, type: 'network'|'auth', canRetry: boolean }
+  // initData Telegram-аккаунта, который впервые открыл приложение и ещё не
+  // связан ни с одним пользователем. Не создаём аккаунт молча — ждём, пока
+  // AuthView не спросит "уже есть аккаунт?" и не получит ответ пользователя.
+  const telegramPendingInitData = ref(null)
+  // Показать один раз сразу после регистрации по email: без привязанного
+  // Telegram у такого аккаунта нет ни одного способа восстановить пароль
+  // (SMTP не настроен) — пользователь должен узнать об этом сразу, а не
+  // когда реально забудет пароль.
+  const showTelegramLinkPrompt = ref(false)
 
   const ui = useUIStore()
 
@@ -245,6 +254,148 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const signInWithTelegram = async (initData) => {
+    loading.value = true
+    authStatus.value = 'loading'
+    authError.value = null
+    try {
+        const res = await withRetry(async () => {
+            return await withTimeout(
+              pb.send('/api/telegram-auth', { method: 'POST', body: { initData } }),
+              15000
+            )
+        })
+
+        if (res?.status === 'not_found') {
+            // Этот Telegram-аккаунт ещё ни с кем не связан. НЕ создаём
+            // нового пользователя молча — иначе человек, у которого уже
+            // есть email-аккаунт, попадёт в новый пустой и решит, что
+            // потерял все данные. AuthView должен спросить явно.
+            telegramPendingInitData.value = initData
+            authStatus.value = 'idle'
+            return
+        }
+
+        pb.authStore.save(res.token, res.record)
+        await handleUserSession(pb.authStore.model)
+    } catch (e) {
+        ui.addLog('Ошибка входа через Telegram', 'error', e)
+        authStatus.value = 'error'
+        const isNetwork = isNetworkError(e)
+        authError.value = {
+          message: isNetwork ? 'Ошибка сети при входе через Telegram' : 'Не удалось войти через Telegram',
+          type: isNetwork ? 'network' : 'auth',
+          canRetry: isNetwork
+        }
+        throw e
+    } finally {
+        loading.value = false
+    }
+  }
+
+  // Пользователь на экране выбора подтвердил, что аккаунта раньше не было —
+  // теперь можно создать новый Telegram-аккаунт по той же initData.
+  const createTelegramAccount = async (initData) => {
+    loading.value = true
+    authStatus.value = 'loading'
+    authError.value = null
+    try {
+        const res = await withRetry(async () => {
+            return await withTimeout(
+              pb.send('/api/telegram-auth', { method: 'POST', body: { initData, createIfMissing: true } }),
+              15000
+            )
+        })
+        pb.authStore.save(res.token, res.record)
+        await handleUserSession(pb.authStore.model)
+        telegramPendingInitData.value = null
+    } catch (e) {
+        ui.addLog('Не удалось создать аккаунт через Telegram', 'error', e)
+        authStatus.value = 'error'
+        const isNetwork = isNetworkError(e)
+        authError.value = {
+          message: isNetwork ? 'Ошибка сети при создании аккаунта' : 'Не удалось создать аккаунт',
+          type: isNetwork ? 'network' : 'auth',
+          canRetry: isNetwork
+        }
+        throw e
+    } finally {
+        loading.value = false
+    }
+  }
+
+  // Вызывается после того, как пользователь на экране выбора нажал "уже
+  // есть аккаунт" и успешно вошёл/зарегистрировался по email — привязывает
+  // тот самый Telegram, из-за которого возник выбор. Молча логирует неудачу:
+  // пользователь уже авторизован своим email/паролем, блокировать его из-за
+  // сбоя привязки не нужно, привязать можно и позже вручную в Настройках.
+  const linkPendingTelegram = async () => {
+    if (!telegramPendingInitData.value) return
+    const initData = telegramPendingInitData.value
+    telegramPendingInitData.value = null
+    try {
+        await linkTelegram(initData)
+    } catch (e) {
+        ui.addLog('Не удалось автоматически привязать Telegram после входа по email', 'warn', e)
+    }
+  }
+
+  const clearTelegramPending = () => {
+    telegramPendingInitData.value = null
+  }
+
+  // Привязывает Telegram-аккаунт (по initData из открытого внутри Telegram
+  // Mini App) к УЖЕ вошедшему пользователю — а не логинит заново.
+  // pb.send сам подставит Authorization из текущей сессии, а сервер по его
+  // наличию отличает "привязать" от "войти/зарегистрироваться" в одном и
+  // том же /api/telegram-auth (см. pb_hooks/main.pb.js).
+  const linkTelegram = async (initData) => {
+    await withRetry(async () => {
+        return await withTimeout(
+          pb.send('/api/telegram-auth', { method: 'POST', body: { initData } }),
+          15000
+        )
+    })
+    await handleUserSession(pb.authStore.model)
+  }
+
+  // Восстановление пароля через бота — код приходит в Telegram вместо
+  // email-ссылки, что не зависит от настройки SMTP на сервере.
+  const requestTelegramRecovery = async (email) => {
+    return await withRetry(async () => {
+        return await withTimeout(
+          pb.send('/api/telegram-recovery/request', { method: 'POST', body: { email } }),
+          15000
+        )
+    })
+  }
+
+  const confirmTelegramRecovery = async (email, code, password, passwordConfirm) => {
+    return await withRetry(async () => {
+        return await withTimeout(
+          pb.send('/api/telegram-recovery/confirm', { method: 'POST', body: { email, code, password, passwordConfirm } }),
+          15000
+        )
+    })
+  }
+
+  // Задаёт настоящие email и пароль Telegram-аккаунту (был tg_<id>@telegram.local
+  // со случайным паролем) — запасной способ входа и обязательное условие для
+  // восстановления пароля через бота.
+  const setEmailPassword = async (email, password, passwordConfirm) => {
+    // Смена пароля на сервере тут же обнуляет текущий токен (перевыпуск
+    // tokenKey), поэтому эндпоинт сразу возвращает новый — используем его,
+    // а не пытаемся обновить сессию по уже недействительному старому токену.
+    const res = await withRetry(async () => {
+        return await withTimeout(
+          pb.send('/api/set-email-password', { method: 'POST', body: { email, password, passwordConfirm } }),
+          15000
+        )
+    })
+    pb.authStore.save(res.token, res.record)
+    await handleUserSession(pb.authStore.model)
+  }
+
   const signUp = async (email, password) => {
     loading.value = true
     authStatus.value = 'loading'
@@ -267,6 +418,7 @@ export const useAuthStore = defineStore('auth', () => {
         })
 
         await handleUserSession(pb.authStore.model)
+        showTelegramLinkPrompt.value = true
     } catch (e) {
         ui.addLog('Ошибка регистрации', 'error', e)
         authStatus.value = 'error'
@@ -278,18 +430,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { 
-    user, 
-    householdId, 
-    isAuth, 
+  const dismissTelegramLinkPrompt = () => {
+    showTelegramLinkPrompt.value = false
+  }
+
+  return {
+    user,
+    householdId,
+    isAuth,
     loading,
     authStatus,
     authError,
-    init, 
-    refreshSession, 
+    telegramPendingInitData,
+    showTelegramLinkPrompt,
+    dismissTelegramLinkPrompt,
+    init,
+    refreshSession,
     signIn,
     signUp,
-    signOut, 
+    signInWithTelegram,
+    createTelegramAccount,
+    linkPendingTelegram,
+    clearTelegramPending,
+    linkTelegram,
+    requestTelegramRecovery,
+    confirmTelegramRecovery,
+    setEmailPassword,
+    signOut,
     handleUserSession
   }
 })

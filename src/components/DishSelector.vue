@@ -53,7 +53,7 @@ onMounted(async () => {
 
 watch(() => props.isOpen, (newVal) => {
     ui.syncModalState(modalRegistryId, newVal)
-})
+}, { immediate: true })
 
 onUnmounted(() => {
     ui.clearModalState(modalRegistryId)
@@ -85,9 +85,14 @@ const recommendedDishes = computed(() => {
     return dishStore.dishes.filter(d => {
         // Не показываем уже выбранные
         if (props.existingItems.some(i => i.dish === d.id)) return false
-        
+
+        // Если выбрана категория (например, "Гарнир" из подсказки) — держим
+        // список рекомендаций в её рамках, иначе подсказка "Выбрать гарнир"
+        // выглядела бы обманчиво: фильтр активен, а сверху всё равно горячее
+        if (activeCategory.value !== 'all' && d.dish_type !== activeCategory.value) return false
+
         // Вчерашние или подходящие по слоту
-        return yesterdayDishIds.value.has(d.id) || d.meal_type === props.slotId
+        return yesterdayDishIds.value.has(d.id) || (d.meal_type || []).includes(props.slotId)
     }).sort((a, b) => {
         // Сначала вчерашние, потом по слоту
         const isAYesterday = yesterdayDishIds.value.has(a.id)
@@ -156,9 +161,47 @@ const groupedProducts = computed(() => {
     return groups
 })
 
+// Если у только что выбранного блюда стоит "Подаётся с гарниром" и в этом
+// приёме пищи гарнира ещё нет — подсказываем добавить его, не заставляя
+// искать нужную категорию вручную. Баннер сам исчезает, как только гарнир
+// в слоте появляется (следим через watch ниже), в т.ч. если добавили его
+// без подсказки.
+const garnishTypeId = computed(() => dictionaries.dishTypes.find((t) => t.name === 'Гарнир')?.id || null)
+
+const hasGarnishInSlot = computed(() => {
+    if (!garnishTypeId.value) return false
+    return props.existingItems.some((i) => {
+        if (!i.dish) return false
+        const dish = dishStore.dishes.find((d) => d.id === i.dish)
+        return dish?.dish_type === garnishTypeId.value
+    })
+})
+
+const garnishPrompt = ref(null) // { dishName } | null
+
+watch(() => props.existingItems, () => {
+    if (hasGarnishInSlot.value) garnishPrompt.value = null
+}, { deep: true })
+
 const selectItem = (item, type) => {
     platform.haptic.selection()
     emit('select', { item, type })
+
+    if (type === 'dish' && item.needs_side_dish && garnishTypeId.value && !hasGarnishInSlot.value) {
+        garnishPrompt.value = { dishName: item.name }
+    }
+}
+
+const pickGarnish = () => {
+    platform.haptic.selection()
+    activeMode.value = 'dish'
+    activeCategory.value = garnishTypeId.value
+    searchQuery.value = ''
+    garnishPrompt.value = null
+}
+
+const dismissGarnishPrompt = () => {
+    garnishPrompt.value = null
 }
 
 const updatePortions = (item, delta) => {
@@ -194,27 +237,26 @@ const getDishSlotName = (id) => {
 
 <template>
   <Transition name="modal">
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="$emit('close')">
     <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
     
-    <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
+    <div class="sheet sheet-tall modal-content">
       
       <div class="flex-1 flex flex-col overflow-hidden relative">
-        <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
+        <div class="sheet-handle"></div>
 
         <!-- Sticky Header Section -->
-        <div class="shrink-0 bg-white z-30 border-b border-slate-50 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
-            <!-- Top Row: Slot Info + Done Button -->
-            <div class="px-5 pb-3 flex justify-between items-center bg-white">
-                <div class="min-w-0 flex-1 pr-4">
-                    <h2 class="text-lg card-title truncate leading-tight">{{ getSlotName }}</h2>
-                    <p class="text-[10px] font-bold text-slate-400">
-                        {{ selectedDate ? format(new Date(selectedDate), 'd MMMM', { locale: ru }) : '' }}
-                    </p>
-                </div>
-                <button @click="$emit('close')" class="btn-primary text-[11px] font-black py-2 px-5 shadow-md shrink-0">
-                    Готово
+        <div class="shrink-0 bg-white z-30 border-b border-slate-100">
+            <!-- Шапка: крестик слева, приём пищи и дата по центру. Изменения применяются сразу. -->
+            <div class="sheet-header !border-b-0 mb-1">
+                <button @click="$emit('close')" class="sheet-close tap-effect" aria-label="Закрыть">
+                    <span class="material-icons-round text-xl">close</span>
                 </button>
+                <div class="min-w-0">
+                    <h2 class="sheet-title">{{ getSlotName }}</h2>
+                    <p class="sheet-subtitle">{{ selectedDate ? format(new Date(selectedDate), 'd MMMM, EEEE', { locale: ru }) : '' }}</p>
+                </div>
+                <button @click="$emit('close')" class="sheet-action tap-effect">Готово</button>
             </div>
 
             <!-- Search Row -->
@@ -243,9 +285,9 @@ const getDishSlotName = (id) => {
                             v-for="dish in dropdownSearchResults" 
                             :key="dish.id"
                             @mousedown="selectFromDropdown(dish)"
-                            class="w-full text-left px-4 py-3 hover:bg-slate-50 font-bold text-slate-700 text-sm border-b border-slate-50 last:border-0 flex justify-between items-center group"
+                            class="w-full text-left px-4 py-3 hover:bg-slate-50 card-title border-b border-slate-50 last:border-0 flex justify-between items-center group"
                         >
-                            <span class="group-hover:text-slate-900 transition-colors">{{ dish.name }}</span>
+                            <span>{{ dish.name }}</span>
                             <span v-if="dish.kcal" class="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">🔥 {{ dish.kcal }}</span>
                         </button>
                     </div>
@@ -255,7 +297,7 @@ const getDishSlotName = (id) => {
             <!-- Existing Items: порции и "уже есть дома" можно поправить сразу тут -->
             <div v-if="existingItems.length > 0" class="px-4 pb-3">
                 <div class="bg-slate-50/80 rounded-2xl p-2 border border-slate-100">
-                    <div class="text-[9px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider">
+                    <div class="text-[10px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider">
                         <span>Выбрано ({{ existingItems.length }})</span>
                     </div>
                     <div class="space-y-1.5">
@@ -280,9 +322,9 @@ const getDishSlotName = (id) => {
                                 @click="toggleShopping(item)"
                                 :title="item.ignore_shopping ? 'Не войдёт в список покупок — уже есть дома' : 'Войдёт в список покупок'"
                                 class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-                                :class="item.ignore_shopping ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-300'"
+                                :class="item.ignore_shopping ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 'bg-slate-50 text-slate-300'"
                             >
-                                <span class="material-icons-round text-sm">{{ item.ignore_shopping ? 'home' : 'shopping_cart' }}</span>
+                                <span class="material-icons-round text-sm">{{ item.ignore_shopping ? 'remove_shopping_cart' : 'shopping_cart' }}</span>
                             </button>
 
                             <button @click="removeItem(item)" class="text-slate-300 hover:text-red-500 transition-colors shrink-0">
@@ -292,6 +334,27 @@ const getDishSlotName = (id) => {
                     </div>
                 </div>
             </div>
+
+            <!-- Подсказка "добавить гарнир" — появляется после выбора блюда с
+                 отмеченным needs_side_dish, пока в слоте нет ни одного гарнира -->
+            <Transition name="list">
+                <div v-if="garnishPrompt" class="px-4 pb-3">
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 flex items-center gap-3">
+                        <span class="text-xl shrink-0">🍚</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-[11px] font-bold text-indigo-900 leading-snug">
+                                «{{ garnishPrompt.dishName }}» подаётся с гарниром
+                            </div>
+                        </div>
+                        <button @click="pickGarnish" class="shrink-0 btn-primary text-[11px] py-2 px-3 whitespace-nowrap">
+                            Выбрать гарнир
+                        </button>
+                        <button @click="dismissGarnishPrompt" class="shrink-0 text-indigo-300 hover:text-indigo-500">
+                            <span class="material-icons-round text-lg">close</span>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
 
             <!-- Mode Switcher -->
             <div class="px-4 pb-3 flex gap-2">
@@ -315,11 +378,11 @@ const getDishSlotName = (id) => {
         </div>
 
         <!-- Filter Row (Horizontal Scroll) -->
-        <div v-if="activeMode === 'dish'" class="shrink-0 bg-white px-4 py-2 border-b border-slate-50 flex overflow-x-auto gap-2 no-scrollbar">
+        <div v-if="activeMode === 'dish'" class="shrink-0 bg-white px-4 py-2 border-b border-slate-50 flex overflow-x-auto gap-1.5 no-scrollbar">
             <button 
                 @click="activeCategory = 'all'; platform.haptic.selection()" 
-                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
-                :class="activeCategory === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+                class="chip tap-effect"
+                :class="activeCategory === 'all' ? 'chip-active' : ''"
             >
                 Все
             </button>
@@ -327,8 +390,8 @@ const getDishSlotName = (id) => {
                 v-for="cat in dictionaries.dishTypes" 
                 :key="cat.id" 
                 @click="activeCategory = cat.id; platform.haptic.selection()"
-                class="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black border transition-colors tap-effect"
-                :class="activeCategory === cat.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+                class="chip tap-effect"
+                :class="activeCategory === cat.id ? 'chip-active' : ''"
             >
                 {{ cat.name }}
             </button>
@@ -337,8 +400,11 @@ const getDishSlotName = (id) => {
         <div class="flex-1 relative overflow-hidden bg-slate-50">
             <Transition :name="transitionName">
             <div v-if="activeMode === 'dish'" key="dish" class="absolute inset-0 w-full h-full overflow-y-auto px-4 pb-10 pt-3">
-                <div v-if="filteredDishes.length === 0 && recommendedDishes.length === 0" class="text-center py-10 text-slate-400 text-sm font-bold">
-                    {{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}
+                <div v-if="filteredDishes.length === 0 && recommendedDishes.length === 0" class="empty-state-container">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round" style="font-size: 64px;">{{ searchQuery ? 'search_off' : 'restaurant_menu' }}</span>
+                    </div>
+                    <p class="empty-state-title">{{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}</p>
                 </div>
 
                 <!-- Рекомендованные блюда -->
@@ -416,7 +482,7 @@ const getDishSlotName = (id) => {
 
             <div v-else key="product" class="absolute inset-0 w-full h-full overflow-y-auto px-4 pb-10 pt-3">
                 <div v-for="(products, catName) in groupedProducts" :key="catName">
-                    <h3 class="text-[10px] font-black text-slate-400 mb-2 ml-1">{{ catName }}</h3>
+                    <h3 class="text-[10px] font-black text-slate-400 mb-2 ml-1 uppercase tracking-wider">{{ catName }}</h3>
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                         <div 
                             v-for="prod in products" 

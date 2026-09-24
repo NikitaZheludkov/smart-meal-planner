@@ -15,6 +15,7 @@ const uiStore = useUIStore()
 const activeMode = ref('dishes')
 const transitionName = ref('slide-left')
 const searchQuery = ref('')
+const dishesViewRef = ref(null)
 
 const modes = ['dishes', 'products']
 
@@ -61,7 +62,7 @@ const setMealType = (id) => {
     <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4">
       
       <div class="relative mb-3">
-        <span class="material-icons-outlined absolute left-3.5 top-3 text-slate-400">search</span>
+        <span class="material-icons-round absolute left-3.5 top-3 text-slate-400">search</span>
         <input 
           v-model="searchQuery" 
           type="text" 
@@ -86,33 +87,50 @@ const setMealType = (id) => {
           >
             <span>🥘</span> Рецепты
           </button>
-          <button 
-            @click="activeMode = 'products'; platform.haptic.selection()" 
+          <button
+            @click="activeMode = 'products'; platform.haptic.selection()"
             class="flex-1 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
             :class="activeMode === 'products' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
           >
             <span>🥦</span> Продукты
           </button>
         </div>
+
+        <!-- Слот фильтра занимает место в обоих режимах, чтобы переключатель не менял ширину -->
+        <button
+          @click="activeMode === 'dishes' && dishesViewRef?.openFilters()"
+          class="relative shrink-0 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 tap-effect"
+          :class="[uiStore.dishes.filterTags.length > 0 ? 'bg-slate-900 text-white' : '', activeMode === 'dishes' ? '' : 'invisible pointer-events-none']"
+          :tabindex="activeMode === 'dishes' ? 0 : -1"
+          :aria-hidden="activeMode !== 'dishes'"
+        >
+          <span class="material-icons-round text-lg">tune</span>
+          <span
+            v-if="uiStore.dishes.filterTags.length > 0"
+            class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white"
+          >
+            {{ uiStore.dishes.filterTags.length }}
+          </span>
+        </button>
       </div>
 
       <!-- Блок категорий (основные) -->
-      <div class="flex overflow-x-auto gap-2 no-scrollbar mb-2">
+      <div class="flex overflow-x-auto gap-1.5 no-scrollbar mb-2">
         <!-- Категории для рецептов -->
         <template v-if="activeMode === 'dishes'">
           <button 
             @click="setDishCategory('all')" 
-            class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
-            :class="uiStore.dishes.activeCategory === 'all' ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            class="chip tap-effect"
+            :class="uiStore.dishes.activeCategory === 'all' ? 'chip-active' : ''"
           >
-            Все типы
+            Все виды
           </button>
           <button 
             v-for="cat in dictionaries.dishTypes" 
             :key="cat.id" 
             @click="setDishCategory(cat.id)" 
-            class="whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors tap-effect border" 
-            :class="uiStore.dishes.activeCategory === cat.id ? 'bg-white text-slate-900 border-slate-300 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            class="chip tap-effect"
+            :class="uiStore.dishes.activeCategory === cat.id ? 'chip-active' : ''"
           >
             {{ cat.name }}
           </button>
@@ -124,8 +142,8 @@ const setMealType = (id) => {
             v-for="cat in productCategories" 
             :key="cat"
             @click="setProductCategory(cat)"
-            class="whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold transition-colors border"
-            :class="uiStore.products.activeCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+            class="chip tap-effect"
+            :class="uiStore.products.activeCategory === cat ? 'chip-active' : ''"
           >
             {{ cat }}
           </button>
@@ -133,11 +151,11 @@ const setMealType = (id) => {
       </div>
 
       <!-- Блок приемов пищи (только для рецептов) -->
-      <div v-if="activeMode === 'dishes'" class="flex overflow-x-auto gap-2 no-scrollbar">
+      <div v-if="activeMode === 'dishes'" class="flex overflow-x-auto gap-1.5 no-scrollbar">
         <button 
           @click="setMealType(null)" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeTag === null ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white text-slate-400 border-slate-200'"
+          class="chip tap-effect"
+          :class="uiStore.dishes.activeTag === null ? 'chip-active' : ''"
         >
           Все
         </button>
@@ -145,8 +163,8 @@ const setMealType = (id) => {
           v-for="type in dictionaries.mealTypes" 
           :key="type.id" 
           @click="setMealType(type.id)" 
-          class="whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors tap-effect border" 
-          :class="uiStore.dishes.activeTag === type.id ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200'"
+          class="chip tap-effect"
+          :class="uiStore.dishes.activeTag === type.id ? 'chip-active' : ''"
         >
           {{ type.name }}
         </button>
@@ -155,7 +173,7 @@ const setMealType = (id) => {
 
     <div class="flex-1 relative overflow-hidden">
       <transition :name="transitionName">
-        <DishesView v-if="activeMode === 'dishes'" :key="'dishes'" :search-query="searchQuery" class="absolute inset-0 w-full h-full overflow-y-auto" />
+        <DishesView v-if="activeMode === 'dishes'" ref="dishesViewRef" :key="'dishes'" :search-query="searchQuery" class="absolute inset-0 w-full h-full overflow-y-auto" />
         <ProductsView v-else :key="'products'" :search-query="searchQuery" class="absolute inset-0 w-full h-full overflow-y-auto" />
       </transition>
     </div>

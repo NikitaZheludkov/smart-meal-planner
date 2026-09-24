@@ -163,6 +163,78 @@ const handleSave = async () => {
     }
 }
 
+// --- ПРИВЯЗКА TELEGRAM ---
+// Реальный initData доступен только внутри самого Mini App — привязать
+// можно лишь открыв Настройки через бота, а не с обычного сайта.
+const isInsideTelegram = !!window.Telegram?.WebApp?.initData
+const isTelegramLinked = computed(() => !!authStore.user?.telegram_id)
+const telegramBotLink = import.meta.env.VITE_TELEGRAM_BOT_LINK
+const linkingTelegram = ref(false)
+
+const handleLinkTelegram = async () => {
+    const initData = window.Telegram?.WebApp?.initData
+    if (!initData) return
+
+    linkingTelegram.value = true
+    try {
+        await authStore.linkTelegram(initData)
+        platform.haptic.notification('success')
+        ui.showToast('Telegram привязан', 'success')
+    } catch (e) {
+        platform.haptic.notification('error')
+        ui.showToast(e.message || 'Не удалось привязать Telegram', 'error')
+    } finally {
+        linkingTelegram.value = false
+    }
+}
+
+// --- EMAIL И ПАРОЛЬ ДЛЯ TELEGRAM-АККАУНТОВ ---
+// У аккаунтов, созданных через Telegram, email синтетический
+// (tg_<id>@telegram.local), а пароль — случайная строка, которую
+// пользователь никогда не видел. Это единственный признак такого аккаунта,
+// который нужен клиенту: сервер (см. /api/set-email-password) перепроверяет
+// то же самое перед сохранением, так что подделать это на клиенте бессмысленно.
+const hasTelegramOnlyAccount = computed(() => /^tg_\d+@telegram\.local$/.test(authStore.user?.email || ''))
+const showEmailPasswordForm = ref(false)
+const newEmail = ref('')
+const newPassword = ref('')
+const newPasswordConfirm = ref('')
+const showNewPassword = ref(false)
+const savingEmailPassword = ref(false)
+const emailPasswordError = ref('')
+
+const handleSetEmailPassword = async () => {
+    emailPasswordError.value = ''
+    const trimmedEmail = newEmail.value.trim()
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        emailPasswordError.value = 'Введите корректный email'
+        return
+    }
+    if (newPassword.value.length < 8) {
+        emailPasswordError.value = 'Пароль должен быть не короче 8 символов'
+        return
+    }
+    if (newPassword.value !== newPasswordConfirm.value) {
+        emailPasswordError.value = 'Пароли не совпадают'
+        return
+    }
+
+    savingEmailPassword.value = true
+    try {
+        await authStore.setEmailPassword(trimmedEmail, newPassword.value, newPasswordConfirm.value)
+        platform.haptic.notification('success')
+        ui.showToast('Email и пароль добавлены', 'success')
+        showEmailPasswordForm.value = false
+        newEmail.value = ''
+        newPassword.value = ''
+        newPasswordConfirm.value = ''
+    } catch (e) {
+        emailPasswordError.value = e.message || 'Не удалось сохранить. Попробуйте ещё раз.'
+    } finally {
+        savingEmailPassword.value = false
+    }
+}
+
 const handleLogout = async () => {
     platform.haptic.impact('medium')
     if (await ui.confirm('Выйти из аккаунта?', { okText: 'Выйти', cancelText: 'Отмена' })) {
@@ -183,7 +255,7 @@ const periods = [
 <template>
   <div class="h-full flex flex-col bg-slate-50 relative">
     
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[160px] flex flex-col justify-between">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h1 class="app-title mb-0">Настройки</h1>
         <button 
@@ -204,13 +276,13 @@ const periods = [
       </div>
     </div>
 
-    <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-[76px]">
+    <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-app-nav">
       
       <div>
         <h3 class="card-title text-sm ml-2 mb-2">Моя Семья</h3>
         
         <div v-if="settingsStore.loading" class="text-center py-6">
-            <span class="material-icons-outlined animate-spin text-slate-300">sync</span>
+            <span class="material-icons-round animate-spin text-slate-300">sync</span>
         </div>
 
         <div v-else class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 space-y-4">
@@ -323,9 +395,12 @@ const periods = [
             </select>
           </div>
 
-          <div class="flex items-center justify-between">
-            <span class="card-title text-sm">Порции (по умолч.)</span>
-            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="card-title text-sm block">Порции (по умолч.)</span>
+              <span class="text-[10px] font-bold text-slate-400 leading-snug block mt-0.5">Сколько порций добавляется в план при выборе блюда на приём пищи. Можно поправить прямо в плане позже.</span>
+            </div>
+            <div class="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1 shrink-0">
                 <button @click="selectedPortions = Math.max(1, selectedPortions - 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600">
                   <span class="material-icons-round text-sm">remove</span>
                 </button>
@@ -339,8 +414,128 @@ const periods = [
       </div>
 
       <div>
-        <button 
-          @click="handleLogout" 
+        <h3 class="card-title text-sm ml-2 mb-2">Telegram</h3>
+        <div class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100">
+          <div v-if="isTelegramLinked" class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+              <span class="material-icons-round text-xl">check_circle</span>
+            </div>
+            <div>
+              <div class="text-sm font-black text-slate-900">Telegram привязан</div>
+              <div class="text-[10px] font-bold text-slate-400">Восстановление пароля работает через бота</div>
+            </div>
+          </div>
+
+          <div v-else-if="isInsideTelegram" class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-black text-slate-900">Привязать Telegram</div>
+              <div class="text-[10px] font-bold text-slate-400">Понадобится, чтобы восстанавливать пароль через бота</div>
+            </div>
+            <button
+              @click="handleLinkTelegram"
+              :disabled="linkingTelegram"
+              class="btn-primary shadow-lg tap-effect text-[11px] py-2 px-4 shrink-0 disabled:opacity-60"
+            >
+              {{ linkingTelegram ? '...' : 'Привязать' }}
+            </button>
+          </div>
+
+          <div v-else class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                <span class="material-icons-round text-xl">link_off</span>
+              </div>
+              <div>
+                <div class="text-sm font-black text-slate-900">Telegram не привязан</div>
+                <div class="text-[10px] font-bold text-slate-400">Нужен для восстановления пароля</div>
+              </div>
+            </div>
+            <a
+              v-if="telegramBotLink"
+              :href="telegramBotLink"
+              target="_blank"
+              class="btn-primary shadow-lg tap-effect text-[11px] py-2 px-4 shrink-0"
+            >
+              Открыть
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="hasTelegramOnlyAccount">
+        <h3 class="card-title text-sm ml-2 mb-2">Email и пароль</h3>
+        <div class="bg-white p-4 rounded-[20px] shadow-sm border border-slate-100">
+          <div v-if="!showEmailPasswordForm" class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-black text-slate-900">Не заданы</div>
+              <div class="text-[10px] font-bold text-slate-400 leading-snug">Запасной способ входа, если Telegram станет недоступен, и вход с компьютера без бота</div>
+            </div>
+            <button
+              @click="showEmailPasswordForm = true"
+              class="btn-primary shadow-lg tap-effect text-[11px] py-2 px-4 shrink-0"
+            >
+              Добавить
+            </button>
+          </div>
+
+          <form v-else @submit.prevent="handleSetEmailPassword" class="space-y-3 text-left">
+            <div>
+              <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Email</label>
+              <input
+                v-model="newEmail"
+                type="email"
+                autocomplete="email"
+                placeholder="your@email.com"
+                autofocus
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none"
+              >
+            </div>
+            <div>
+              <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Пароль</label>
+              <div class="relative">
+                <input
+                  v-model="newPassword"
+                  :type="showNewPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                  class="w-full px-4 py-3 pr-11 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none"
+                >
+                <button type="button" @click="showNewPassword = !showNewPassword" tabindex="-1" class="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400">
+                  <span class="material-icons-round text-lg">{{ showNewPassword ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block">Повторите пароль</label>
+              <input
+                v-model="newPasswordConfirm"
+                :type="showNewPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                placeholder="••••••••"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none"
+              >
+            </div>
+
+            <div v-if="emailPasswordError" class="bg-red-50 text-red-500 text-xs font-bold px-4 py-3 rounded-xl border border-red-100">
+              {{ emailPasswordError }}
+            </div>
+
+            <div class="flex gap-2">
+              <button type="button" @click="showEmailPasswordForm = false" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm">
+                Отмена
+              </button>
+              <button type="submit" :disabled="savingEmailPassword" class="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                <span v-if="savingEmailPassword" class="material-icons-round animate-spin text-base">donut_large</span>
+                <span>Сохранить</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div>
+        <button
+          @click="handleLogout"
           class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-slate-900 font-bold text-sm"
         >
              <span class="material-icons-round">logout</span>
@@ -353,38 +548,37 @@ const periods = [
     
 
     <Transition name="modal">
-    <div v-if="showJoinModal" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="showJoinModal = false">
+    <div v-if="showJoinModal" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showJoinModal = false">
         <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
-        
-        <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
-            <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
-            <div class="flex-1 p-8 flex flex-col items-center justify-center">
-                <div class="text-center mb-8">
-                    <div class="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm border border-slate-100">🔑</div>
-                    <h3 class="text-2xl font-black text-slate-900">Вход в семью</h3>
-                    <p class="text-sm text-slate-400 font-bold mt-2">Введите 6-значный код приглашения</p>
+
+        <div class="sheet modal-content">
+            <div class="sheet-handle"></div>
+            <div class="sheet-header">
+                <button @click="showJoinModal = false" class="sheet-close tap-effect" aria-label="Закрыть">
+                    <span class="material-icons-round text-xl">close</span>
+                </button>
+                <h3 class="sheet-title">Вход в семью</h3>
+                <div>
+                    <button
+                        @click="handleJoin"
+                        :disabled="isJoining || joinCodeInput.length < 6"
+                        class="sheet-action tap-effect"
+                    >
+                        <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
+                        {{ isJoining ? 'Проверка' : 'Войти' }}
+                    </button>
                 </div>
-                
+            </div>
+            <div class="min-h-0 overflow-y-auto px-6 pt-6 pb-[calc(32px+env(safe-area-inset-bottom,0px))]">
+                <p class="text-sm text-secondary text-center mb-4">Введите 6-значный код приглашения</p>
                 <input 
                     v-model="joinCodeInput" 
-                    placeholder="000 000" 
+                    placeholder="000000" 
                     type="tel"
-                    class="w-full text-center text-4xl tracking-[0.2em] font-black p-6 bg-slate-50 rounded-[24px] outline-none border-none mb-6 text-slate-900 placeholder:text-slate-200 shadow-inner"
+                    inputmode="numeric"
+                    class="w-full text-center text-3xl tracking-[0.3em] font-semibold py-4 input-outline rounded-2xl outline-none text-slate-900 placeholder:text-slate-200"
                     maxlength="6"
                 >
-                
-                <div class="w-full space-y-3">
-                    <button 
-                        @click="handleJoin" 
-                        :disabled="isJoining || joinCodeInput.length < 6"
-                        class="btn-primary w-full py-4 shadow-xl flex items-center justify-center gap-2"
-                    >
-                        <span v-if="isJoining" class="material-icons-round animate-spin text-lg">sync</span>
-                        {{ isJoining ? 'Проверка...' : 'Войти в семью' }}
-                    </button>
-                    
-                    <button @click="showJoinModal = false" class="btn-secondary w-full py-4 text-sm font-bold">Отмена</button>
-                </div>
             </div>
         </div>
     </div>

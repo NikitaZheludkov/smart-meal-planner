@@ -1,4 +1,5 @@
 <script setup>
+import { formatUnit } from '../lib/utils'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useProductStore } from '../stores/products'
 import { usePlatformStore } from '../stores/platform'
@@ -25,8 +26,8 @@ const categoryIcons = {
     'Овощи и фрукты': '🥦',
     'Молочные продукты': '🥛',
     'Мясо, птица, рыба': '🥩',
-    'Бакалея и хлеб': '🍞',
-    'Заморозка': '🧊',
+    'Хлеб': '🍞',
+    'Крупы, макароны': '🌾',
     'Напитки': '🥤',
     'Бытовая химия': '🧼',
     'Соусы': '🧂',
@@ -94,19 +95,21 @@ onMounted(async () => {
             <span class="material-icons-round animate-spin text-slate-900">sync</span>
         </div>
 
-        <div v-else-if="filteredProducts.length === 0" class="text-center py-10 opacity-50">
-            <div class="text-4xl mb-2">🥦</div>
-            <p class="text-sm font-bold">Список пуст</p>
+        <div v-else-if="filteredProducts.length === 0" class="empty-state-container">
+            <div class="empty-state-icon">
+                <span class="material-icons-round" style="font-size: 64px;">search_off</span>
+            </div>
+            <p class="empty-state-title">Ничего не найдено</p>
         </div>
 
-        <div v-else class="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden relative p-1">
+        <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative p-0.5">
             <div 
                 v-for="product in filteredProducts" 
                 :key="product.id" 
                 @click="openProduct(product)"
-                class="flex items-center px-4 py-3 w-full min-h-[52px] border-b border-slate-50 last:border-0 tap-effect active:bg-slate-50 transition-colors rounded-xl"
+                class="flex items-center px-3 py-1.5 w-full min-h-[40px] border-b border-slate-50 last:border-0 tap-effect active:bg-slate-50 transition-colors rounded-xl"
             >
-                <div class="w-9 h-9 flex items-center justify-center text-lg mr-3 bg-slate-50 rounded-[14px] shrink-0">
+                <div class="w-7 h-7 flex items-center justify-center text-base mr-2.5 bg-slate-50 rounded-[10px] shrink-0">
                     {{ getCategoryIcon(product.category) }}
                 </div>
                 
@@ -114,8 +117,8 @@ onMounted(async () => {
                     {{ product.name }}
                 </div>
                 
-                <div class="text-[10px] font-normal text-secondary bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 whitespace-nowrap flex-shrink-0">
-                    {{ product.unit }}
+                <div class="text-[10px] font-normal text-secondary bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 whitespace-nowrap flex-shrink-0">
+                    {{ formatUnit(product.unit) }}
                 </div>
             </div>
         </div>

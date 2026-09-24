@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { formatUnit } from '../lib/utils'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { startOfWeek, addDays, subDays, format, isToday, isSameDay, isWithinInterval, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../stores/auth'
@@ -19,6 +20,12 @@ const settingsStore = useSettingsStore()
 const dishStore = useDishStore()
 const uiStore = useUIStore()
 const platform = usePlatformStore()
+
+// Экспериментальный переключатель отображения вкладки "Неделя" — сравниваем
+// текущую сетку 4 слотов в ряд с вертикальным списком приёмов пищи.
+// Хранится локально, чтобы можно было быстро сравнить оба варианта вживую.
+const weekLayoutMode = ref(localStorage.getItem('weekLayoutMode') || 'grid')
+watch(weekLayoutMode, (val) => localStorage.setItem('weekLayoutMode', val))
 
 const transitionName = ref('slide-left')
 const switchTab = (tab) => {
@@ -145,6 +152,18 @@ const batchStatusMap = computed(() => {
     return map
 })
 
+// Единая строка-сводка приёма пищи для компактного списка недели — всегда
+// одна строка независимо от числа блюд, чтобы слоты не "прыгали" по высоте.
+const getSlotSummary = (day, slotId) => {
+    return getSlotItems(day, slotId)
+        .map((item) => {
+            const name = item.dish ? item.dishData?.name : item.productData?.name
+            const portions = item.portions > 1 ? ` x${item.portions}` : ''
+            return `${name || ''}${portions}`
+        })
+        .join(', ')
+}
+
 const getSlotIcon = (slotName) => {
     if (!slotName) return '🥘'
     const name = slotName.toLowerCase()
@@ -172,6 +191,18 @@ const getSlotItems = (date, slotId) => {
   if (!date) return []
   const dStr = format(date, 'yyyy-MM-dd')
   return planByDateSlot.value.get(`${dStr}_${slotId}`) || []
+}
+
+// В ячейке сетки показываем максимум 2 блюда строками — остальные
+// сворачиваем в одну плашку "+N", чтобы ячейка не разрасталась.
+const MAX_GRID_ITEMS = 2
+const getVisibleSlotItems = (date, slotId) => {
+  const items = getSlotItems(date, slotId)
+  return items.length > MAX_GRID_ITEMS ? items.slice(0, MAX_GRID_ITEMS) : items
+}
+const getGridOverflowCount = (date, slotId) => {
+  const items = getSlotItems(date, slotId)
+  return items.length > MAX_GRID_ITEMS ? items.length - MAX_GRID_ITEMS : 0
 }
 
 const openSelector = (date, slot) => {
@@ -344,6 +375,36 @@ const dailyTotalsByDate = computed(() => {
   return map
 })
 
+const showDayNutritionModal = ref(false)
+// Шторку регистрируем как модалку, чтобы нижнее меню пряталось и не перекрывало её
+const nutritionModalId = `plan-day-nutrition-${Math.random().toString(36).slice(2)}`
+watch(showDayNutritionModal, (open) => uiStore.syncModalState(nutritionModalId, open))
+onUnmounted(() => uiStore.clearModalState(nutritionModalId))
+const nutritionModalDay = ref(null)
+const openDayNutrition = (day) => {
+  nutritionModalDay.value = day
+  showDayNutritionModal.value = true
+}
+
+const dayNutritionGroups = computed(() => {
+  if (!nutritionModalDay.value) return []
+  return mealSlots.value
+    .map(slot => {
+      const items = getSlotItems(nutritionModalDay.value, slot.id)
+        .filter(item => item.dish && item.dishData)
+        .map(item => ({
+          id: item.id,
+          name: item.dishData?.name || '',
+          kcal: Math.round(Number(item.dishData?.kcal) || 0),
+          protein: Math.round(Number(item.dishData?.protein) || 0),
+          fat: Math.round(Number(item.dishData?.fat) || 0),
+          carbs: Math.round(Number(item.dishData?.carbs) || 0)
+        }))
+      return { slot, items }
+    })
+    .filter(group => group.items.length > 0)
+})
+
 const getDailyTotals = (day) => {
   const dStr = format(day, 'yyyy-MM-dd')
   return dailyTotalsByDate.value.get(dStr) || { kcal: 0, protein: 0, fat: 0, carbs: 0 }
@@ -356,9 +417,17 @@ const displayDateLabel = computed(() => {
     const length = settingsStore.periodLength || 7
     const start = currentWeekStart.value
     const end = addDays(start, length - 1)
-    return `${format(start, 'd MMM', { locale: ru })} — ${format(end, 'd MMM', { locale: ru })}`
+    return `${format(start, 'd MMM', { locale: ru })} – ${format(end, 'd MMM', { locale: ru })}`
   }
 })
+
+// Шапка: мелкая подпись (день недели / "Период") + основной заголовок
+const headerEyebrow = computed(() =>
+  uiStore.plan.activeTab === 'day' ? format(selectedDate.value, 'EEEE', { locale: ru }) : 'Период'
+)
+const headerTitle = computed(() =>
+  uiStore.plan.activeTab === 'day' ? format(selectedDate.value, 'd MMMM', { locale: ru }) : displayDateLabel.value
+)
 
 const showTodayBtn = computed(() => {
   if (uiStore.plan.activeTab === 'day') return !isToday(selectedDate.value)
@@ -392,22 +461,27 @@ onMounted(() => { if (auth.isAuth) loadData() })
   <div class="flex flex-col h-full bg-slate-50 relative">
 
     <!-- Header with Date and View Switcher -->
-    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-4 h-[165px] flex flex-col justify-between">
+    <div class="bg-white rounded-b-[32px] shadow-sm z-20 relative border-b border-slate-100 px-5 pt-app-header pb-3 flex flex-col gap-2.5">
       
       <!-- Date Navigation & Switcher Row -->
       <div class="flex items-center justify-between">
-          <div class="flex flex-col tap-effect min-h-[50px] justify-center" @click="goToToday">
-              <div class="app-title !mb-0 text-2xl flex items-center gap-2 leading-none">
-                  {{ displayDateLabel }}
-              </div>
-              <div v-if="showTodayBtn" class="text-[10px] font-bold text-slate-900 mt-1">
-                  Вернуться
+          <div class="flex flex-col justify-center">
+              <div class="tap-effect" @click="goToToday">
+                  <div class="app-eyebrow mb-1">{{ headerEyebrow }}</div>
+                  <div class="app-title !mb-0 whitespace-nowrap">{{ headerTitle }}</div>
               </div>
           </div>
 
           <div class="flex items-center gap-1">
+            <button
+                v-if="showTodayBtn"
+                @click="goToToday"
+                class="h-9 px-3 mr-1 flex items-center rounded-full bg-slate-900 text-white text-[11px] font-bold whitespace-nowrap active:scale-95 transition-transform tap-effect"
+            >
+                Сегодня
+            </button>
             <button @click="changePeriod(-1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
-                <span class="material-icons-outlined text-xl">chevron_left</span>
+                <span class="material-icons-round text-xl">chevron_left</span>
             </button>
             <button @click="changePeriod(1)" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 active:scale-90 transition-transform tap-effect">
                 <span class="material-icons-round text-xl">chevron_right</span>
@@ -422,7 +496,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
              День
          </button>
          <button @click="switchTab('week')" class="flex-1 relative z-10 text-[11px] font-bold text-center transition-colors tap-effect" :class="uiStore.plan.activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'">
-             Сетка
+             Неделя
          </button>
       </div>
     </div>
@@ -455,52 +529,43 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         <span class="material-icons-round" style="font-size: 64px;">restaurant</span>
                     </div>
                     <p class="empty-state-title">День свободен</p>
-                    <button @click="switchTab('week')" class="mt-4 btn-secondary text-xs px-4 py-2">Перейти к сетке</button>
+                    <button @click="switchTab('week')" class="mt-4 btn-secondary text-xs px-4 py-2">Перейти к неделе</button>
                 </div>
 
-                <div class="space-y-6 mt-2">
+                <div class="space-y-4 mt-2">
                     <div v-for="group in currentDayData" :key="group.slot.id">
                         <transition name="fade">
                             <div v-if="group.hasItems">
-                                <div class="flex items-center justify-between px-2 mb-2">
-                                    <h3 class="card-title text-lg">{{ group.slot.name }}</h3>
+                                <div class="flex items-center justify-between px-2 mb-1.5">
+                                    <h3 class="card-title">{{ group.slot.name }}</h3>
                                     <button @click="openSelector(selectedDate, group.slot)" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 active:scale-90 transition-transform tap-effect">
                                         <span class="material-icons-round text-lg">add</span>
                                     </button>
                                 </div>
-                                <TransitionGroup name="list" tag="div" class="space-y-3 relative">
-                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white p-4 rounded-[24px] shadow-sm border border-slate-100 flex items-center gap-4 relative transition-transform w-full" :class="item.dish ? 'tap-effect active:scale-[0.98]' : ''">
-                                        <div class="w-16 h-16 bg-slate-50 rounded-[20px] overflow-hidden flex-shrink-0 relative flex items-center justify-center text-2xl">
-                                            <img v-if="item.dish && item.dishData?.image_url" :src="item.dishData.image_url" class="w-full h-full object-cover">
-                                            <span v-else-if="item.product">🥦</span>
+                                <TransitionGroup name="list" tag="div" class="space-y-2 relative">
+                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white px-3.5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 relative transition-transform w-full" :class="item.dish ? 'tap-effect active:scale-[0.98]' : ''">
+                                        <img v-if="item.dish && item.dishData?.image_url" :src="item.dishData.image_url" class="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 object-cover">
+                                        <div v-else class="w-9 h-9 bg-slate-50 rounded-xl flex-shrink-0 flex items-center justify-center text-lg">
+                                            <span v-if="item.product">🥦</span>
                                             <span v-else>{{ getSlotIcon(group.slot.name) }}</span>
                                         </div>
-                                        <div class="flex-1 min-w-0 py-1">
-                                            <div class="text-base card-title truncate leading-tight">
-                                                {{ item.dish ? item.dishData?.name : item.productData?.name }}
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-sm card-title truncate leading-tight">
+                                                    {{ item.dish ? item.dishData?.name : item.productData?.name }}
+                                                </span>
+                                                <span v-if="item.ignore_shopping" class="material-icons-round text-sm text-amber-500 shrink-0" title="Уже есть дома, не в списке покупок">home</span>
                                             </div>
-                                            <!-- Batch Indicator List View -->
-                                            <div v-if="batchStatusMap.has(item.id)" class="inline-flex items-center gap-1 mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                                                <span class="text-[9px] font-black text-slate-900">Готовка {{ batchStatusMap.get(item.id).batch }}</span>
-                                                <span class="text-[9px] text-slate-400">|</span>
-                                                <span class="text-[9px] font-black text-slate-600">{{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }} порций</span>
-                                            </div>
-                                            <div class="mt-1.5 flex flex-wrap gap-2">
-                                                <span v-if="item.portions > 1" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{{ item.portions }} порции</span>
+                                            <div class="text-[11px] font-bold text-slate-400 mt-0.5 truncate">
                                                 <template v-if="item.dish">
-                                                    <span class="text-[10px] font-normal text-secondary bg-slate-100 px-2 py-0.5 rounded-md">{{ dishTypeNameById.get(item.dishData?.dish_type) || 'Блюдо' }}</span>
-                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ item.dishData?.kcal }} ккал</span>
+                                                    {{ dishTypeNameById.get(item.dishData?.dish_type) || 'Блюдо' }} · {{ item.dishData?.kcal }} ккал<template v-if="item.portions > 1"> · {{ item.portions }} порц.</template><template v-if="batchStatusMap.has(item.id)"> · осталось {{ batchStatusMap.get(item.id).current }}/{{ batchStatusMap.get(item.id).total }}</template>
                                                 </template>
                                                 <template v-else>
-                                                    <span class="text-[10px] font-normal text-slate-900 bg-slate-200 px-2 py-0.5 rounded-md">{{ Number(item.portions) }} {{ item.productData?.unit }}</span>
+                                                    {{ Number(item.portions) }} {{ formatUnit(item.productData?.unit) }}
                                                 </template>
                                             </div>
-                                            <div v-if="item.ignore_shopping" class="mt-1 flex items-center gap-1 text-[9px] font-bold text-amber-600">
-                                                <span class="material-icons-round text-xs">home</span>
-                                                Уже есть дома, не в списке покупок
-                                            </div>
                                         </div>
-                                        <div v-if="item.dish" class="text-slate-300 pr-1"><span class="material-icons-round text-lg">chevron_right</span></div>
+                                        <div v-if="item.dish" class="text-slate-300 shrink-0"><span class="material-icons-round text-lg">chevron_right</span></div>
                                     </div>
                                 </TransitionGroup>
                             </div>
@@ -510,14 +575,24 @@ onMounted(() => { if (auth.isAuth) loadData() })
             </div>
 
             <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
+                <!-- Экспериментальный переключатель вида — временный, для сравнения -->
+                <div class="flex items-center justify-end gap-1 -mt-1 mb-1">
+                    <button @click="weekLayoutMode = 'grid'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors tap-effect" :class="weekLayoutMode === 'grid' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'">
+                        <span class="material-icons-round text-base">grid_view</span>
+                    </button>
+                    <button @click="weekLayoutMode = 'list'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors tap-effect" :class="weekLayoutMode === 'list' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'">
+                        <span class="material-icons-round text-base">view_agenda</span>
+                    </button>
+                </div>
+
                 <div v-for="day in weekDays" :key="format(day, 'yyyy-MM-dd')"
                     class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-colors duration-300"
-                    :class="isToday(day) ? 'shadow-md ring-2 ring-slate-900/5 border-slate-900' : 'shadow-sm border border-slate-100'"
+                    :class="isToday(day) ? 'shadow-md' : 'shadow-sm border border-slate-100'"
                 >
-                    
-                    <div class="flex items-center justify-between pb-1.5 border-b" :class="isToday(day) ? 'border-slate-200' : 'border-slate-50'">
+
+                    <div class="flex items-center justify-between pb-1.5 border-b border-slate-50">
                         <div class="flex items-center gap-2">
-                            <span class="text-base font-black" :class="isToday(day) ? 'text-slate-900' : 'text-slate-800'">{{ format(day, 'd') }}</span>
+                            <span class="w-6 h-6 flex items-center justify-center rounded-full text-sm font-black leading-none" :class="isToday(day) ? 'bg-slate-900 text-white' : 'text-slate-800'">{{ format(day, 'd') }}</span>
                             <span class="text-[10px] font-bold" :class="isToday(day) ? 'text-slate-900' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
                         </div>
 
@@ -539,21 +614,37 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                 <span class="text-[8px] font-bold text-slate-700">{{ Math.round(getDailyTotals(day).carbs) }}</span>
                                 <span class="text-[6px] font-bold text-slate-400 leading-none">У</span>
                             </div>
+                            <button @click.stop="openDayNutrition(day)" class="w-4 h-4 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 tap-effect active:scale-90 transition-transform">
+                                <span class="material-icons-round text-[10px] leading-none">info</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="w-full grid grid-cols-4 gap-1.5">
-                    
-                    <button 
-                        v-for="slot in mealSlots" 
+                    <div v-if="weekLayoutMode === 'list'" class="w-full flex flex-col gap-1">
+                        <button v-for="slot in mealSlots" :key="slot.id" @click="openSelector(day, slot)" class="w-full flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 tap-effect text-left rounded-lg">
+                            <span class="text-xs shrink-0">{{ getSlotIcon(slot.name) }}</span>
+                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-wide shrink-0">{{ slot.name }}</span>
+                            <span v-if="getSlotItems(day, slot.id).length > 0" class="flex-1 min-w-0 text-[11px] font-bold text-slate-700 truncate">
+                                {{ getSlotSummary(day, slot.id) }}
+                            </span>
+                            <span v-else class="flex-1"></span>
+                            <span class="material-icons-round text-sm text-slate-300 shrink-0">{{ getSlotItems(day, slot.id).length === 0 ? 'add' : 'chevron_right' }}</span>
+                        </button>
+                    </div>
+
+                    <div v-else class="w-full grid grid-cols-4 gap-1.5">
+
+                    <button
+                        v-for="slot in mealSlots"
                         :key="slot.id" 
             @click="openSelector(day, slot)" 
             class="w-full h-20 rounded-xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-colors bg-white shadow-sm border-slate-100" 
             :class="getSlotItems(day, slot.id).length === 0 ? 'bg-slate-50 border-slate-50 items-center justify-center' : ''"
           >
-            <span v-if="getSlotItems(day, slot.id).length === 0" class="text-[7px] font-bold text-slate-300 text-center break-all px-1">
-                {{ slot.name.substring(0, 3) }}
-            </span>
+            <div v-if="getSlotItems(day, slot.id).length === 0" class="flex flex-col items-center gap-0.5">
+                <span class="text-base opacity-30 grayscale leading-none">{{ getSlotIcon(slot.name) }}</span>
+                <span class="text-[8px] font-bold text-slate-300 text-center leading-none">{{ slot.name }}</span>
+            </div>
 
             <template v-else-if="getSlotItems(day, slot.id).length === 1">
                <template v-if="getSlotItems(day, slot.id)[0].dish && getSlotItems(day, slot.id)[0].dishData?.image_url">
@@ -595,20 +686,20 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
             <template v-else>
                <div class="flex flex-col w-full h-full p-1 gap-1">
-                   <div 
-                      v-for="(item, idx) in getSlotItems(day, slot.id).slice(0, 3)" 
-                      :key="item.id" 
-                      class="flex-1 w-full rounded-lg border flex items-center justify-center px-1 overflow-hidden"
+                   <div
+                      v-for="item in getVisibleSlotItems(day, slot.id)"
+                      :key="item.id"
+                      class="flex-1 w-full min-h-0 rounded-lg border flex items-center px-1.5 overflow-hidden"
                       :class="item.ignore_shopping ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'"
                    >
-                      <span class="text-[7px] font-bold text-center leading-tight line-clamp-2 w-full break-words" :class="item.ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-700'">
+                      <span class="text-[7.5px] font-bold text-left leading-tight truncate w-full" :class="item.ignore_shopping ? 'text-slate-400 line-through' : 'text-slate-700'">
                           {{ item.dish ? item.dishData?.name : item.productData?.name }}
                           <span v-if="item.portions > 1" class="text-slate-900"> x{{ item.portions }}</span>
                       </span>
                     </div>
-                   
-                   <div v-if="getSlotItems(day, slot.id).length > 3" class="h-2 w-full bg-slate-100 rounded-sm flex items-center justify-center">
-                       <span class="material-icons-round text-[10px] text-slate-300">more_horiz</span>
+
+                   <div v-if="getGridOverflowCount(day, slot.id) > 0" class="w-full flex-1 min-h-0 bg-slate-100 rounded-lg flex items-center justify-center">
+                       <span class="text-[7.5px] font-bold text-slate-400">+{{ getGridOverflowCount(day, slot.id) }}</span>
                     </div>
                </div>
             </template>
@@ -632,6 +723,49 @@ onMounted(() => { if (auth.isAuth) loadData() })
     />
 
     <DishDetailModal :is-open="showDishModal" :dish="viewingDish" @close="showDishModal = false" />
+
+    <Transition name="modal">
+      <div v-if="showDayNutritionModal" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showDayNutritionModal = false">
+        <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
+        <div class="sheet modal-content">
+          <div class="sheet-handle"></div>
+
+          <div class="sheet-header">
+            <button @click="showDayNutritionModal = false" class="sheet-close tap-effect" aria-label="Закрыть">
+              <span class="material-icons-round text-xl">close</span>
+            </button>
+            <div class="min-w-0">
+              <h2 class="sheet-title">КБЖУ за день</h2>
+              <p class="sheet-subtitle">{{ nutritionModalDay ? format(nutritionModalDay, 'd MMMM, EEEE', { locale: ru }) : '' }}</p>
+            </div>
+            <div></div>
+          </div>
+
+          <div v-if="dayNutritionGroups.length > 0" class="min-h-0 overflow-y-auto px-5 pt-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] space-y-5">
+            <div v-for="group in dayNutritionGroups" :key="group.slot.id">
+              <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 px-1">{{ group.slot.name }}</h3>
+              <div class="space-y-1.5">
+                <div v-for="item in group.items" :key="item.id" class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
+                  <span class="text-xs font-bold text-slate-700 truncate">{{ item.name }}</span>
+                  <div class="flex items-center gap-2.5 shrink-0">
+                    <span class="text-[11px] font-black text-slate-900">{{ item.kcal }} ккал</span>
+                    <span class="text-[10px] font-bold text-slate-400">Б {{ item.protein }}</span>
+                    <span class="text-[10px] font-bold text-slate-400">Ж {{ item.fat }}</span>
+                    <span class="text-[10px] font-bold text-slate-400">У {{ item.carbs }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state-container py-10">
+            <div class="empty-state-icon">
+              <span class="material-icons-round" style="font-size: 48px;">restaurant</span>
+            </div>
+            <p class="empty-state-desc">В этот день ещё нет выбранных блюд</p>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 

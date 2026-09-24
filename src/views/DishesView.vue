@@ -44,6 +44,12 @@ const showFilterModal = ref(false)
 const viewingDish = ref(null)
 const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
 
+// "Обед · Ужин · #Быстро · #Детское" — приёмы пищи и теги одной строкой
+const cardMeta = (dish) => [
+  ...(dish.meal_type || []).map((id) => dictionaries.getMealTypeById(id)?.name || '...'),
+  ...(dish.tags || []).map((id) => tagById.value.get(id)?.name).filter(Boolean).map((n) => '#' + n)
+].join(' · ')
+
 const openDish = (dish) => {
   viewingDish.value = dish
   showDetailModal.value = true
@@ -54,7 +60,7 @@ const openCreateDish = () => {
       id: null, 
       name: '',
       dish_type: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
-      meal_type: uiStore.dishes.activeTag ? uiStore.dishes.activeTag : (dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id), 
+      meal_type: [uiStore.dishes.activeTag ? uiStore.dishes.activeTag : (dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id)].filter(Boolean),
       kcal: null, protein: null, fat: null, carbs: null,
       tags: [],
       ingredients: []
@@ -66,6 +72,10 @@ const openFilters = () => {
     platform.haptic.impact('light')
     showFilterModal.value = true
 }
+
+// Открывается снаружи (кнопка-фильтр в шапке CatalogView) — сама эта вьюха
+// не рисует шапку, шапка общая для вкладок "Рецепты"/"Продукты".
+defineExpose({ openFilters })
 
 // Если открытое блюдо удалили (в том числе с другого устройства через
 // realtime), закрываем модалку — иначе она останется открытой на
@@ -99,12 +109,12 @@ const filteredDishes = computed(() => {
     result = result.filter(d => d.name.toLowerCase().includes(q))
   }
 
-  // 2. Прием пищи (Завтрак/Обед...)
+  // 2. Вид приёма пищи (Завтрак/Обед...)
   if (uiStore.dishes.activeTag) {
-    result = result.filter(d => d.meal_type === uiStore.dishes.activeTag)
+    result = result.filter(d => (d.meal_type || []).includes(uiStore.dishes.activeTag))
   }
 
-  // 3. Категория (Суп/Второе...)
+  // 3. Вид блюда (Горячее/Салат...)
   if (uiStore.dishes.activeCategory !== 'all') {
     result = result.filter(d => d.dish_type === uiStore.dishes.activeCategory)
   }
@@ -126,50 +136,45 @@ const filteredDishes = computed(() => {
 
     <div class="flex-1 relative overflow-hidden">
       
-      <div v-if="filteredDishes.length === 0" class="text-center py-20 opacity-40 absolute inset-0 pointer-events-none z-10">
-        <div class="text-5xl mb-2">🍳</div>
-        <p class="font-bold text-slate-400">Ничего не найдено</p>
-        <p v-if="uiStore.dishes.filterTags.length > 0" class="text-xs text-slate-300 mt-1">Попробуйте сбросить теги</p>
+      <div v-if="filteredDishes.length === 0" class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+        <div class="empty-state-container">
+          <div class="empty-state-icon">
+            <span class="material-icons-round" style="font-size: 64px;">search_off</span>
+          </div>
+          <p class="empty-state-title">Ничего не найдено</p>
+          <p v-if="uiStore.dishes.filterTags.length > 0" class="empty-state-desc">Попробуйте сбросить теги</p>
+        </div>
       </div>
 
       <Transition :name="transitionName">
         <div :key="uiStore.dishes.activeTag || 'all'" class="absolute inset-0 w-full h-full overflow-y-auto px-5 pt-4 pb-app-nav scroll-area">
-          <div class="space-y-3 relative min-h-full">
+          <div class="space-y-2 relative min-h-full">
             <div 
                 v-for="dish in filteredDishes" 
                 :key="dish.id" 
                 @click="openDish(dish)" 
-                class="bg-white p-5 rounded-[24px] shadow-sm flex flex-col gap-2 tap-effect border border-slate-100/50 relative group w-full"
+                class="bg-white px-4 py-3 rounded-2xl shadow-sm flex flex-col gap-1.5 tap-effect border border-slate-100/50 w-full"
             >
-                <div class="flex justify-between items-start">
-                <span class="card-title leading-tight pr-8 flex items-center gap-1.5">
-                    <span v-if="dish.batch_yield > 1" title="Готовится про запас на несколько приёмов пищи" class="material-icons-round text-sm text-indigo-500 shrink-0">kitchen</span>
-                    {{ dish.name }}
-                </span>
-                <span class="text-[10px] font-normal bg-slate-50 text-secondary px-2 py-1 rounded-lg border border-slate-100 shrink-0">
-                    {{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}
-                </span>
-                </div>
-                
-                <div class="flex flex-wrap gap-1 mt-1">
-                    <span class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-100 border-slate-200">
-                        {{ dictionaries.getMealTypeById(dish.meal_type)?.name || '...' }}
+                <div class="flex items-start justify-between gap-3">
+                    <span class="card-title leading-snug flex items-center gap-1.5 min-w-0">
+                        <span v-if="dish.batch_yield > 1" title="Готовится про запас на несколько приёмов пищи" class="material-icons-round text-sm text-indigo-500 shrink-0">kitchen</span>
+                        <span class="truncate">{{ dish.name }}</span>
                     </span>
-                    <span 
-                        v-for="tagId in (dish.tags || []).slice(0, 3)" 
-                        :key="tagId" 
-                        class="text-[10px] font-normal px-2 py-0.5 rounded-md border text-secondary bg-slate-50 border-slate-100 flex items-center gap-1" 
-                    >
-                    {{ tagById.get(tagId)?.icon }} {{ tagById.get(tagId)?.name }}
-                    </span>
-                    <span v-if="(dish.tags || []).length > 3" class="text-[10px] font-normal text-secondary px-1 pt-0.5">+{{ (dish.tags || []).length - 3 }}</span>
+                    <span class="text-sm font-black text-slate-900 shrink-0 leading-snug">{{ dish.kcal || 0 }}<span class="text-[10px] font-bold text-slate-400 ml-0.5">ккал</span></span>
                 </div>
-                
-                <div class="flex gap-3 text-[10px] font-normal text-secondary mt-1">
-                <span class="text-slate-900 font-bold">🔥 {{ dish.kcal || 0 }}</span>
-                <span>Б {{ dish.protein || 0 }}</span>
-                <span>Ж {{ dish.fat || 0 }}</span>
-                <span>У {{ dish.carbs || 0 }}</span>
+
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-md shrink-0">
+                        {{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}
+                    </span>
+                    <span class="text-[10px] text-secondary truncate min-w-0">
+                        {{ cardMeta(dish) }}
+                    </span>
+                    <div class="flex gap-1.5 text-[10px] font-normal text-secondary shrink-0 ml-auto leading-tight">
+                        <span>Б {{ dish.protein || 0 }}</span>
+                        <span>Ж {{ dish.fat || 0 }}</span>
+                        <span>У {{ dish.carbs || 0 }}</span>
+                    </div>
                 </div>
             </div>
           </div>

@@ -1,3 +1,10 @@
+// Мультивыбор (relation с maxSelect > 1) приходит массивом id; на всякий
+// случай принимаем и одиночную строку (старый формат / кэш до миграции).
+export const toIdArray = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [value] : []
+}
+
 export const isNetworkError = (err) => {
     return err.name === 'TimeoutError' || 
            err.message?.includes('fetch') || 
@@ -31,3 +38,6 @@ export const withRetry = async (fn, retries = 3, delay = 1000, onRetry = null) =
         }
     }
 }
+
+// Единицы в базе хранятся как 'Кг', 'Шт'... — на экране показываем строчными: "0.3 кг", "2 шт".
+export const formatUnit = (unit) => (unit || '').toString().toLowerCase()

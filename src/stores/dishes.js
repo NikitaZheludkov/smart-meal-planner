@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { pb } from '../lib/supabase'
 import { useAuthStore } from './auth'
-import { withRetry, withTimeout } from '../lib/utils'
+import { withRetry, withTimeout, toIdArray } from '../lib/utils'
 import { useUIStore } from './ui'
 import { useProductStore } from './products'
 
@@ -27,7 +27,7 @@ export const useDishStore = defineStore('dishes', () => {
 
     return {
       ...dish,
-      meal_type: dish.meal_type || null,
+      meal_type: toIdArray(dish.meal_type),
       dish_type: dish.dish_type || null,
       tags: Array.isArray(dish.tags) ? dish.tags : [],
       ingredients
@@ -129,7 +129,7 @@ export const useDishStore = defineStore('dishes', () => {
       const dishPayload = {
         name: dishData.name,
         dish_type: dishData.dish_type || null,
-        meal_type: dishData.meal_type || null,
+        meal_type: toIdArray(dishData.meal_type),
         tags: Array.isArray(dishData.tags) ? dishData.tags : [],
         description: dishData.description || '',
         kcal: Number(dishData.kcal) || 0,
@@ -138,6 +138,7 @@ export const useDishStore = defineStore('dishes', () => {
         carbs: Number(dishData.carbs) || 0,
         is_batch: dishData.is_batch || false,
         batch_yield: dishData.batch_yield || 1,
+        needs_side_dish: dishData.needs_side_dish || false,
         household: auth.householdId
       }
 
@@ -202,7 +203,7 @@ export const useDishStore = defineStore('dishes', () => {
       const dishPayload = {
         name: dishData.name,
         dish_type: dishData.dish_type || null,
-        meal_type: dishData.meal_type || null,
+        meal_type: toIdArray(dishData.meal_type),
         tags: Array.isArray(dishData.tags) ? dishData.tags : [],
         description: dishData.description || '',
         kcal: Number(dishData.kcal) || 0,
@@ -210,7 +211,8 @@ export const useDishStore = defineStore('dishes', () => {
         fat: Number(dishData.fat) || 0,
         carbs: Number(dishData.carbs) || 0,
         is_batch: dishData.is_batch || false,
-        batch_yield: dishData.batch_yield || 1
+        batch_yield: dishData.batch_yield || 1,
+        needs_side_dish: dishData.needs_side_dish || false
       }
 
       await withRetry(async () => {

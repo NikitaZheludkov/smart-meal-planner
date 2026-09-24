@@ -1,4 +1,4 @@
-const SYSTEM_UNITS = ['Кг', 'Г', 'Л', 'Шт', 'Упак']
+const SYSTEM_UNITS = ['Кг', 'Г', 'Л', 'Мл', 'Шт', 'Упак']
 const STOP_WORDS = new Set(['соус', 'масло', 'сыр'])
 const NAME_MATCH_MIN_SCORE = 84
 // \b — ASCII-only в JS (даже с флагом 'u'): после кириллической буквы граница
@@ -39,6 +39,7 @@ const convertToProductUnit = (alias, rawAmount, productUnit) => {
   if (alias.dimension === 'volume') {
     const ml = rawAmount * alias.toBase
     if (productUnit === 'Л') return ml / 1000
+    if (productUnit === 'Мл') return ml
     return null
   }
   if (alias.dimension === 'count') {
@@ -277,7 +278,7 @@ const isAmountAnomalous = (amount, unit) => {
   const normalizedUnit = normalizeSystemUnit(unit)
   if (!Number.isFinite(amount) || !normalizedUnit) return false
   if ((normalizedUnit === 'Кг' || normalizedUnit === 'Л') && amount >= 2) return true
-  if (normalizedUnit === 'Г' && amount >= 2000) return true
+  if ((normalizedUnit === 'Г' || normalizedUnit === 'Мл') && amount >= 2000) return true
   if (normalizedUnit === 'Шт' && amount >= 30) return true
   return false
 }

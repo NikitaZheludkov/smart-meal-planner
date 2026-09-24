@@ -12,6 +12,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Material Icons (Rounded & Outlined) -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round|Material+Icons+Outlined" rel="stylesheet">
+    <!-- Telegram Mini Apps SDK: должен грузиться именно с телеграмного CDN, а не self-host.
+         defer — чтобы недоступность/медленность telegram.org не блокировала показ
+         страницы обычным веб-пользователям; порядок выполнения относительно
+         основного модуля (тоже отложенного по спецификации) сохраняется. -->
+    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
   </head>
   <body>
     <div id="app"></div>

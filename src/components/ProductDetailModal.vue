@@ -1,4 +1,5 @@
 <script setup>
+import { formatUnit } from '../lib/utils'
 import { ref, watch, onUnmounted } from 'vue'
 import { useProductStore } from '../stores/products'
 import { useDictionariesStore } from '../stores/dictionaries'
@@ -10,7 +11,7 @@ const props = defineProps({
   product: Object,
   zIndex: {
     type: [Number, String],
-    default: 60
+    default: 70
   }
 })
 
@@ -35,8 +36,8 @@ const categoryIcons = {
     'Овощи и фрукты': '🥦',
     'Молочные продукты': '🥛',
     'Мясо, птица, рыба': '🥩',
-    'Бакалея и хлеб': '🍞',
-    'Заморозка': '🧊',
+    'Хлеб': '🍞',
+    'Крупы, макароны': '🌾',
     'Напитки': '🥤',
     'Бытовая химия': '🧼',
     'Соусы': '🧂',
@@ -47,7 +48,7 @@ const getCategoryIcon = (categoryName) => {
     return categoryIcons[categoryName] || '📦'
 }
 
-const units = ['Кг', 'Г', 'Л', 'Шт', 'Упак']
+const units = ['Кг', 'Г', 'Л', 'Мл', 'Шт', 'Упак']
 const modalRegistryId = `product-detail-${Math.random().toString(36).slice(2)}`
 
 watch(() => props.isOpen, (newVal) => {
@@ -152,51 +153,41 @@ const handleCancel = () => {
   <Transition name="modal">
     <div v-if="isOpen" class="fixed inset-0 flex flex-col justify-end" :style="{ zIndex: zIndex }" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
-      <div class="relative w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl overflow-hidden flex flex-col shadow-2xl modal-content">
-        <div class="flex-1 flex flex-col overflow-hidden relative">
-          <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
-          <!-- Header -->
-          <div class="px-5 pb-3 flex items-center justify-between shrink-0 border-b border-slate-50 bg-white z-20 min-h-[50px]">
-            <div class="w-20 flex justify-start">
-              <button @click="handleCancel" class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 tap-effect hover:bg-slate-200 active:scale-95 transition-transform">
-                <span class="material-icons-outlined text-xl">close</span>
-              </button>
-            </div>
-            <h3 class="card-title text-lg truncate px-2 text-center flex-1">
+      <div class="sheet modal-content">
+          <div class="sheet-handle"></div>
+          <div class="sheet-header z-20">
+            <button @click="handleCancel" class="sheet-close tap-effect" aria-label="Закрыть">
+              <span class="material-icons-round text-xl">close</span>
+            </button>
+            <h3 class="sheet-title">
               {{ isEditing ? (formData.id ? 'Редактирование' : 'Новый продукт') : 'Продукт' }}
             </h3>
-            <div class="w-20 flex justify-end items-center gap-2">
-              <template v-if="isEditing">
-                <button @click="handleSave" class="btn-primary text-xs font-bold shadow-lg flex items-center gap-2" :class="formData.name && formData.category && !isSaving ? 'bg-slate-900' : 'bg-slate-300 cursor-not-allowed'" :disabled="!formData.name || !formData.category || isSaving">
-                  <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
-                  {{ isSaving ? 'Сохранение' : 'Готово' }}
-                </button>
-              </template>
-              <template v-else>
-                <button @click="isEditing = true" class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center tap-effect hover:bg-indigo-100 active:scale-95 transition-transform">
-                  <span class="material-icons-round text-xl">edit</span>
-                </button>
-              </template>
+            <div>
+              <button v-if="isEditing" @click="handleSave" class="sheet-action tap-effect" :disabled="!formData.name || !formData.category || isSaving">
+                <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
+                {{ isSaving ? 'Сохр...' : 'Сохранить' }}
+              </button>
+              <button v-else @click="isEditing = true" class="sheet-close !text-slate-900 tap-effect" aria-label="Редактировать">
+                <span class="material-icons-round text-lg">edit</span>
+              </button>
             </div>
           </div>
           <!-- Content -->
-          <div class="flex-1 overflow-y-auto px-6 pb-8 pt-4 no-scrollbar bg-slate-50 relative z-0">
-            <div v-if="!isEditing" class="flex flex-col space-y-6 items-center pt-6">
-              <div class="w-24 h-24 bg-white rounded-3xl flex items-center justify-center text-5xl shadow-sm border border-slate-100">
+          <div class="min-h-0 overflow-y-auto px-6 pt-5 pb-[calc(32px+env(safe-area-inset-bottom,0px))] no-scrollbar bg-slate-50 relative z-0">
+            <div v-if="!isEditing" class="flex flex-col space-y-4 items-center">
+              <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-4xl border border-slate-100">
                 {{ getCategoryIcon(formData.category) }}
               </div>
               <div class="text-center">
-                <h2 class="text-2xl font-black text-slate-900 leading-tight mb-2">{{ formData.name }}</h2>
-                <span class="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold">
-                  {{ formData.category }}
-                </span>
+                <h2 class="text-xl card-title leading-tight mb-1">{{ formData.name }}</h2>
+                <span class="text-xs text-secondary">{{ formData.category }}</span>
               </div>
               <div class="bg-white p-4 rounded-2xl w-full border border-slate-100 shadow-sm flex justify-between items-center">
                 <span class="text-xs font-bold text-slate-400">Единица измерения</span>
-                <span class="font-black text-slate-900 text-lg">{{ formData.unit }}</span>
+                <span class="card-title">{{ formatUnit(formData.unit) }}</span>
               </div>
             </div>
-            <div v-else class="space-y-6">
+            <div v-else class="space-y-5">
               <div class="space-y-1">
                 <label class="text-[10px] font-bold text-slate-400 ml-1">Название</label>
                 <input v-model="formData.name" placeholder="Например: Молоко" class="w-full p-4 bg-white rounded-2xl font-bold text-slate-900 outline-none border-none text-lg shadow-sm" autoFocus>
@@ -217,19 +208,18 @@ const handleCancel = () => {
                   <label class="text-[10px] font-bold text-slate-400 ml-1">Единица</label>
                   <div class="relative">
                     <select v-model="formData.unit" class="w-full p-3 bg-white rounded-xl font-bold text-slate-900 outline-none border-none appearance-none text-sm shadow-sm">
-                      <option v-for="u in units" :key="u" :value="u">{{ u }}</option>
+                      <option v-for="u in units" :key="u" :value="u">{{ formatUnit(u) }}</option>
                     </select>
                     <span class="material-icons-round absolute right-3 top-3 text-slate-400 pointer-events-none text-sm">expand_more</span>
                   </div>
                 </div>
               </div>
-              <div v-if="formData.id" class="pt-6 mt-6 border-t border-slate-200">
+              <div v-if="formData.id" class="pt-2">
                 <button @click="handleDelete" class="w-full py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer">
                   <span class="material-icons-round">delete</span> Удалить продукт
                 </button>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>

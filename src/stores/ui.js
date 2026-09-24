@@ -12,8 +12,8 @@ export const useUIStore = defineStore('ui', () => {
 
   // --- БЛЮДА ---
   const dishes = ref({
-    activeCategory: 'all', // Тип блюда (Суп, Второе...)
-    activeTag: null,       // Прием пищи (Завтрак, Обед...) - старое название переменной
+    activeCategory: 'all', // Вид блюда (Горячее, Салат...)
+    activeTag: null,       // Вид приёма пищи (Завтрак, Обед...) - старое название переменной
     filterTags: [],        // НОВОЕ: Массив ID выбранных тегов (Быстро, ПП...)
     searchQuery: ''
   })
@@ -94,6 +94,12 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   const setOffline = (value) => {
+    // Без этой проверки любой вызов — включая самый первый, при открытии
+    // приложения (App.vue вызывает setOffline(!navigator.onLine) просто
+    // чтобы задать начальное состояние) — безусловно показывал тост, даже
+    // когда сеть никуда не пропадала. Тост нужен только на РЕАЛЬНУЮ смену.
+    if (value === isOffline.value) return
+
     isOffline.value = value
     if (value) {
         addLog('Сетевое соединение потеряно', 'warn')

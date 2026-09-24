@@ -4,8 +4,12 @@
 
 :root {
   font-family: 'Inter', sans-serif;
-  /* Стандартный отступ для мобильных устройств (Safe Area + базовый хедер) */
-  --app-header-pt: calc(env(safe-area-inset-top, 0px) + 16px);
+  /* Высота собственной шапки Telegram Mini App (кнопка "Закрыть", свайп-стрелка
+     и т.п.) — по умолчанию 0, выставляется из JS через contentSafeAreaInset,
+     когда приложение открыто внутри Telegram. См. App.vue. */
+  --tg-header-inset: 0px;
+  /* Стандартный отступ для мобильных устройств (Safe Area + шапка Telegram + базовый хедер) */
+  --app-header-pt: calc(env(safe-area-inset-top, 0px) + var(--tg-header-inset, 0px) + 16px);
   /* Анимация: тайминги
   */
   --dur-fast: 300ms;
@@ -31,11 +35,31 @@ body {
 /* Typography System */
 .app-title {
   font-family: 'Montserrat', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #000000;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Крупный логотип — только для экранов входа */
+.app-brand {
+  font-family: 'Montserrat', sans-serif;
   font-size: 32px;
-  font-weight: 900; /* Black/Heavy */
+  font-weight: 900;
   color: #000000;
   letter-spacing: -0.04em;
   line-height: 1.1;
+}
+
+/* Мелкая подпись над заголовком шапки */
+.app-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8E8E93;
+  line-height: 1;
 }
 
 .card-title {
@@ -319,3 +343,124 @@ html, body { overscroll-behavior-y: none; }
 .modal-leave-to .modal-content {
   transform: translateY(100%);
 }
+
+/* ---------- Чипы: единый вид для всех фильтров и выборов ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid #E5E5EA;
+  background-color: #FFFFFF;
+  color: #636366;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chip:active { transform: scale(0.97); }
+.chip-active {
+  background-color: #000000;
+  border-color: #000000;
+  color: #FFFFFF;
+}
+
+/* ---------- Нижние шторки (модалки) ---------- */
+/* Высота по содержимому, но не больше 92% экрана. Для длинных форм
+   добавляется .sheet-tall — фиксированная высота. */
+.sheet {
+  position: relative;
+  width: 100%;
+  max-height: 92vh;
+  background-color: #FFFFFF;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-tall { height: 92vh; }
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: #D1D1D6;
+  margin: 8px auto 4px;
+  flex-shrink: 0;
+}
+/* Шапка: крестик слева, заголовок строго по центру, действие справа */
+.sheet-header {
+  display: grid;
+  grid-template-columns: 96px 1fr 96px;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px 8px;
+  border-bottom: 1px solid #F2F2F7;
+  flex-shrink: 0;
+  background-color: #FFFFFF;
+}
+.sheet-header > :first-child { justify-self: start; }
+.sheet-header > :last-child { justify-self: end; }
+.sheet-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #000000;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-subtitle {
+  font-size: 10px;
+  font-weight: 500;
+  color: #8E8E93;
+  text-align: center;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background-color: #F2F2F7;
+  color: #8E8E93;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sheet-close:active { transform: scale(0.94); }
+.sheet-action {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background-color: #000000;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.sheet-action:disabled { background-color: #D1D1D6; cursor: not-allowed; }
+.sheet-action:active:not(:disabled) { transform: scale(0.96); }
+.sheet-action-text {
+  height: 36px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8E8E93;
+  white-space: nowrap;
+}
+
+/* Поле с тонкой рамкой (глобальный стиль input убирает border, поэтому !important) */
+.input-outline { border: 1px solid #E5E5EA !important; }
+.input-outline:focus { border-color: #000000 !important; }
