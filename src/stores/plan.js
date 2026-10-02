@@ -111,6 +111,9 @@ export const usePlanStore = defineStore('plan', () => {
     const optimisticItem = {
         ...payload,
         id: tempId,
+        // Стабильный ключ для списков: id сменится с временного на настоящий,
+        // а анимации не должны принять это за удаление и новое появление
+        _key: tempId,
         slot: '',
         dishData: item.type === 'dish' ? item : null,
         productData: item.type === 'product' ? item : null
@@ -127,6 +130,7 @@ export const usePlanStore = defineStore('plan', () => {
         ui.showToast('Не удалось сохранить в план', 'error')
         // Откат
         plan.value = plan.value.filter(p => p.id !== tempId)
+        return null
     } else {
         // Обновляем временный ID на реальный
         const index = plan.value.findIndex(p => p.id === tempId)
@@ -140,6 +144,8 @@ export const usePlanStore = defineStore('plan', () => {
         if (!ui.isModalOpen) {
           ui.showToast('Добавлено в план', 'success', 1200)
         }
+        // id созданной записи — чтобы вызывающий мог при необходимости её убрать
+        return data.id
     }
   }
 

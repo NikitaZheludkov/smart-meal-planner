@@ -4,11 +4,15 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
+import { useAppConfigStore } from '../stores/appConfig'
+import AdminPanel from '../components/AdminPanel.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const platform = usePlatformStore()
 const ui = useUIStore()
+const appConfig = useAppConfigStore()
+const showAdminPanel = ref(false)
 
 const selectedStartDay = ref(1)
 const selectedPeriod = ref(7)
@@ -533,6 +537,20 @@ const periods = [
         </div>
       </div>
 
+      <div v-if="appConfig.isAdmin">
+        <button
+          @click="showAdminPanel = true; platform.haptic.impact('light')"
+          class="w-full bg-white px-4 py-3.5 rounded-[20px] border border-slate-100 flex items-center gap-3 tap-effect text-left"
+        >
+          <span class="material-icons-round text-xl text-slate-900">admin_panel_settings</span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-sm font-semibold text-slate-900">Администрирование</span>
+            <span class="block text-[11px] text-secondary">Статистика, справочники и настройки приложения</span>
+          </span>
+          <span class="material-icons-round text-lg text-slate-300">chevron_right</span>
+        </button>
+      </div>
+
       <div>
         <button
           @click="handleLogout"
@@ -546,6 +564,8 @@ const periods = [
     </div>
 
     
+
+    <AdminPanel :is-open="showAdminPanel" @close="showAdminPanel = false" />
 
     <Transition name="modal">
     <div v-if="showJoinModal" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showJoinModal = false">

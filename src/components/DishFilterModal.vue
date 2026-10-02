@@ -1,8 +1,9 @@
 <script setup>
-import { watch, onUnmounted } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
+import { AUTO_TAGS } from '../lib/suggestions'
 
 const props = defineProps({
   isOpen: Boolean
@@ -29,6 +30,12 @@ onUnmounted(() => {
 // выбрасывала (order.map перебирал только 'time'/'context'/'diet'), и
 // список всегда был пустым. Тегов сейчас всего 5 и группировать их
 // пока не по чему — показываем плоским списком, как они есть.
+
+// Вычисляемые признаки идут первыми, затем теги пользователя
+const filterOptions = computed(() => [
+    ...AUTO_TAGS.map((t) => ({ id: t.id, name: t.name })),
+    ...(dictionaries.availableTags || []).map((t) => ({ id: t.id, name: t.name }))
+])
 
 const isSelected = (tagId) => {
     return uiStore.dishes.filterTags.includes(tagId)
@@ -79,12 +86,9 @@ const close = () => {
         </div>
 
         <div class="min-h-0 overflow-y-auto px-5 pt-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] no-scrollbar">
-          <div v-if="dictionaries.availableTags.length === 0" class="text-center text-sm text-secondary py-6">
-            Тегов пока нет
-          </div>
-          <div v-else class="flex flex-wrap gap-1.5">
+          <div class="flex flex-wrap gap-1.5">
             <button
-              v-for="tag in dictionaries.availableTags"
+              v-for="tag in filterOptions"
               :key="tag.id"
               @click="toggleFilter(tag.id)"
               class="chip tap-effect"

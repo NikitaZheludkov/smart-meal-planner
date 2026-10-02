@@ -7,6 +7,7 @@ import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
 import DishDetailModal from '../components/DishDetailModal.vue'
 import DishFilterModal from '../components/DishFilterModal.vue'
+import { dishHasTag } from '../lib/suggestions'
 
 const props = defineProps({
   searchQuery: {
@@ -31,11 +32,21 @@ const getMealTypeIndex = (id) => {
   return index !== -1 ? index + 1 : 0
 }
 
-// Слушаем изменение activeTag для определения направления анимации
+// Индекс вида блюда (все = 0)
+const getDishTypeIndex = (id) => {
+  if (id === 'all') return 0
+  const index = dictionaries.dishTypes.findIndex(t => t.id === id)
+  return index !== -1 ? index + 1 : 0
+}
+
+// Направление перелистывания: по тому ряду чипов, который переключили
 watch(() => uiStore.dishes.activeTag, (newId, oldId) => {
   const newIndex = getMealTypeIndex(newId)
   const oldIndex = getMealTypeIndex(oldId)
   transitionName.value = newIndex > oldIndex ? 'slide-left' : 'slide-right'
+})
+watch(() => uiStore.dishes.activeCategory, (newId, oldId) => {
+  transitionName.value = getDishTypeIndex(newId) > getDishTypeIndex(oldId) ? 'slide-left' : 'slide-right'
 })
 
 // Состояние модалок
@@ -122,8 +133,8 @@ const filteredDishes = computed(() => {
   // 4. ТЕГИ (Множественный выбор, логика AND)
   if (uiStore.dishes.filterTags.length > 0) {
       result = result.filter(dish => {
-          const dishTagIds = Array.isArray(dish.tags) ? dish.tags : []
-          return uiStore.dishes.filterTags.every(tagId => dishTagIds.includes(tagId))
+          // Теги пользователя + вычисляемые признаки ("Мало калорий" и т.п.)
+          return uiStore.dishes.filterTags.every(tagId => dishHasTag(dish, tagId))
       })
   }
   
@@ -136,6 +147,7 @@ const filteredDishes = computed(() => {
 
     <div class="flex-1 relative overflow-hidden">
       
+      <Transition name="fade">
       <div v-if="filteredDishes.length === 0" class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
         <div class="empty-state-container">
           <div class="empty-state-icon">
@@ -145,9 +157,10 @@ const filteredDishes = computed(() => {
           <p v-if="uiStore.dishes.filterTags.length > 0" class="empty-state-desc">Попробуйте сбросить теги</p>
         </div>
       </div>
+      </Transition>
 
       <Transition :name="transitionName">
-        <div :key="uiStore.dishes.activeTag || 'all'" class="absolute inset-0 w-full h-full overflow-y-auto px-5 pt-4 pb-app-nav scroll-area">
+        <div :key="(uiStore.dishes.activeTag || 'all') + '|' + uiStore.dishes.activeCategory" class="absolute inset-0 w-full h-full overflow-y-auto px-5 pt-4 pb-app-nav scroll-area">
           <div class="space-y-2 relative min-h-full">
             <div 
                 v-for="dish in filteredDishes" 

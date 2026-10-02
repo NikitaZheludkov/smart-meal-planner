@@ -20,6 +20,15 @@ const dictionaries = useDictionariesStore()
 const uiStore = useUIStore()
 
 const showProductModal = ref(false)
+
+// Перелистывание при смене категории — как у блюд: направление по порядку
+// чипов (тот же порядок, что в CatalogView: "Все", затем по алфавиту)
+const transitionName = ref('slide-left')
+const categoryOrder = computed(() => ['Все', ...Array.from(new Set(productStore.products.map((p) => p.category || 'Разное'))).sort()])
+watch(() => uiStore.products.activeCategory, (newCat, oldCat) => {
+  const order = categoryOrder.value
+  transitionName.value = order.indexOf(newCat) > order.indexOf(oldCat) ? 'slide-left' : 'slide-right'
+})
 const selectedProduct = ref(null)
 
 const categoryIcons = {
@@ -90,7 +99,9 @@ onMounted(async () => {
 <template>
   <div class="h-full bg-slate-50 flex flex-col relative">
 
-    <div class="flex-1 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area w-full">
+    <div class="flex-1 relative overflow-hidden">
+    <Transition :name="transitionName">
+    <div :key="uiStore.products.activeCategory" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav scroll-area w-full">
         <div v-if="productStore.loading" class="flex justify-center py-10">
             <span class="material-icons-round animate-spin text-slate-900">sync</span>
         </div>
@@ -122,6 +133,8 @@ onMounted(async () => {
                 </div>
             </div>
         </div>
+    </div>
+    </Transition>
     </div>
 
     <button 

@@ -319,7 +319,9 @@ html, body { overscroll-behavior-y: none; }
   transform: translateZ(0);
   overflow: hidden;
   will-change: transform, opacity;
-  background-color: #F5F5F7;
+  /* = bg-slate-50, фон всех экранов: без него во время перелистывания
+     мелькал прямоугольник другого оттенка серого */
+  background-color: #F8FAFC;
 }
 
 .slide-left-enter-from { opacity: 0; transform: translateX(20px); }
@@ -327,6 +329,7 @@ html, body { overscroll-behavior-y: none; }
 .slide-right-enter-from { opacity: 0; transform: translateX(-20px); }
 .slide-right-leave-to { opacity: 0; transform: translateX(20px); }
 
+/* Шторки (.modal-content выезжает снизу) и диалоги по центру (.modal-dialog) */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity var(--dur-base) var(--easing-base);
@@ -343,6 +346,66 @@ html, body { overscroll-behavior-y: none; }
 .modal-leave-to .modal-content {
   transform: translateY(100%);
 }
+.modal-enter-active .modal-dialog,
+.modal-leave-active .modal-dialog {
+  transition: transform var(--dur-base) var(--easing-base);
+}
+.modal-enter-from .modal-dialog,
+.modal-leave-to .modal-dialog {
+  transform: scale(0.94) translateY(8px);
+}
+
+/* Полноэкранные разделы с кнопкой «Назад» — въезжают справа */
+.page-enter-active,
+.page-leave-active {
+  transition: transform var(--dur-base) var(--easing-base);
+}
+.page-enter-from,
+.page-leave-to {
+  transform: translateX(100%);
+}
+
+/* Простое появление/исчезновение */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--dur-fast) var(--easing-base);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Быстрая подмена содержимого на месте (mode="out-in") */
+.swap-enter-active,
+.swap-leave-active {
+  transition: opacity 180ms var(--easing-base), transform 180ms var(--easing-base);
+}
+.swap-enter-from { opacity: 0; transform: translateY(4px); }
+.swap-leave-to { opacity: 0; transform: translateY(-4px); }
+
+/* Элементы списков (TransitionGroup name="list") */
+.list-enter-active,
+.list-leave-active {
+  transition: opacity var(--dur-fast) var(--easing-base), transform var(--dur-fast) var(--easing-base);
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+/* уходящий элемент вынимаем из потока, чтобы соседи плавно сдвинулись
+   (контейнер списка должен быть relative) */
+.list-leave-active {
+  position: absolute;
+  width: 100%;
+}
+.list-move {
+  transition: transform var(--dur-fast) var(--easing-base);
+}
+
+/* Проявление при появлении в DOM (уход — мгновенный) */
+.animate-fade-in { animation: fade-in var(--dur-fast) var(--easing-base); }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---------- Чипы: единый вид для всех фильтров и выборов ---------- */
 .chip {
@@ -383,6 +446,8 @@ html, body { overscroll-behavior-y: none; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* высоту при смене содержимого анимирует JS (см. DishDetailModal) */
+  transition: height var(--dur-base) var(--easing-base);
 }
 .sheet-tall { height: 92vh; }
 .sheet-handle {

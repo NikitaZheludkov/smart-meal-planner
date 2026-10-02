@@ -1,5 +1,6 @@
 <script setup>
 import { formatUnit } from '../lib/utils'
+import CollapseTransition from '../components/CollapseTransition.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { useSettingsStore } from '../stores/settings'
@@ -374,6 +375,7 @@ const formatQuantity = (item) => {
                                 </div>
 
                                 <!-- Expansion Content -->
+                                <CollapseTransition>
                                 <div v-if="expandedProductIds.has(item.id) && item.dishes.length > 0" class="px-4 pb-3 pl-10">
                                     <div class="flex flex-wrap gap-1">
                                         <div v-for="dishName in item.dishes" :key="dishName" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
@@ -381,6 +383,7 @@ const formatQuantity = (item) => {
                                         </div>
                                     </div>
                                 </div>
+                                </CollapseTransition>
                             </div>
                         </TransitionGroup>
                     </div>

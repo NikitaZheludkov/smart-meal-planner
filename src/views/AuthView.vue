@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { isNetworkError } from '../lib/utils'
 import { pb } from '../lib/supabase'
+import { useAppConfigStore } from '../stores/appConfig'
 
 const auth = useAuthStore()
 
@@ -10,6 +11,7 @@ const email = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
 const isLogin = ref(true)
+const appConfig = useAppConfigStore()
 const showPassword = ref(false)
 const showPasswordConfirm = ref(false)
 
@@ -92,6 +94,10 @@ const translateAuthError = (e) => {
   }
   if (fieldErrors.password) {
     return 'Проверьте пароль.'
+  }
+
+  if (!isLogin.value && e?.status === 400 && /Регистрация/.test(e?.message || '')) {
+    return 'Регистрация новых аккаунтов временно закрыта.'
   }
 
   if (isLogin.value && (e?.status === 400 || e?.status === 401)) {
@@ -275,6 +281,10 @@ const handleRequestPasswordReset = async () => {
                     class="flex-1 py-2 text-xs font-bold rounded-lg transition-colors"
                     :class="!isLogin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'"
                 >Регистрация</button>
+            </div>
+
+            <div v-if="!isLogin && !appConfig.registrationOpen" class="text-xs text-secondary text-center bg-slate-50 rounded-xl px-4 py-3 mb-1">
+                Регистрация новых аккаунтов сейчас закрыта. Войти можно в уже существующий аккаунт.
             </div>
 
             <div class="space-y-3 text-left">

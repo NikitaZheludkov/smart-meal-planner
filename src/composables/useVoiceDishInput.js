@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { pb } from '../lib/supabase'
 import { parseAiDishResponse, normalizeAiIngredient, matchIngredientToProduct, toFormIngredient } from '../lib/aiIngredients'
 
 const MAX_VOICE_RECORDING_MS = 12000
@@ -11,6 +12,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = 45000) => {
     try {
         return await fetch(url, {
             ...options,
+            headers: { ...(options.headers || {}), Authorization: pb.authStore.token },
             signal: controller.signal
         })
     } finally {

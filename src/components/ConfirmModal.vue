@@ -19,7 +19,7 @@ const onOk = () => ui.resolveConfirm(true)
   <Transition name="modal">
     <div v-if="isConfirmOpen" class="fixed inset-0 z-[3000] flex items-center justify-center px-5" @click.self="onCancel">
       <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
-      <div class="relative w-full max-w-sm bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="modal-dialog relative w-full max-w-sm bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden">
         <div class="p-5">
           <div class="text-sm font-black text-slate-900">{{ title }}</div>
           <div class="mt-2 text-xs text-slate-600 font-bold leading-relaxed whitespace-pre-line">{{ message }}</div>

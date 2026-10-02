@@ -11,7 +11,9 @@ import { useDishStore } from '../stores/dishes'
 import { useUIStore } from '../stores/ui' 
 import { usePlatformStore } from '../stores/platform'
 import DishSelector from '../components/DishSelector.vue'
+import CollapseTransition from '../components/CollapseTransition.vue'
 import DishDetailModal from '../components/DishDetailModal.vue'
+import WeekDraftSheet from '../components/WeekDraftSheet.vue'
 
 const auth = useAuthStore()
 const planStore = usePlanStore()
@@ -82,6 +84,7 @@ const defaultPortions = computed(() => {
 })
 
 const showSelector = ref(false)
+const showWeekDraft = ref(false)
 const targetSlot = ref({
     dateObj: null,      
     dateStr: '',        
@@ -438,6 +441,8 @@ const showTodayBtn = computed(() => {
 
 const goToToday = () => {
   const today = new Date()
+  const current = uiStore.plan.activeTab === 'day' ? selectedDate.value : currentWeekStart.value
+  transitionName.value = today < current ? 'slide-right' : 'slide-left'
   const userStartDay = settingsStore.startDay ?? 1
   currentWeekStart.value = startOfWeek(today, { weekStartsOn: userStartDay })
   selectedDate.value = today
@@ -534,7 +539,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
 
                 <div class="space-y-4 mt-2">
                     <div v-for="group in currentDayData" :key="group.slot.id">
-                        <transition name="fade">
+                        <CollapseTransition>
                             <div v-if="group.hasItems">
                                 <div class="flex items-center justify-between px-2 mb-1.5">
                                     <h3 class="card-title">{{ group.slot.name }}</h3>
@@ -543,7 +548,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                     </button>
                                 </div>
                                 <TransitionGroup name="list" tag="div" class="space-y-2 relative">
-                                    <div v-for="item in group.items" :key="item.id" @click="openDishDetails(item)" class="bg-white px-3.5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 relative transition-transform w-full" :class="item.dish ? 'tap-effect active:scale-[0.98]' : ''">
+                                    <div v-for="item in group.items" :key="item._key || item.id" @click="openDishDetails(item)" class="bg-white px-3.5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 relative transition-transform w-full" :class="item.dish ? 'tap-effect active:scale-[0.98]' : ''">
                                         <img v-if="item.dish && item.dishData?.image_url" :src="item.dishData.image_url" class="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 object-cover">
                                         <div v-else class="w-9 h-9 bg-slate-50 rounded-xl flex-shrink-0 flex items-center justify-center text-lg">
                                             <span v-if="item.product">🥦</span>
@@ -569,14 +574,20 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                     </div>
                                 </TransitionGroup>
                             </div>
-                        </transition>
+                        </CollapseTransition>
                     </div>
                 </div>
             </div>
 
-            <div v-else :key="'week'" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
-                <!-- Экспериментальный переключатель вида — временный, для сравнения -->
-                <div class="flex items-center justify-end gap-1 -mt-1 mb-1">
+            <div v-else :key="'week-' + currentWeekStart.toISOString()" class="absolute inset-0 overflow-y-auto px-5 pt-4 pb-app-nav space-y-3 mt-2 scroll-area w-full">
+                <div class="flex items-center gap-1 -mt-1 mb-1">
+                    <button
+                        @click="showWeekDraft = true; platform.haptic.impact('light')"
+                        class="h-8 pl-2.5 pr-3.5 mr-auto rounded-full bg-white border border-slate-200 text-slate-900 text-[12px] font-semibold flex items-center gap-1.5 tap-effect"
+                    >
+                        <span class="material-icons-round text-base">auto_awesome</span>
+                        Идеи на неделю
+                    </button>
                     <button @click="weekLayoutMode = 'grid'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors tap-effect" :class="weekLayoutMode === 'grid' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'">
                         <span class="material-icons-round text-base">grid_view</span>
                     </button>
@@ -712,15 +723,17 @@ onMounted(() => { if (auth.isAuth) loadData() })
     </div>
 
     <DishSelector 
-        v-if="showSelector" 
         :is-open="showSelector"
         :selected-date="targetSlot.dateObj"
         :slot-id="targetSlot.slotId"
         :existing-items="targetSlot.dateObj ? getSlotItems(targetSlot.dateObj, targetSlot.slotId) : []"
         :yesterday-items="targetSlot.yesterdayItems"
+        :period-start="currentWeekStart"
         @close="showSelector = false" 
         @select="onDishSelected" 
     />
+
+    <WeekDraftSheet :is-open="showWeekDraft" :period-start="currentWeekStart" @close="showWeekDraft = false" />
 
     <DishDetailModal :is-open="showDishModal" :dish="viewingDish" @close="showDishModal = false" />
 
@@ -769,6 +782,3 @@ onMounted(() => { if (auth.isAuth) loadData() })
   </div>
 </template>
 
-<style scoped>
-/* Scoped styles removed, using global transitions */
-</style>

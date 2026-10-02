@@ -9,6 +9,7 @@ import { useUIStore } from './stores/ui'
 import { usePlanStore } from './stores/plan'
 import { useDishStore } from './stores/dishes'
 import { useProductStore } from './stores/products'
+import { useAppConfigStore } from './stores/appConfig'
 
 // Импортируем компоненты страниц
 import PlanView from './views/PlanView.vue'
@@ -20,6 +21,7 @@ import ResetPasswordView from './views/ResetPasswordView.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import TelegramLinkPromptModal from './components/TelegramLinkPromptModal.vue'
+import AnnouncementSheet from './components/AnnouncementSheet.vue'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
@@ -27,6 +29,7 @@ const settings = useSettingsStore()
 const platform = usePlatformStore()
 const realtime = useRealtimeStore()
 const ui = useUIStore()
+const appConfig = useAppConfigStore()
 
 const currentTab = ref('plan')
 const transitionName = ref('slide-left')
@@ -110,7 +113,9 @@ const loadUserData = () => {
                         dictionaries.fetchDictionaries().catch(e => console.error('Dictionaries load failed', e)),
                         usePlanStore().fetchPlan().catch(e => console.error('Plan load failed', e)),
                         useDishStore().fetchDishes().catch(e => console.error('Dishes load failed', e)),
-                        useProductStore().fetchProducts().catch(e => console.error('Products load failed', e))
+                        useProductStore().fetchProducts().catch(e => console.error('Products load failed', e)),
+                        appConfig.fetchConfig(),
+                        appConfig.checkAdmin()
                     ])
                 } catch (e) {
                     console.error('Parallel data load error', e)
@@ -136,6 +141,7 @@ const loadUserData = () => {
 // Если статус авторизации меняется (например, вошли), грузим данные
 watch(() => auth.isAuth, (newVal) => {
   if (newVal) loadUserData()
+  else appConfig.isAdmin = false
 })
 
 // Обработчик возвращения приложения из фона/сна
@@ -207,6 +213,9 @@ onMounted(async () => {
             tgWebApp.onEvent?.('contentSafeAreaChanged', applyTelegramHeaderInset)
         }
 
+        // Настройки приложения нужны и до входа (например, закрыта ли регистрация)
+        appConfig.fetchConfig()
+
         await auth.init()
 
         // Если локальной сессии нет, но приложение открыто внутри Telegram
@@ -255,6 +264,8 @@ onUnmounted(() => {
         Нет соединения с интернетом
     </div>
 
+    <!-- Загрузка → вход → приложение: мягкая смена экранов -->
+    <Transition name="fade" mode="out-in">
     <div v-if="resetPasswordToken" class="flex-1 bg-white">
       <ResetPasswordView :token="resetPasswordToken" @done="clearResetPasswordToken" />
     </div>
@@ -278,7 +289,7 @@ onUnmounted(() => {
       <AuthView />
     </div>
 
-    <template v-else>
+    <div v-else class="flex-1 flex flex-col relative min-h-0">
       <main class="flex-1 relative z-0 overflow-hidden bg-slate-50">
         <transition :name="transitionName" mode="out-in">
            <component :is="activeComponent" :key="currentTab" class="absolute inset-0 w-full h-full" />
@@ -316,10 +327,12 @@ onUnmounted(() => {
           </button>
         </div>
       </nav>
-    </template>
+    </div>
+    </Transition>
     <ToastContainer />
     <ConfirmModal />
     <TelegramLinkPromptModal />
+    <AnnouncementSheet v-if="auth.isAuth && !isAppInitializing" />
   </div>
 </template>
 

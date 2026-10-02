@@ -6,6 +6,15 @@ routerAdd(
   'POST',
   '/api/yandex-stt/speech/v1/stt:recognize',
   (e) => {
+    // Прокси тратит платный ключ Yandex — только для вошедших пользователей
+    // и только пока голосовой ввод включён в панели администратора.
+    if (!e.auth) {
+      throw new UnauthorizedError('Нужно войти в аккаунт')
+    }
+    if (require(`${__hooks}/admin_utils.js`).getSetting('voice_input_enabled') === false) {
+      throw new ForbiddenError('Голосовой ввод временно отключён')
+    }
+
     const yandexKey = ($os.getenv('YANDEX_API_KEY') || '').trim()
     if (!yandexKey) {
       throw new InternalServerError('YANDEX_API_KEY не задана в окружении сервера PocketBase')
@@ -65,6 +74,15 @@ routerAdd(
   'POST',
   '/api/yandex-llm/foundationModels/v1/completion',
   (e) => {
+    // Прокси тратит платный ключ Yandex — только для вошедших пользователей
+    // и только пока голосовой ввод включён в панели администратора.
+    if (!e.auth) {
+      throw new UnauthorizedError('Нужно войти в аккаунт')
+    }
+    if (require(`${__hooks}/admin_utils.js`).getSetting('voice_input_enabled') === false) {
+      throw new ForbiddenError('Голосовой ввод временно отключён')
+    }
+
     const yandexKey = ($os.getenv('YANDEX_API_KEY') || '').trim()
     if (!yandexKey) {
       throw new InternalServerError('YANDEX_API_KEY не задана в окружении сервера PocketBase')
@@ -331,6 +349,10 @@ routerAdd('POST', '/api/telegram-auth', (e) => {
           username: tgUser.username || ''
         }
       })
+    }
+
+    if (require(`${__hooks}/admin_utils.js`).getSetting('registration_open') === false) {
+      throw new BadRequestError('Регистрация новых аккаунтов временно закрыта')
     }
 
     const usersCollection = $app.findCollectionByNameOrId('users')

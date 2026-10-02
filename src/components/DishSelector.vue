@@ -6,7 +6,10 @@ import { usePlanStore } from '../stores/plan'
 import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
+import { useSettingsStore } from '../stores/settings'
+import { buildContext, rankDishes, SUGGESTION_FILTERS } from '../lib/suggestions'
 import { format, parseISO } from 'date-fns'
+import CollapseTransition from './CollapseTransition.vue'
 import { ru } from 'date-fns/locale'
 
 const props = defineProps({
@@ -20,7 +23,9 @@ const props = defineProps({
   yesterdayItems: {
       type: Array,
       default: () => []
-  }
+  },
+  // Начало текущего периода плана — для подсказок "из того, что покупаем"
+  periodStart: [Date, String]
 })
 
 const emit = defineEmits(['close', 'select'])
@@ -55,6 +60,20 @@ watch(() => props.isOpen, (newVal) => {
     ui.syncModalState(modalRegistryId, newVal)
 }, { immediate: true })
 
+// Окно не размонтируется при закрытии (иначе не видно анимации ухода),
+// поэтому при каждом открытии начинаем с чистого листа.
+watch(() => props.isOpen, (open) => {
+    if (!open) return
+    transitionName.value = 'slide-left'
+    activeMode.value = 'dish'
+    searchQuery.value = ''
+    activeCategory.value = 'all'
+    showSearchDropdown.value = false
+    suggestionFilters.value = []
+    suggestionPage.value = 0
+    garnishPrompt.value = null
+})
+
 onUnmounted(() => {
     ui.clearModalState(modalRegistryId)
 })
@@ -69,39 +88,63 @@ const selectFromDropdown = (dish) => {
     showSearchDropdown.value = false
 }
 
-const yesterdayDishIds = computed(() => {
-    const ids = new Set()
-    if (props.yesterdayItems && props.yesterdayItems.length > 0) {
-        props.yesterdayItems.forEach(item => {
-            if (item.dish) ids.add(item.dish)
-        })
-    }
-    return ids
-})
+// --- Предложения (движок в lib/suggestions.js) ---
+const settingsStore = useSettingsStore()
+const SUGGESTIONS_PER_PAGE = 3
+const suggestionFilters = ref([])
+const suggestionPage = ref(0)
 
-const recommendedDishes = computed(() => {
-    if (activeMode.value !== 'dish' || searchQuery.value) return []
-    
-    return dishStore.dishes.filter(d => {
-        // Не показываем уже выбранные
-        if (props.existingItems.some(i => i.dish === d.id)) return false
+// Фильтры: вычисляемые + теги пользователя
+const suggestionFilterOptions = computed(() => [
+    ...SUGGESTION_FILTERS,
+    ...(dictionaries.availableTags || []).map((t) => ({ id: t.id, name: t.name }))
+])
 
-        // Если выбрана категория (например, "Гарнир" из подсказки) — держим
-        // список рекомендаций в её рамках, иначе подсказка "Выбрать гарнир"
-        // выглядела бы обманчиво: фильтр активен, а сверху всё равно горячее
-        if (activeCategory.value !== 'all' && d.dish_type !== activeCategory.value) return false
+const toggleSuggestionFilter = (id) => {
+    platform.haptic.selection()
+    const idx = suggestionFilters.value.indexOf(id)
+    if (idx === -1) suggestionFilters.value.push(id)
+    else suggestionFilters.value.splice(idx, 1)
+    suggestionPage.value = 0
+}
 
-        // Вчерашние или подходящие по слоту
-        return yesterdayDishIds.value.has(d.id) || (d.meal_type || []).includes(props.slotId)
-    }).sort((a, b) => {
-        // Сначала вчерашние, потом по слоту
-        const isAYesterday = yesterdayDishIds.value.has(a.id)
-        const isBYesterday = yesterdayDishIds.value.has(b.id)
-        if (isAYesterday && !isBYesterday) return -1
-        if (!isAYesterday && isBYesterday) return 1
-        return 0
+const rankedSuggestions = computed(() => {
+    if (activeMode.value !== 'dish' || searchQuery.value || !props.selectedDate || !props.slotId) return []
+    const ctx = buildContext({
+        planItems: planStore.plan,
+        dishes: dishStore.dishes,
+        periodStart: props.periodStart || props.selectedDate,
+        periodLength: settingsStore.periodLength || 7
     })
+    const onlyGarnish = !!garnishTypeId.value && activeCategory.value === garnishTypeId.value
+    let ranked = rankDishes(ctx, dishStore.dishes, {
+        date: props.selectedDate,
+        mealTypeId: props.slotId,
+        mealTypeName: dictionaries.getMealTypeById(props.slotId)?.name || '',
+        filters: suggestionFilters.value,
+        excludeDishIds: props.existingItems.map((i) => i.dish).filter(Boolean),
+        garnishTypeId: garnishTypeId.value,
+        onlyGarnish
+    })
+    if (!onlyGarnish && activeCategory.value !== 'all') {
+        ranked = ranked.filter((r) => r.dish.dish_type === activeCategory.value)
+    }
+    return ranked
 })
+
+const suggestionPageCount = computed(() => Math.ceil(rankedSuggestions.value.length / SUGGESTIONS_PER_PAGE))
+const visibleSuggestions = computed(() => {
+    const start = (suggestionPage.value % Math.max(1, suggestionPageCount.value)) * SUGGESTIONS_PER_PAGE
+    return rankedSuggestions.value.slice(start, start + SUGGESTIONS_PER_PAGE)
+})
+const showMoreSuggestions = () => {
+    platform.haptic.selection()
+    suggestionPage.value = (suggestionPage.value + 1) % Math.max(1, suggestionPageCount.value)
+}
+watch([activeCategory, () => props.existingItems.length], () => { suggestionPage.value = 0 })
+
+// Видимые предложения не дублируем в общем списке ниже
+const recommendedDishes = computed(() => visibleSuggestions.value.map((r) => r.dish))
 
 const dropdownSearchResults = computed(() => {
     if (!searchQuery.value) return []
@@ -227,7 +270,6 @@ const getSlotName = computed(() => {
     return slot ? slot.name : 'Прием пищи'
 })
 
-const isYesterday = (id) => yesterdayDishIds.value.has(id)
 const isSlotMatch = (dishMealTypeId) => dishMealTypeId === props.slotId
 const getDishSlotName = (id) => {
     const slot = dictionaries.mealTypes.find(m => m.id === id)
@@ -295,14 +337,15 @@ const getDishSlotName = (id) => {
             </div>
 
             <!-- Existing Items: порции и "уже есть дома" можно поправить сразу тут -->
+            <CollapseTransition>
             <div v-if="existingItems.length > 0" class="px-4 pb-3">
                 <div class="bg-slate-50/80 rounded-2xl p-2 border border-slate-100">
                     <div class="text-[10px] font-black text-slate-400 px-1 mb-1.5 uppercase tracking-wider">
                         <span>Выбрано ({{ existingItems.length }})</span>
                     </div>
-                    <div class="space-y-1.5">
-                        <div v-for="item in existingItems" :key="item.id"
-                            class="bg-white border border-slate-200 rounded-xl px-2.5 py-2 flex items-center gap-2 shadow-sm animate-fade-in"
+                    <CollapseTransition group class="space-y-1.5">
+                        <div v-for="item in existingItems" :key="item._key || item.id"
+                            class="bg-white border border-slate-200 rounded-xl px-2.5 py-2 flex items-center gap-2 shadow-sm"
                         >
                             <span class="flex-1 min-w-0 text-[11px] font-bold text-slate-700 truncate">
                                 {{ item.dish ? item.dishData?.name : item.productData?.name }}
@@ -331,13 +374,14 @@ const getDishSlotName = (id) => {
                                 <span class="material-icons-round text-lg">cancel</span>
                             </button>
                         </div>
-                    </div>
+                    </CollapseTransition>
                 </div>
             </div>
+            </CollapseTransition>
 
             <!-- Подсказка "добавить гарнир" — появляется после выбора блюда с
                  отмеченным needs_side_dish, пока в слоте нет ни одного гарнира -->
-            <Transition name="list">
+            <CollapseTransition>
                 <div v-if="garnishPrompt" class="px-4 pb-3">
                     <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 flex items-center gap-3">
                         <span class="text-xl shrink-0">🍚</span>
@@ -354,7 +398,7 @@ const getDishSlotName = (id) => {
                         </button>
                     </div>
                 </div>
-            </Transition>
+            </CollapseTransition>
 
             <!-- Mode Switcher -->
             <div class="px-4 pb-3 flex gap-2">
@@ -400,56 +444,72 @@ const getDishSlotName = (id) => {
         <div class="flex-1 relative overflow-hidden bg-slate-50">
             <Transition :name="transitionName">
             <div v-if="activeMode === 'dish'" key="dish" class="absolute inset-0 w-full h-full overflow-y-auto px-4 pb-10 pt-3">
-                <div v-if="filteredDishes.length === 0 && recommendedDishes.length === 0" class="empty-state-container">
+                <div v-if="searchQuery && filteredDishes.length === 0" class="empty-state-container">
                     <div class="empty-state-icon">
                         <span class="material-icons-round" style="font-size: 64px;">{{ searchQuery ? 'search_off' : 'restaurant_menu' }}</span>
                     </div>
                     <p class="empty-state-title">{{ searchQuery ? 'Ничего не найдено' : 'Список пуст' }}</p>
                 </div>
 
-                <!-- Рекомендованные блюда -->
-                <div v-if="recommendedDishes.length > 0" class="space-y-2">
-                    <div class="flex items-center gap-2 px-1">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Рекомендуем</span>
-                        <div class="h-px bg-slate-200 flex-1"></div>
-                    </div>
-                    
-                    <div v-for="dish in recommendedDishes" :key="dish.id" @click="selectItem(dish, 'dish')"
-                        class="p-3 rounded-2xl flex items-center gap-3 border transition-colors tap-effect active:scale-[0.98] bg-white shadow-sm"
-                        :class="isYesterday(dish.id) ? 'border-indigo-200 ring-1 ring-indigo-50' : 'border-emerald-200 ring-1 ring-emerald-50'"
-                    >
-                        <div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center text-xl border border-slate-100">
-                            <img v-if="dish.image_url" :src="dish.image_url" class="w-full h-full object-cover">
-                            <span v-else>🥘</span>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                <span v-if="isYesterday(dish.id)" class="text-[9px] font-black text-indigo-500 bg-indigo-50 px-1.5 rounded border border-indigo-100 uppercase">Вчера</span>
-                                <span v-else class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 rounded border border-emerald-100 uppercase">{{ getSlotName }}</span>
-                                <div class="card-title text-sm truncate flex items-center gap-1">
-                                    <span v-if="dish.batch_yield > 1" title="Готовится про запас" class="material-icons-round text-xs text-indigo-500 shrink-0">kitchen</span>
-                                    {{ dish.name }}
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-medium text-secondary bg-slate-100 px-1.5 py-0.5 rounded">{{ dictionaries.getDishTypeById(dish.dish_type)?.name || '...' }}</span>
-                                <span class="text-[10px] font-bold text-orange-400">🔥 {{ dish.kcal }}</span>
-                            </div>
-                        </div>
-                        <button class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md">
-                            <span class="material-icons-round text-lg">add</span>
+                <!-- Предложения -->
+                <div v-if="!searchQuery" class="mb-4">
+                    <div class="flex items-center justify-between px-1 mb-2">
+                        <span class="app-eyebrow flex items-center gap-1"><span class="material-icons-round text-[13px] text-slate-900">auto_awesome</span>Предложения</span>
+                        <button
+                            v-if="suggestionPageCount > 1"
+                            @click="showMoreSuggestions"
+                            class="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tap-effect"
+                        >
+                            <span class="material-icons-round text-sm">refresh</span>
+                            Ещё варианты
                         </button>
                     </div>
+
+                    <div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mb-2">
+                        <button
+                            v-for="f in suggestionFilterOptions"
+                            :key="f.id"
+                            @click="toggleSuggestionFilter(f.id)"
+                            class="chip tap-effect"
+                            :class="suggestionFilters.includes(f.id) ? 'chip-active' : ''"
+                        >{{ f.name }}</button>
+                    </div>
+
+                    <Transition name="swap" mode="out-in">
+                    <div v-if="visibleSuggestions.length" :key="visibleSuggestions.map((s) => s.dish.id).join()" class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                        <button
+                            v-for="s in visibleSuggestions"
+                            :key="s.dish.id"
+                            @click="selectItem(s.dish, 'dish')"
+                            class="w-full !rounded-none flex items-center gap-3 px-3.5 py-2.5 border-b border-slate-50 last:border-0 text-left active:bg-slate-50 transition-colors"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <div class="card-title leading-snug flex items-center gap-1">
+                                    <span v-if="s.dish.batch_yield > 1" title="Готовится про запас" class="material-icons-round text-xs text-slate-400 shrink-0">kitchen</span>
+                                    {{ s.dish.name }}
+                                </div>
+                                <div v-for="reason in s.reasons" :key="reason" class="text-[11px] text-secondary leading-snug mt-0.5">{{ reason }}</div>
+                                <div v-if="s.dish.kcal" class="text-[11px] text-secondary leading-snug mt-0.5">{{ s.dish.kcal }} ккал на порцию</div>
+                            </div>
+                            <span class="w-8 h-8 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center shrink-0">
+                                <span class="material-icons-round text-lg">add</span>
+                            </span>
+                        </button>
+                    </div>
+                    <div v-else class="text-[12px] text-secondary text-center bg-white rounded-2xl border border-slate-100 px-4 py-4">
+                        {{ suggestionFilters.length ? 'Нет блюд под выбранные фильтры' : 'Нет блюд для этого приёма пищи' }}
+                    </div>
+                    </Transition>
                 </div>
 
                 <!-- Основной список -->
                 <div v-if="filteredDishes.length > 0" class="space-y-2">
-                    <div v-if="recommendedDishes.length > 0" class="flex items-center gap-2 px-1 pt-2">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Все блюда</span>
+                    <div v-if="!searchQuery" class="flex items-center gap-2 px-1">
+                        <span class="app-eyebrow">Все блюда</span>
                         <div class="h-px bg-slate-200 flex-1"></div>
                     </div>
 
-                    <TransitionGroup name="list" tag="div" class="space-y-2">
+                    <TransitionGroup name="list" tag="div" class="space-y-2 relative">
                     <div 
                         v-for="dish in filteredDishes" 
                         :key="dish.id"
@@ -509,25 +569,3 @@ const getDishSlotName = (id) => {
   </Transition>
 </template>
 
-<style scoped>
-/* Removed animate-slide-up as it is handled by global modal transition */
-.list-enter-active,
-.list-leave-active {
-  transition: opacity var(--dur-fast) var(--easing-base), transform var(--dur-fast) var(--easing-base);
-}
-.list-enter-from {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-.list-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-.list-leave-active {
-  position: absolute;
-  width: 100%;
-}
-.list-move {
-  transition: transform var(--dur-fast) var(--easing-base);
-}
-</style>

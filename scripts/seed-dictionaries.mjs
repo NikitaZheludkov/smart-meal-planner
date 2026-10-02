@@ -9,7 +9,7 @@ await pb.collection('_superusers').authWithPassword(ADMIN_EMAIL, ADMIN_PASS);
 
 const mealTypes = ['Завтрак', 'Обед', 'Ужин', 'Перекус'];
 const dishTypes = ['Горячее', 'Салат', 'Гарнир', 'Закуска', 'Прочее'];
-const dishTags = ['Быстро', 'Вегетарианское', 'Детское', 'Праздничное', 'Заготовка'];
+const dishTags = ['Быстро', 'Вегетарианское', 'Детское', 'Праздничное'];
 
 async function seed(collection, names) {
   const existing = await pb.collection(collection).getFullList();

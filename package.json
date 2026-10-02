@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/montserrat": "^5.3.0",
     "date-fns": "^4.1.0",
+    "material-icons": "^1.13.14",
     "pinia": "^3.0.4",
     "pocketbase": "^0.26.9",
     "vue": "^3.5.24"

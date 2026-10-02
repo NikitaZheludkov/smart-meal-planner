@@ -18,7 +18,7 @@ const getBgColor = (type) => {
 
 <template>
   <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
-    <transition-group name="toast" move-class="">
+    <transition-group name="toast">
       <div 
         v-for="toast in toasts" 
         :key="toast.id"
@@ -44,8 +44,14 @@ const getBgColor = (type) => {
   opacity: 0;
   transform: translateY(-20px);
 }
+/* уходящий тост вынимаем из потока, чтобы остальные плавно поднялись;
+   left/right = отступы контейнера (px-4), иначе тост расширялся бы */
 .toast-leave-active {
   position: absolute;
-  width: 100%;
+  left: 16px;
+  right: 16px;
+}
+.toast-move {
+  transition: transform var(--dur-fast) var(--easing-base);
 }
 </style>

@@ -6,9 +6,14 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlanStore } from '../stores/plan'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
+import { useAppConfigStore } from '../stores/appConfig'
 import ProductDetailModal from './ProductDetailModal.vue'
+import CollapseTransition from './CollapseTransition.vue'
 import { useVoiceDishInput } from '../composables/useVoiceDishInput'
 import { toIdArray, formatUnit } from '../lib/utils'
+import { getAutoTags } from '../lib/suggestions'
+
+const appConfig = useAppConfigStore()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -25,7 +30,36 @@ const ui = useUIStore()
 
 const isEditing = ref(false)
 const isSaving = ref(false)
-const showTagSelection = ref(false)
+
+// Просмотр ↔ редактирование: шторка плавно меняет высоту от текущей к новой.
+// Высоту фиксируем до перерисовки, меряем новую и анимируем между ними —
+// иначе в момент смены разметки шторка на кадр схлопывается.
+const sheetEl = ref(null)
+let sheetResizeId = 0
+watch(isEditing, async () => {
+    const el = sheetEl.value
+    if (!el || !props.isOpen) return
+    const id = ++sheetResizeId
+    const from = el.getBoundingClientRect().height
+    el.style.height = `${from}px`
+    await nextTick()
+    // мерим новую высоту без перехода, иначе получим стартовое значение анимации
+    el.style.transition = 'none'
+    el.style.height = ''
+    const to = el.getBoundingClientRect().height
+    el.style.height = `${from}px`
+    void el.offsetHeight
+    el.style.transition = ''
+    el.style.height = `${to}px`
+    const clear = (e) => {
+        if (e && (e.target !== el || e.propertyName !== 'height')) return
+        if (id !== sheetResizeId) return // уже идёт следующая смена
+        el.removeEventListener('transitionend', clear)
+        el.style.height = ''
+    }
+    el.addEventListener('transitionend', clear)
+    setTimeout(clear, 600)
+}, { flush: 'pre' })
 const showIngredientOverlay = ref(false)
 const editingIngredientKey = ref(null)
 const tempAmount = ref('')
@@ -316,30 +350,6 @@ const toggleMealType = (id) => {
         : [...current, id]
 }
 
-const categoryLabels = {
-    'time': 'Время приготовления',
-    'context': 'Сценарий и Метод',
-    'diet': 'Тип питания и Здоровье',
-    'other': 'Прочее'
-}
-
-const groupedTags = computed(() => {
-    const groups = {}
-    dictionaries.availableTags.forEach(tag => {
-        const cat = tag.category || 'other'
-        if (!groups[cat]) groups[cat] = []
-        groups[cat].push(tag)
-    })
-    
-    const order = ['time', 'context', 'diet', 'other']
-    
-    return order.map(code => ({
-        code,
-        label: categoryLabels[code] || code,
-        tags: groups[code] || []
-    })).filter(g => g.tags.length > 0)
-})
-
 const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
 
 const isTagSelected = (tag) => {
@@ -355,15 +365,8 @@ const toggleTag = (tag) => {
     }
 }
 
-const openTagSelector = () => {
-    platform.haptic.impact('light')
-    showTagSelection.value = true
-}
-
-const closeTagSelector = () => {
-    platform.haptic.impact('light')
-    showTagSelection.value = false
-}
+// Признаки, которые считаются сами из КБЖУ (не теги в базе)
+const autoTagNames = computed(() => getAutoTags(formData.value || {}).map((t) => t.name))
 
 const initForm = (dishData) => {
     formData.value = JSON.parse(JSON.stringify(dishData))
@@ -406,7 +409,6 @@ const initForm = (dishData) => {
     productAmounts.value = {}
     productSearchQuery.value = ''
     showProductDropdown.value = false
-    showTagSelection.value = false 
     showIngredientOverlay.value = false
     showAdditionalDetails.value = false
     isAiNutritionEstimated.value = false
@@ -646,26 +648,22 @@ onUnmounted(() => {
     <div v-if="isOpen" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="handleCancel">
       <div class="absolute inset-0 bg-black/40 transition-opacity"></div>
       
-      <div class="sheet modal-content" :class="{ 'sheet-tall': isEditing || showTagSelection }" style="isolation: isolate;">
+      <div ref="sheetEl" class="sheet modal-content" :class="{ 'sheet-tall': isEditing }" style="isolation: isolate;">
             <div class="sheet-handle"></div>
 
             <div class="sheet-header z-20">
                 <div>
-                    <button v-if="showTagSelection" @click="closeTagSelector" class="sheet-close tap-effect" aria-label="Назад">
-                        <span class="material-icons-round text-xl">arrow_back</span>
-                    </button>
-                    <button v-else @click="handleCancel" class="sheet-close tap-effect" aria-label="Закрыть">
+                    <button @click="handleCancel" class="sheet-close tap-effect" aria-label="Закрыть">
                         <span class="material-icons-round text-xl">close</span>
                     </button>
                 </div>
 
                 <h3 class="sheet-title">
-                    {{ showTagSelection ? 'Теги' : (formData.id ? (isEditing ? 'Редактирование' : 'Блюдо') : 'Новое блюдо') }}
+                    {{ formData.id ? (isEditing ? 'Редактирование' : 'Блюдо') : 'Новое блюдо' }}
                 </h3>
 
                 <div>
-                    <button v-if="showTagSelection" @click="closeTagSelector" class="sheet-action tap-effect">Готово</button>
-                    <button v-else-if="isEditing" @click="handleSave" :disabled="!formData.name || isSaving" class="sheet-action tap-effect">
+                    <button v-if="isEditing" @click="handleSave" :disabled="!formData.name || isSaving" class="sheet-action tap-effect">
                         <span v-if="isSaving" class="material-icons-round text-sm animate-spin">sync</span>
                         {{ isSaving ? 'Сохр...' : 'Сохранить' }}
                     </button>
@@ -675,11 +673,13 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div class="relative bg-white" :class="isEditing || showTagSelection ? 'flex-1 overflow-hidden' : 'min-h-0 flex flex-col'">
+            <div class="relative bg-white" :class="isEditing ? 'flex-1 overflow-hidden' : 'min-h-0 flex flex-col'">
                 
-                <div v-show="!showTagSelection" class="overflow-y-auto px-6 pt-4 no-scrollbar" :class="isEditing ? 'absolute inset-0 pb-[120px]' : 'min-h-0 pb-[calc(24px+env(safe-area-inset-bottom,0px))]'">
+                <div class="overflow-y-auto px-6 pt-4 no-scrollbar" :class="isEditing ? 'absolute inset-0 pb-[120px]' : 'min-h-0 pb-[calc(24px+env(safe-area-inset-bottom,0px))]'">
                     
-                    <div v-if="!isEditing" class="flex flex-col space-y-3">
+                    <!-- новое содержимое проявляется, старое уходит сразу — так шторка
+                         может сразу мерить и анимировать новую высоту -->
+                    <div v-if="!isEditing" class="flex flex-col space-y-3 animate-fade-in">
                         <div class="text-center">
                             <h2 class="text-xl card-title leading-tight mb-1.5">{{ formData.name }}</h2>
                             <div class="text-xs text-secondary text-center">
@@ -747,7 +747,7 @@ onUnmounted(() => {
                         </div>
                     </div>
 
-                    <div v-else class="relative overflow-hidden min-h-[400px]">
+                    <div v-else class="relative overflow-hidden min-h-[400px] animate-fade-in">
                         
                         <div class="space-y-4">
                             
@@ -759,14 +759,14 @@ onUnmounted(() => {
                                         class="flex-1 text-center text-lg font-bold input-outline rounded-2xl px-4 py-2.5 w-full outline-none focus:ring-0 transition-colors placeholder:text-slate-300 placeholder:font-medium"
                                     >
                                     <button 
-                                        v-if="isProcessingVoice"
+                                        v-if="appConfig.voiceInputEnabled && isProcessingVoice"
                                         class="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0"
                                         disabled
                                     >
                                         <span class="material-icons-round text-xl text-slate-400 animate-spin">sync</span>
                                     </button>
                                     <button 
-                                        v-else
+                                        v-else-if="appConfig.voiceInputEnabled"
                                         @click="toggleVoiceRecord"
                                         class="w-11 h-11 rounded-2xl flex items-center justify-center transition-all tap-effect shrink-0"
                                         :class="isRecordingVoice 
@@ -780,7 +780,7 @@ onUnmounted(() => {
                                 <div v-if="isRecordingVoice" class="text-center text-xs font-bold text-red-500">
                                     Слушаю...
                                 </div>
-                                <div v-else-if="!formData.id && !formData.ingredients.length" class="text-center text-[10px] font-bold text-slate-400 px-4">
+                                <div v-else-if="appConfig.voiceInputEnabled && !formData.id && !formData.ingredients.length" class="text-center text-[10px] font-bold text-slate-400 px-4">
                                     Можно надиктовать рецепт целиком — название, состав и БЖУ заполнятся сами
                                 </div>
                             </div>
@@ -815,6 +815,25 @@ onUnmounted(() => {
                                         >
                                             {{ t.name }}
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div v-if="dictionaries.availableTags.length">
+                                    <div class="text-[10px] font-bold text-slate-400 mb-1 pl-1">Теги <span class="font-normal">— помогают в подсказках при планировании</span></div>
+                                    <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
+                                        <button
+                                            v-for="tag in dictionaries.availableTags"
+                                            :key="tag.id"
+                                            @click="toggleTag(tag)"
+                                            type="button"
+                                            class="chip tap-effect"
+                                            :class="isTagSelected(tag) ? 'chip-active' : ''"
+                                        >
+                                            {{ tag.name }}
+                                        </button>
+                                    </div>
+                                    <div v-if="autoTagNames.length" class="text-[10px] text-secondary mt-1.5 pl-1">
+                                        Автоматически по КБЖУ: {{ autoTagNames.join(' · ') }}
                                     </div>
                                 </div>
                             </div>
@@ -964,11 +983,11 @@ onUnmounted(() => {
                                     class="w-full py-3 rounded-2xl bg-slate-50 text-slate-700 font-bold text-sm flex items-center justify-center gap-2 tap-effect active:bg-slate-100 transition-colors"
                                 >
                                     <span class="material-icons-round text-lg transition-transform" :class="showAdditionalDetails ? 'rotate-180' : ''">expand_more</span>
-                                    БЖУ, теги и заметки
+                                    БЖУ и заметки
                                 </button>
                             </div>
 
-                            <Transition name="slide-fade">
+                            <CollapseTransition>
                                 <div v-if="showAdditionalDetails" class="space-y-4 pt-2">
                                     
                                     <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
@@ -998,22 +1017,6 @@ onUnmounted(() => {
                                         </div>
                                     </div>
 
-                                    <div class="space-y-1">
-                                         <div class="flex flex-wrap gap-1.5">
-                                            <button 
-                                                @click="openTagSelector"
-                                                class="chip tap-effect border-dashed"
-                                            >
-                                                <span class="material-icons-round text-sm">add</span> Тег
-                                            </button>
-                                            <span v-for="tagId in formData.tags" :key="tagId" class="chip chip-active !pr-1.5">
-                                                <span v-if="tagById.get(tagId)?.icon">{{ tagById.get(tagId)?.icon }}</span>
-                                                <span>{{ tagById.get(tagId)?.name }}</span>
-                                                <button @click="tagById.get(tagId) && toggleTag(tagById.get(tagId))" class="ml-0.5 text-white/60 flex"><span class="material-icons-round text-sm">close</span></button>
-                                            </span>
-                                        </div>
-                                    </div>
-
                                     <textarea 
                                         v-model="formData.description" 
                                         placeholder="Заметки / Рецепт" 
@@ -1021,7 +1024,7 @@ onUnmounted(() => {
                                     ></textarea>
 
                                 </div>
-                            </Transition>
+                            </CollapseTransition>
 
                             <div v-if="formData.id" class="pt-4">
                                 <button @click="handleDelete" class="w-full py-3 rounded-2xl bg-slate-100 text-slate-500 font-bold text-xs flex items-center justify-center gap-2 tap-effect active:bg-slate-200 transition-colors">
@@ -1033,34 +1036,10 @@ onUnmounted(() => {
                     </div>
                     </div>
 
-                    <div v-show="showTagSelection" class="absolute inset-0 bg-slate-50 overflow-y-auto pb-20 pt-4 px-4 no-scrollbar">
-                        <div class="space-y-6">
-                            <div v-for="group in groupedTags" :key="group.code" class="space-y-3">
-                                <div class="flex items-center gap-2 px-1">
-                                    <div class="text-xs font-black text-slate-400">{{ group.label }}</div>
-                                    <div class="h-[1px] bg-slate-200 flex-1"></div>
-                                </div>
-                                
-                                <div class="flex flex-wrap gap-2">
-                                     <button 
-                                        v-for="tag in group.tags" 
-                                        :key="tag.id" 
-                                        @click="toggleTag(tag)"
-                                        class="chip tap-effect"
-                                        :class="isTagSelected(tag) ? 'chip-active' : ''"
-                                     >
-                                        <span v-if="tag.icon">{{ tag.icon }}</span>
-                                        <span>{{ tag.name }}</span>
-                                     </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="h-10"></div>
-                    </div>
-
+            <Transition name="modal">
             <div v-show="showIngredientOverlay" class="fixed inset-0 z-[80] flex flex-col">
                 <div class="absolute inset-0 bg-black/50" @click="closeIngredientOverlay"></div>
-                <div class="sheet sheet-tall relative z-10 mt-auto">
+                <div class="sheet sheet-tall modal-content relative z-10 mt-auto">
                     <div class="sheet-handle"></div>
                     <div class="sheet-header">
                         <button @click="closeIngredientOverlay" class="sheet-close tap-effect" aria-label="Закрыть">
@@ -1166,6 +1145,7 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
+            </Transition>
       </div>
       <ProductDetailModal 
           :is-open="showCreateProductModal"
@@ -1180,8 +1160,5 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.animate-fade-in { animation: fadeIn 0.2s ease; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 </style>
