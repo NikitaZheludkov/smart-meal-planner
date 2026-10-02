@@ -174,6 +174,12 @@ const sinceDay = (cookedOn, dateStr) => {
   return `${day === 2 ? 'со' : 'с'} ${WEEKDAY_GENITIVE[day]}`
 }
 
+// Короткий список для метки: "морковь +2" — длинные названия не влезают
+const shortNames = (names) => {
+  const lower = names.map((n) => n.toLowerCase())
+  return lower.length > 1 ? `${lower[0]} +${lower.length - 1}` : lower[0] || ''
+}
+
 // Фраза про общие продукты. Называем блюдо, ради которого продукт покупается:
 // - оно уже в плане → "Морковь и лук уже в списке покупок — для «Щи»";
 // - оно пока только в этих идеях → "Морковь пригодится и для «Щи» выше";
@@ -209,10 +215,12 @@ const sharedReason = (dish, sharedProducts, ctx) => {
 /**
  * Баллы и объяснения для одного блюда в конкретный день и приём пищи.
  * Причины собираются с весом, пользователю показываем 2 самые важные.
+ * У каждой причины есть полная фраза (text) и короткая метка с иконкой
+ * (short, icon) — для компактных карточек; самая важная метка = badge.
  */
 export const scoreDish = (dish, ctx, { date, mealTypeId, mealTypeName = '' }) => {
   const dateStr = toDateStr(date)
-  const reasons = [] // { weight, text }
+  const reasons = [] // { weight, text, short, icon }
   let score = 0
 
   // 1. Остатки свежей заготовки — сначала доесть
@@ -222,7 +230,9 @@ export const scoreDish = (dish, ctx, { date, mealTypeId, mealTypeName = '' }) =>
     score += 6
     reasons.push({
       weight: 10,
-      text: `Осталось ${leftover} ${plural(leftover, 'порция', 'порции', 'порций')} ${sinceDay(leftoverInfo.cookedOn, dateStr)} — можно доесть`
+      text: `Осталось ${leftover} ${plural(leftover, 'порция', 'порции', 'порций')} ${sinceDay(leftoverInfo.cookedOn, dateStr)} — можно доесть`,
+      short: `доесть ${leftover} ${plural(leftover, 'порцию', 'порции', 'порций')}`,
+      icon: 'kitchen'
     })
   }
 
@@ -242,7 +252,7 @@ export const scoreDish = (dish, ctx, { date, mealTypeId, mealTypeName = '' }) =>
   const sharedNames = sharedProducts.map((p) => p.name)
   if (sharedNames.length) {
     score += 3 * (sharedNames.length / perishable.length) + Math.min(sharedNames.length, 3) * 0.6
-    reasons.push({ weight: 8, text: sharedReason(dish, sharedProducts, ctx) })
+    reasons.push({ weight: 8, text: sharedReason(dish, sharedProducts, ctx), short: shortNames(sharedNames), icon: 'shopping_cart' })
   }
 
   // 3. Разнообразие: ближайшее появление этого блюда (прошлое и будущее)
@@ -271,27 +281,30 @@ export const scoreDish = (dish, ctx, { date, mealTypeId, mealTypeName = '' }) =>
   const daysSince = lastPast ? daysBetween(dateStr, lastPast) : null
   if (!dates.length) {
     score += 0.5
-    reasons.push({ weight: 2, text: 'Ещё ни разу не было в плане' })
+    reasons.push({ weight: 2, text: 'Ещё ни разу не было в плане', short: 'ещё не готовили', icon: 'fiber_new' })
   } else if (daysSince !== null && daysSince >= LONG_AGO_DAYS) {
     score += 1.5
-    reasons.push({ weight: 3, text: `Не было в плане ${daysSince} ${plural(daysSince, 'день', 'дня', 'дней')}` })
+    reasons.push({ weight: 3, text: `Не было в плане ${daysSince} ${plural(daysSince, 'день', 'дня', 'дней')}`, short: `не было ${daysSince} ${plural(daysSince, 'день', 'дня', 'дней')}`, icon: 'schedule' })
   }
 
   // 6. Привычка: как часто выбирали именно на этот приём пищи
   const freq = ctx.slotFrequency.get(`${dish.id}|${mealTypeId}`) || 0
   if (freq > 0) {
     score += Math.min(freq, 5) * 0.3
-    if (freq >= 3) reasons.push({ weight: 4, text: mealTypeName ? `Часто выбираете на ${mealTypeName.toLowerCase()}` : 'Часто выбираете' })
+    if (freq >= 3) {
+      const slot = mealTypeName ? ` на ${mealTypeName.toLowerCase()}` : ''
+      reasons.push({ weight: 4, text: `Часто выбираете${slot}`, short: `часто${slot}`, icon: 'favorite_border' })
+    }
   }
 
   // «Ещё ни разу не было в плане» — слабая причина: показываем, только если других нет
   const hasStrong = reasons.some((r) => r.weight >= 3)
-  const topReasons = reasons
+  const top = reasons
     .filter((r) => !hasStrong || r.weight >= 3)
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 2)
-    .map((r) => r.text)
-  return { dish, score, reasons: topReasons, shared: sharedNames.length, daysSince, leftover, everPlanned: dates.length > 0 }
+  const badge = top[0] ? { short: top[0].short, icon: top[0].icon } : null
+  return { dish, score, reasons: top.map((r) => r.text), badge, shared: sharedNames.length, daysSince, leftover, everPlanned: dates.length > 0 }
 }
 
 const passesFilters = (result, filters) => {
@@ -315,11 +328,15 @@ const jitter = (seed, id) => {
  * Отсортированные предложения для слота.
  * excludeDishIds — уже стоящие в этом слоте; garnishTypeId — гарниры не
  * предлагаем как самостоятельное блюдо (они подбираются к горячему отдельно).
+ * dishTypeId — только блюда этого вида ("заполнить салаты на неделю").
  */
-export const rankDishes = (ctx, dishes, { date, mealTypeId, mealTypeName = '', filters = [], excludeDishIds = [], garnishTypeId = null, onlyGarnish = false, seed = 0 }) => {
+export const rankDishes = (ctx, dishes, { date, mealTypeId, mealTypeName = '', filters = [], excludeDishIds = [], garnishTypeId = null, onlyGarnish = false, dishTypeId = null, seed = 0 }) => {
   const exclude = new Set(excludeDishIds)
+  // Выбрали вид «Гарнир» — гарниры предлагаем как обычные блюда
+  if (dishTypeId && dishTypeId === garnishTypeId) onlyGarnish = true
   return dishes
     .filter((d) => !exclude.has(d.id))
+    .filter((d) => !dishTypeId || d.dish_type === dishTypeId)
     .filter((d) => (onlyGarnish ? d.dish_type === garnishTypeId : d.dish_type !== garnishTypeId || !garnishTypeId))
     .filter((d) => onlyGarnish || (d.meal_type || []).includes(mealTypeId))
     .map((d) => scoreDish(d, ctx, { date, mealTypeId, mealTypeName }))
@@ -333,17 +350,30 @@ export const rankDishes = (ctx, dishes, { date, mealTypeId, mealTypeName = '', f
  * пересчитывая контекст с учётом уже выбранного (так блюда делят продукты,
  * заготовки доедаются, а одно и то же не повторяется подряд).
  *
- * Возвращает [{ key, date, mealTypeId, dishId, garnishId, reasons, alternatives }].
+ * Без dishTypeId заполняются только пустые приёмы пищи. С dishTypeId (например,
+ * «Салат») — приёмы пищи, где ещё нет блюда этого вида: салат добавится к
+ * обеду, в котором уже стоит борщ.
+ *
+ * Возвращает [{ key, date, mealTypeId, dishId, garnishId, reasons, badge }].
  */
 export const buildWeekDraft = ({
   planItems, dishes, periodStart, periodLength, mealTypeIds, filters = [],
-  garnishTypeId = null, portions = 1, seed = 0, today = new Date(), fromDate = null, mealTypeNames = {}
+  garnishTypeId = null, dishTypeId = null, portions = 1, seed = 0, today = new Date(), fromDate = null, mealTypeNames = {}
 }) => {
   const simulated = planItems.map((p) => ({
     dish: p.dish, product: p.product, date: toDateStr(p.date || ''), meal_type: p.meal_type,
     portions: p.portions, ignore_shopping: p.ignore_shopping
   }))
-  const occupied = new Set(simulated.filter((p) => p.dish || p.product).map((p) => `${p.date}|${p.meal_type}`))
+  const typeOf = new Map(dishes.map((d) => [d.id, d.dish_type]))
+  const occupied = new Set(simulated
+    .filter((p) => (dishTypeId ? p.dish && typeOf.get(p.dish) === dishTypeId : p.dish || p.product))
+    .map((p) => `${p.date}|${p.meal_type}`))
+  // Блюда, уже стоящие в слоте, — их не предлагаем повторно
+  const inSlot = (dateStr, mealTypeId) => simulated
+    .filter((p) => p.dish && p.date === dateStr && p.meal_type === mealTypeId)
+    .map((p) => p.dish)
+  // Гарнир к блюду подбираем, если не заполняем сами гарниры
+  const pairGarnish = garnishTypeId && dishTypeId !== garnishTypeId
   const draft = []
   const startStr = toDateStr(periodStart)
   const minDate = fromDate ? toDateStr(fromDate) : null
@@ -354,12 +384,15 @@ export const buildWeekDraft = ({
     for (const mealTypeId of mealTypeIds) {
       if (occupied.has(`${dateStr}|${mealTypeId}`)) continue
       const ctx = buildContext({ planItems: simulated, dishes, periodStart: startStr, periodLength, today })
-      const ranked = rankDishes(ctx, dishes, { date: dateStr, mealTypeId, mealTypeName: mealTypeNames[mealTypeId], filters, garnishTypeId, seed })
+      const ranked = rankDishes(ctx, dishes, {
+        date: dateStr, mealTypeId, mealTypeName: mealTypeNames[mealTypeId], filters, garnishTypeId, dishTypeId,
+        excludeDishIds: inSlot(dateStr, mealTypeId), seed
+      })
       if (!ranked.length) continue
       const pick = ranked[0]
 
       let garnish = null
-      if (pick.dish.needs_side_dish && garnishTypeId) {
+      if (pick.dish.needs_side_dish && pairGarnish) {
         garnish = rankDishes(ctx, dishes, { date: dateStr, mealTypeId, garnishTypeId, onlyGarnish: true, seed })[0] || null
       }
 
@@ -369,7 +402,8 @@ export const buildWeekDraft = ({
         mealTypeId,
         dishId: pick.dish.id,
         garnishId: garnish?.dish.id || null,
-        reasons: pick.reasons
+        reasons: pick.reasons,
+        badge: pick.badge
       }
       draft.push(entry)
       simulated.push({ dish: pick.dish.id, date: dateStr, meal_type: mealTypeId, portions, ignore_shopping: false, draft: true })
@@ -385,7 +419,7 @@ export const buildWeekDraft = ({
  */
 export const nextAlternative = ({
   planItems, draft, entry, dishes, periodStart, periodLength, filters = [], garnishTypeId = null,
-  portions = 1, tried = [], today = new Date(), mealTypeNames = {}
+  dishTypeId = null, portions = 1, tried = [], today = new Date(), mealTypeNames = {}
 }) => {
   const others = draft.filter((d) => d.key !== entry.key)
   const simulated = [
@@ -396,12 +430,18 @@ export const nextAlternative = ({
     ])
   ]
   const ctx = buildContext({ planItems: simulated, dishes, periodStart, periodLength, today })
-  const ranked = rankDishes(ctx, dishes, { date: entry.date, mealTypeId: entry.mealTypeId, mealTypeName: mealTypeNames[entry.mealTypeId], filters, garnishTypeId, excludeDishIds: tried })
+  const alreadyInSlot = planItems
+    .filter((p) => p.dish && toDateStr(p.date || '') === entry.date && p.meal_type === entry.mealTypeId)
+    .map((p) => p.dish)
+  const ranked = rankDishes(ctx, dishes, {
+    date: entry.date, mealTypeId: entry.mealTypeId, mealTypeName: mealTypeNames[entry.mealTypeId], filters, garnishTypeId, dishTypeId,
+    excludeDishIds: [...tried, ...alreadyInSlot]
+  })
   const pick = ranked[0]
   if (!pick) return null
   let garnish = null
-  if (pick.dish.needs_side_dish && garnishTypeId) {
+  if (pick.dish.needs_side_dish && garnishTypeId && dishTypeId !== garnishTypeId) {
     garnish = rankDishes(ctx, dishes, { date: entry.date, mealTypeId: entry.mealTypeId, garnishTypeId, onlyGarnish: true })[0] || null
   }
-  return { ...entry, dishId: pick.dish.id, garnishId: garnish?.dish.id || null, reasons: pick.reasons }
+  return { ...entry, dishId: pick.dish.id, garnishId: garnish?.dish.id || null, reasons: pick.reasons, badge: pick.badge }
 }

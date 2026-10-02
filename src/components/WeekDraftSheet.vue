@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { format, parseISO, isBefore, startOfDay } from 'date-fns'
+import { format, parseISO, isBefore, startOfDay, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { usePlanStore } from '../stores/plan'
 import { useDishStore } from '../stores/dishes'
@@ -9,9 +9,12 @@ import { useSettingsStore } from '../stores/settings'
 import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
 import { buildWeekDraft, nextAlternative, SUGGESTION_FILTERS } from '../lib/suggestions'
+import CollapseTransition from './CollapseTransition.vue'
 
-// "Идеи на неделю": подбираем блюда в пустые слоты. Пользователь добавляет
-// понравившиеся по одному (+), может заменить вариант или добавить все сразу.
+// "Идеи на неделю": окно выглядит как сама неделя плана. Уже запланированное
+// показано бледно (для контекста), пустые места заполнены предложениями в
+// пунктирных карточках. Пользователь добавляет понравившиеся по одному (+),
+// заменяет вариант (↻) или добавляет все сразу.
 const props = defineProps({
   isOpen: Boolean,
   periodStart: [Date, String]
@@ -33,16 +36,20 @@ const periodLength = computed(() => settingsStore.periodLength || 7)
 const portions = computed(() => Number(settingsStore.defaultPortions) || 1)
 const garnishTypeId = computed(() => dictionaries.dishTypes.find((t) => t.name === 'Гарнир')?.id || null)
 const dishById = computed(() => new Map(dishStore.dishes.map((d) => [d.id, d])))
-const mealTypeById = computed(() => new Map(dictionaries.mealTypes.map((m) => [m.id, m])))
 const mealTypeNames = computed(() => Object.fromEntries(dictionaries.mealTypes.map((m) => [m.id, m.name])))
 
 // Настройки подбора. Перекус по умолчанию не заполняем — его чаще решают на ходу.
 const selectedMealTypes = ref([])
 const filters = ref([])
+// Вид блюда: null — любые (заполняем пустые приёмы пищи), иначе только этот
+// вид — например, салаты на всю неделю, в том числе к уже запланированному
+const dishTypeId = ref(null)
+const showFilters = ref(false)
 const seed = ref(0)
 const draft = ref([])
 const tried = ref({}) // key -> [dishId, ...] уже показанные варианты для слота
 const added = ref(new Map()) // ключ слота -> [id записей плана], уже добавленные
+const expanded = ref(new Set()) // карточки, у которых раскрыто объяснение
 const addingKey = ref('')
 const draftVersion = ref(0) // ключ для анимации смены всей подборки
 
@@ -51,11 +58,22 @@ const filterOptions = computed(() => [
   ...(dictionaries.availableTags || []).map((t) => ({ id: t.id, name: t.name }))
 ])
 
+const toDateStr = (d) => format(d, 'yyyy-MM-dd')
+
 // Прошедшие дни периода не трогаем
 const fromDate = computed(() => {
   const start = startOfDay(new Date(props.periodStart))
   const today = startOfDay(new Date())
   return isBefore(start, today) ? today : start
+})
+const periodEnd = computed(() => addDays(startOfDay(new Date(props.periodStart)), periodLength.value - 1))
+const periodLabel = computed(() => {
+  const from = fromDate.value
+  const to = periodEnd.value
+  if (isBefore(to, from)) return ''
+  return from.getMonth() === to.getMonth()
+    ? `${format(from, 'd')}–${format(to, 'd MMMM', { locale: ru })}`
+    : `${format(from, 'd MMM', { locale: ru })} – ${format(to, 'd MMM', { locale: ru })}`
 })
 
 const rebuild = () => {
@@ -69,6 +87,7 @@ const rebuild = () => {
     mealTypeIds: orderedSlots,
     filters: filters.value,
     garnishTypeId: garnishTypeId.value,
+    dishTypeId: dishTypeId.value,
     portions: portions.value,
     seed: seed.value,
     fromDate: fromDate.value,
@@ -76,6 +95,7 @@ const rebuild = () => {
   })
   tried.value = Object.fromEntries(draft.value.map((e) => [e.key, [e.dishId]]))
   added.value = new Map()
+  expanded.value = new Set()
   draftVersion.value++
 }
 
@@ -83,6 +103,8 @@ watch(() => props.isOpen, (open) => {
   if (!open) return
   selectedMealTypes.value = dictionaries.mealTypes.filter((m) => m.name !== 'Перекус').map((m) => m.id)
   filters.value = []
+  dishTypeId.value = null
+  showFilters.value = false
   seed.value = 0
   rebuild()
 }, { immediate: true })
@@ -93,15 +115,33 @@ const toggleMealType = (id) => {
   selectedMealTypes.value = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
   rebuild()
 }
+const selectDishType = (id) => {
+  if (dishTypeId.value === id) return
+  platform.haptic.selection()
+  dishTypeId.value = id
+  rebuild()
+}
+const dishTypeName = computed(() => dictionaries.dishTypes.find((t) => t.id === dishTypeId.value)?.name || '')
+
 const toggleFilter = (id) => {
   platform.haptic.selection()
   filters.value = filters.value.includes(id) ? filters.value.filter((x) => x !== id) : [...filters.value, id]
   rebuild()
 }
+const toggleFiltersPanel = () => {
+  platform.haptic.selection()
+  showFilters.value = !showFilters.value
+}
 const reshuffle = () => {
   platform.haptic.impact('light')
   seed.value = Math.floor(Math.random() * 1e9) + 1
   rebuild()
+}
+const toggleExpanded = (key) => {
+  const next = new Set(expanded.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expanded.value = next
 }
 
 const replaceEntry = (entry) => {
@@ -110,14 +150,14 @@ const replaceEntry = (entry) => {
   let next = nextAlternative({
     planItems: planStore.plan, draft: draft.value, entry, dishes: dishStore.dishes,
     periodStart: props.periodStart, periodLength: periodLength.value, filters: filters.value,
-    garnishTypeId: garnishTypeId.value, portions: portions.value, tried: seen, mealTypeNames: mealTypeNames.value
+    garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeId.value, portions: portions.value, tried: seen, mealTypeNames: mealTypeNames.value
   })
   if (!next) {
     // Варианты закончились — начинаем круг заново
     next = nextAlternative({
       planItems: planStore.plan, draft: draft.value, entry, dishes: dishStore.dishes,
       periodStart: props.periodStart, periodLength: periodLength.value, filters: filters.value,
-      garnishTypeId: garnishTypeId.value, portions: portions.value, tried: [entry.dishId], mealTypeNames: mealTypeNames.value
+      garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeId.value, portions: portions.value, tried: [entry.dishId], mealTypeNames: mealTypeNames.value
     })
     tried.value[entry.key] = []
   }
@@ -134,22 +174,68 @@ const removeGarnish = (entry) => {
   draft.value = draft.value.map((e) => (e.key === entry.key ? { ...e, garnishId: null } : e))
 }
 
-// Группировка по дням для отображения
-const days = computed(() => {
-  const groups = []
-  for (const entry of draft.value) {
-    let g = groups[groups.length - 1]
-    if (!g || g.date !== entry.date) {
-      g = { date: entry.date, label: format(parseISO(entry.date), 'EEEEEE, d MMMM', { locale: ru }), entries: [] }
-      groups.push(g)
-    }
-    g.entries.push(entry)
-  }
-  return groups
-})
-
 const remaining = computed(() => draft.value.filter((e) => !added.value.has(e.key)))
 
+// --- Калорийность ---
+// Ккал в карточках — на одну порцию (на одного человека), как в карточке блюда
+const entryKcal = (entry) => {
+  const dish = dishById.value.get(entry.dishId)
+  const garnish = entry.garnishId ? dishById.value.get(entry.garnishId) : null
+  if (!dish?.kcal) return 0
+  return Number(dish.kcal) + (garnish ? Number(garnish.kcal) || 0 : 0)
+}
+
+// Ккал за день: то, что уже в плане, + ещё не добавленные предложения.
+// Если у части блюд калорийность не заполнена — "~1 720+"; если неизвестна
+// больше чем у половины блюд — не показываем вовсе.
+const dayKcal = (dateStr) => {
+  let sum = 0
+  let known = 0
+  let unknown = 0
+  const count = (kcal) => {
+    if (kcal > 0) { sum += kcal; known++ } else unknown++
+  }
+  for (const item of planStore.plan) {
+    if (!item.dish || String(item.date).slice(0, 10) !== dateStr) continue
+    count(Number(dishById.value.get(item.dish)?.kcal) || 0)
+  }
+  for (const entry of remaining.value) {
+    if (entry.date !== dateStr) continue
+    count(Number(dishById.value.get(entry.dishId)?.kcal) || 0)
+    if (entry.garnishId) count(Number(dishById.value.get(entry.garnishId)?.kcal) || 0)
+  }
+  if (!known || unknown > (known + unknown) / 2) return null
+  return { value: Math.round(sum), partial: unknown > 0 }
+}
+const formatKcal = (k) => (k ? `~${k.value.toLocaleString('ru-RU')}${k.partial ? '+' : ''}` : '')
+
+// --- Дни: все выбранные приёмы пищи, с планом и предложениями ---
+const days = computed(() => {
+  const slots = dictionaries.mealTypes.filter((m) => selectedMealTypes.value.includes(m.id))
+  if (!slots.length) return []
+  const entryByKey = new Map(draft.value.map((e) => [e.key, e]))
+  const result = []
+  for (let d = fromDate.value; !isBefore(periodEnd.value, d); d = addDays(d, 1)) {
+    const dateStr = toDateStr(d)
+    const rows = slots.map((slot) => {
+      const entry = entryByKey.get(`${dateStr}|${slot.id}`) || null
+      const planned = planStore.plan
+        .filter((p) => String(p.date).slice(0, 10) === dateStr && p.meal_type === slot.id)
+        .map((p) => p.dishData?.name || p.productData?.name)
+        .filter(Boolean)
+      return { slot, entry, planned }
+    })
+    result.push({
+      date: dateStr,
+      label: format(d, 'EEEEEE, d MMMM', { locale: ru }),
+      kcal: dayKcal(dateStr),
+      rows
+    })
+  }
+  return result
+})
+
+// --- Добавление в план ---
 const addEntryToPlan = async (entry) => {
   const ids = []
   for (const dishId of [entry.dishId, entry.garnishId].filter(Boolean)) {
@@ -161,7 +247,7 @@ const addEntryToPlan = async (entry) => {
   if (ids.length) added.value = new Map(added.value).set(entry.key, ids)
 }
 
-// Повторное нажатие на "В плане" — убрать обратно (на случай случайного нажатия)
+// Отмена добавления (на случай случайного нажатия)
 const undoEntry = async (entry) => {
   if (addingKey.value) return
   platform.haptic.selection()
@@ -224,118 +310,169 @@ const close = () => {
           </button>
           <div class="min-w-0">
             <h3 class="sheet-title">Идеи на неделю</h3>
-            <p class="sheet-subtitle">на свободные приёмы пищи</p>
+            <p v-if="periodLabel" class="sheet-subtitle">{{ periodLabel }}</p>
           </div>
-          <div></div>
+          <button
+            @click="toggleFiltersPanel"
+            class="sheet-close tap-effect relative"
+            :class="showFilters || filters.length ? '!bg-slate-900 !text-white' : ''"
+            aria-label="Фильтры"
+          >
+            <span class="material-icons-round text-xl">tune</span>
+            <span v-if="filters.length && !showFilters" class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-white text-slate-900 border border-slate-900 text-[9px] font-bold flex items-center justify-center">{{ filters.length }}</span>
+          </button>
         </div>
 
-        <!-- Настройки подбора -->
-        <div class="shrink-0 px-5 pt-3 pb-3 border-b border-slate-100 space-y-2.5">
-          <div>
-            <div class="text-[10px] font-bold text-slate-400 mb-1 pl-1">Подобрать на</div>
-            <div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
-              <button
-                v-for="m in dictionaries.mealTypes"
-                :key="m.id"
-                @click="toggleMealType(m.id)"
-                class="chip tap-effect"
-                :class="selectedMealTypes.includes(m.id) ? 'chip-active' : ''"
-              >{{ m.name }}</button>
-            </div>
+        <!-- Что заполнять — всегда на виду: список сразу подстраивается -->
+        <div class="shrink-0 px-5 pt-3 pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
+            <span class="w-10 text-[11px] text-secondary shrink-0">Когда</span>
+            <button
+              v-for="m in dictionaries.mealTypes"
+              :key="m.id"
+              @click="toggleMealType(m.id)"
+              class="chip tap-effect"
+              :class="selectedMealTypes.includes(m.id) ? 'chip-active' : ''"
+            >{{ m.name }}</button>
           </div>
-          <div>
-            <div class="text-[10px] font-bold text-slate-400 mb-1 pl-1">Показывать только</div>
-            <div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
-              <button
-                v-for="f in filterOptions"
-                :key="f.id"
-                @click="toggleFilter(f.id)"
-                class="chip tap-effect"
-                :class="filters.includes(f.id) ? 'chip-active' : ''"
-              >{{ f.name }}</button>
-            </div>
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5 mt-2">
+            <span class="w-10 text-[11px] text-secondary shrink-0">Что</span>
+            <button
+              @click="selectDishType(null)"
+              class="chip tap-effect"
+              :class="dishTypeId === null ? 'chip-active' : ''"
+            >Любое</button>
+            <button
+              v-for="t in dictionaries.dishTypes"
+              :key="t.id"
+              @click="selectDishType(t.id)"
+              class="chip tap-effect"
+              :class="dishTypeId === t.id ? 'chip-active' : ''"
+            >{{ t.name }}</button>
           </div>
+
+          <!-- Фильтры — за кнопкой в шапке -->
+          <CollapseTransition>
+            <div v-if="showFilters" class="pt-2.5">
+              <div class="text-[11px] text-secondary mb-1.5">Предлагать только блюда</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="f in filterOptions"
+                  :key="f.id"
+                  @click="toggleFilter(f.id)"
+                  class="chip tap-effect"
+                  :class="filters.includes(f.id) ? 'chip-active' : ''"
+                >{{ f.name }}</button>
+              </div>
+            </div>
+          </CollapseTransition>
         </div>
 
-        <!-- Черновик -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-5 pt-3 pb-[calc(24px+env(safe-area-inset-bottom,0px))] bg-slate-50">
-          <div v-if="draft.length" class="flex items-start justify-between gap-3 mb-3 px-1">
-            <p class="text-[12px] text-secondary leading-snug">
-              <template v-if="added.size">Добавлено в план: {{ added.size }} из {{ draft.length }}. Нажмите «В плане» ещё раз, чтобы убрать.</template>
-              <template v-else>Подобрали блюда в свободные приёмы пищи с сегодняшнего дня. Нажмите <b class="text-slate-900">+</b>, чтобы добавить блюдо в план, или <span class="material-icons-round text-[13px] align-[-2px] text-slate-900">autorenew</span>, чтобы заменить.</template>
-            </p>
-            <button @click="reshuffle" class="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tap-effect shrink-0 pt-0.5">
-              <span class="material-icons-round text-sm">refresh</span>
-              Подобрать иначе
-            </button>
-          </div>
-
-          <div v-if="!draft.length" class="text-center text-[13px] text-secondary bg-white rounded-2xl border border-slate-100 px-5 py-6 leading-relaxed">
-            <template v-if="!selectedMealTypes.length">Выберите приёмы пищи, которые нужно заполнить</template>
-            <template v-else-if="filters.length">Под выбранные фильтры блюд не нашлось — попробуйте убрать часть фильтров</template>
-            <template v-else>Все выбранные приёмы пищи на этой неделе уже запланированы, или для них нет подходящих блюд</template>
+        <div class="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-4 bg-slate-50">
+          <div v-if="!days.length" class="text-center text-[13px] text-secondary bg-white rounded-2xl border border-slate-100 px-5 py-6 leading-relaxed">
+            Выберите, какие приёмы пищи заполнить
           </div>
 
           <Transition name="fade" mode="out-in">
           <div :key="draftVersion">
-          <div v-for="day in days" :key="day.date" class="mb-3">
-            <div class="app-eyebrow px-1 mb-1.5">{{ day.label }}</div>
-            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-              <div
-                v-for="entry in day.entries"
-                :key="entry.key"
-                class="flex items-start gap-2 px-3.5 py-2.5 border-b border-slate-50 last:border-0"
-              >
-                <Transition name="swap" mode="out-in">
-                <div :key="entry.dishId + '|' + (entry.garnishId || '')" class="flex-1 min-w-0">
-                  <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">{{ mealTypeById.get(entry.mealTypeId)?.name }}</div>
-                  <div class="card-title leading-snug">{{ dishById.get(entry.dishId)?.name }}</div>
-                  <div v-if="entry.garnishId" class="text-[12px] text-slate-700 flex items-center gap-1 min-w-0 mt-0.5">
-                    <span>Гарнир: {{ lowerFirst(dishById.get(entry.garnishId)?.name) }}</span>
-                    <button v-if="!added.has(entry.key)" @click="removeGarnish(entry)" class="text-slate-300 flex shrink-0" aria-label="Убрать гарнир">
-                      <span class="material-icons-round text-sm">close</span>
-                    </button>
-                  </div>
-                  <div v-for="reason in entry.reasons" :key="reason" class="text-[11px] text-secondary leading-snug mt-0.5">{{ reason }}</div>
-                </div>
-                </Transition>
-                <template v-if="added.has(entry.key)">
-                  <button
-                    @click="undoEntry(entry)"
-                    :disabled="!!addingKey"
-                    class="h-8 px-2.5 rounded-full bg-slate-100 text-slate-900 text-[11px] font-semibold flex items-center gap-1 shrink-0 tap-effect"
-                    aria-label="Убрать из плана"
-                    title="Нажмите ещё раз, чтобы убрать из плана"
+            <div v-for="day in days" :key="day.date" class="mb-4">
+              <div class="flex items-baseline justify-between px-1 mb-1.5">
+                <span class="text-[12px] font-semibold text-slate-900 first-letter:uppercase">{{ day.label }}</span>
+                <span v-if="day.kcal" class="text-[11px] text-secondary">{{ formatKcal(day.kcal) }} ккал</span>
+              </div>
+
+              <div class="space-y-1.5">
+                <template v-for="row in day.rows" :key="row.slot.id">
+                  <!-- Предложение (пунктир) или уже добавленное (сплошная рамка) -->
+                  <div
+                    v-if="row.entry"
+                    @click="toggleExpanded(row.entry.key)"
+                    class="bg-white rounded-2xl pl-3.5 pr-2.5 py-2.5 cursor-pointer transition-colors"
+                    :class="added.has(row.entry.key) ? 'border border-slate-200' : 'border border-dashed border-slate-300'"
                   >
-                    <span v-if="addingKey === entry.key" class="material-icons-round text-sm animate-spin">sync</span>
-                    <span v-else class="material-icons-round text-sm">check</span>
-                    В плане
-                  </button>
-                </template>
-                <template v-else>
-                  <button @click="replaceEntry(entry)" :disabled="!!addingKey" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 tap-effect" aria-label="Другое блюдо">
-                    <span class="material-icons-round text-base">autorenew</span>
-                  </button>
-                  <button @click="addEntry(entry)" :disabled="!!addingKey" class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 tap-effect" aria-label="Добавить в план">
-                    <span v-if="addingKey === entry.key" class="material-icons-round text-base animate-spin">sync</span>
-                    <span v-else class="material-icons-round text-lg">add</span>
-                  </button>
+                    <div class="flex items-center gap-2">
+                      <Transition name="swap" mode="out-in">
+                        <div :key="row.entry.dishId + '|' + (row.entry.garnishId || '')" class="flex-1 min-w-0">
+                          <div class="text-[10px] leading-none mb-1 truncate">
+                            <span class="font-semibold uppercase tracking-wide text-slate-400">{{ row.slot.name }}</span>
+                            <span v-if="row.planned.length && !added.has(row.entry.key)" class="text-slate-400"> · в плане: {{ row.planned.join(', ') }}</span>
+                          </div>
+                          <div class="card-title leading-snug">{{ dishById.get(row.entry.dishId)?.name }}</div>
+                          <div v-if="row.entry.garnishId" class="text-[11px] text-slate-600 flex items-center gap-1 leading-snug">
+                            <span>+ {{ lowerFirst(dishById.get(row.entry.garnishId)?.name) }}</span>
+                            <button v-if="!added.has(row.entry.key)" @click.stop="removeGarnish(row.entry)" class="text-slate-300 flex shrink-0" aria-label="Убрать гарнир">
+                              <span class="material-icons-round text-[14px]">close</span>
+                            </button>
+                          </div>
+                          <div class="flex items-center gap-1 mt-1 text-[11px] leading-none min-w-0">
+                            <template v-if="added.has(row.entry.key)">
+                              <span class="material-icons-round text-[13px] text-slate-900">check</span>
+                              <span class="font-semibold text-slate-900">в плане</span>
+                            </template>
+                            <template v-else-if="row.entry.badge">
+                              <span class="material-icons-round text-[13px] text-slate-400 shrink-0">{{ row.entry.badge.icon }}</span>
+                              <span class="text-slate-500 truncate">{{ row.entry.badge.short }}</span>
+                            </template>
+                            <span v-if="entryKcal(row.entry)" class="text-slate-400 shrink-0">
+                              <template v-if="added.has(row.entry.key) || row.entry.badge">·</template> {{ entryKcal(row.entry) }} ккал
+                            </span>
+                          </div>
+                        </div>
+                      </Transition>
+
+                      <template v-if="added.has(row.entry.key)">
+                        <button @click.stop="undoEntry(row.entry)" :disabled="!!addingKey" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 tap-effect" aria-label="Убрать из плана">
+                          <span v-if="addingKey === row.entry.key" class="material-icons-round text-base animate-spin">sync</span>
+                          <span v-else class="material-icons-round text-base">undo</span>
+                        </button>
+                      </template>
+                      <template v-else>
+                        <button @click.stop="replaceEntry(row.entry)" :disabled="!!addingKey" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 tap-effect" aria-label="Другое блюдо">
+                          <span class="material-icons-round text-base">autorenew</span>
+                        </button>
+                        <button @click.stop="addEntry(row.entry)" :disabled="!!addingKey" class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 tap-effect" aria-label="Добавить в план">
+                          <span v-if="addingKey === row.entry.key" class="material-icons-round text-base animate-spin">sync</span>
+                          <span v-else class="material-icons-round text-lg">add</span>
+                        </button>
+                      </template>
+                    </div>
+
+                    <!-- Полное объяснение — по нажатию на карточку -->
+                    <CollapseTransition>
+                      <div v-if="expanded.has(row.entry.key) && row.entry.reasons.length" class="pt-1.5 pr-1">
+                        <div v-for="reason in row.entry.reasons" :key="reason" class="text-[11px] text-secondary leading-snug">{{ reason }}</div>
+                      </div>
+                    </CollapseTransition>
+                  </div>
+
+                  <!-- Уже в плане или подобрать нечего — тихая строка для контекста -->
+                  <div v-else class="flex items-baseline gap-2 px-3.5 py-1.5 min-w-0">
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-300 shrink-0">{{ row.slot.name }}</span>
+                    <span v-if="row.planned.length" class="text-[12px] text-slate-400 truncate">{{ row.planned.join(', ') }}</span>
+                    <span v-else class="text-[12px] text-slate-300 truncate">{{ filters.length ? 'нет блюд под фильтры' : dishTypeName ? `нет блюд «${dishTypeName}» с отметкой «${row.slot.name}»` : 'нет подходящих блюд' }}</span>
+                  </div>
                 </template>
               </div>
             </div>
           </div>
+          </Transition>
+        </div>
 
+        <!-- Действия -->
+        <div v-if="days.length" class="shrink-0 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] border-t border-slate-100 bg-white flex items-center gap-2">
+          <button @click="reshuffle" :disabled="!!addingKey" class="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 tap-effect" aria-label="Подобрать иначе" title="Подобрать иначе">
+            <span class="material-icons-round text-xl">shuffle</span>
+          </button>
           <button
-            v-if="remaining.length > 1"
+            v-if="remaining.length"
             @click="addAllRemaining"
             :disabled="!!addingKey"
-            class="btn-secondary w-full text-sm mt-1 flex items-center justify-center gap-2"
+            class="btn-primary flex-1 h-11 !py-0 text-sm flex items-center justify-center gap-2"
           >
             <span v-if="addingKey === 'all'" class="material-icons-round text-sm animate-spin">sync</span>
-            Добавить все оставшиеся · {{ remaining.length }}
+            Добавить {{ added.size ? 'оставшиеся' : 'все' }} · {{ remaining.length }}
           </button>
-          </div>
-          </Transition>
+          <button v-else @click="close" class="btn-primary flex-1 h-11 !py-0 text-sm">Готово</button>
         </div>
       </div>
     </div>
