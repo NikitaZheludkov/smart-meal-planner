@@ -65,13 +65,13 @@ const handleRemoveMember = async (member) => {
     if (member.id === settingsStore.household?.owner) return
 
     const label = member.displayName || member.email || member.username || 'участника'
-    const ok = await ui.confirm(`Исключить ${label} из семьи?`, { okText: 'Исключить', cancelText: 'Отмена' })
+    const ok = await ui.confirm(`Убрать ${label} из семьи?\nОбщий план и список покупок перестанут быть доступны этому участнику.`, { okText: 'Убрать', cancelText: 'Отмена' })
     if (!ok) return
 
     try {
         await settingsStore.removeMember(member.id)
     } catch (e) {
-        ui.showToast(e?.message || 'Не удалось исключить участника', 'error')
+        ui.showToast(e?.message || 'Не удалось убрать участника', 'error')
     }
 }
 
@@ -118,39 +118,39 @@ const copyCode = async () => {
 }
 
 const handleJoin = async () => {
-    if (!joinCodeInput.value) {
-        ui.showToast('Введите код', 'warn')
+    if (joinCodeInput.value.replace(/\D/g, '').length !== 6) {
+        ui.showToast('Введите 6 цифр кода', 'warn')
         return
     }
-    
+
     isJoining.value = true
-    platform.haptic.notification('success')
-    
     try {
         await settingsStore.joinHousehold(joinCodeInput.value)
+        platform.haptic.notification('success')
+        showJoinModal.value = false
+        joinCodeInput.value = ''
     } catch (e) {
         platform.haptic.notification('error')
-        ui.showToast(e?.message ? `Ошибка: ${e.message}` : 'Ошибка при вступлении в семью', 'error')
+        ui.showToast(e?.message || 'Не удалось подключиться к семье', 'error')
+    } finally {
         isJoining.value = false
     }
 }
 
+// Только участник (не владелец) может вернуться к своему личному плану
+const canLeave = computed(() => !isOwner.value && settingsStore.familyMembers.length > 1)
+
 const handleLeave = async () => {
     platform.haptic.notification('warning')
-    if (settingsStore.familyMembers.length <= 1) {
-        ui.showToast('Вы единственный участник семьи', 'warn')
-        return
-    }
-    if (isOwner.value) {
-        ui.showToast('Сначала передайте права владельца другому участнику', 'warn')
-        return
-    }
-    if (await ui.confirm('Вы точно хотите покинуть эту семью? Вы вернетесь к своим личным данным.', { okText: 'Покинуть', cancelText: 'Отмена' })) {
-        try {
-            await settingsStore.leaveHousehold()
-        } catch (e) {
-            ui.showToast(e.message || 'Не удалось покинуть семью', 'error')
-        }
+    const ok = await ui.confirm(
+        'Вернуться к своему плану?\nОбщий план и список покупок этой семьи перестанут отображаться. Вернуться можно по коду приглашения.',
+        { okText: 'Вернуться', cancelText: 'Отмена' }
+    )
+    if (!ok) return
+    try {
+        await settingsStore.leaveHousehold()
+    } catch (e) {
+        ui.showToast(e.message || 'Не удалось выйти из общего плана', 'error')
     }
 }
 
@@ -283,7 +283,7 @@ const periods = [
     <div class="flex-1 px-5 py-4 space-y-6 overflow-y-auto pb-app-nav">
       
       <div>
-        <h3 class="card-title text-sm ml-2 mb-2">Моя Семья</h3>
+        <h3 class="card-title text-sm ml-2 mb-2">Семья</h3>
         
         <div v-if="settingsStore.loading" class="text-center py-6">
             <span class="material-icons-round animate-spin text-slate-300">sync</span>
@@ -293,7 +293,7 @@ const periods = [
             
             <div class="flex items-center justify-between">
                 <div>
-                    <div class="text-[10px] font-normal text-secondary">Вы находитесь в:</div>
+                    <div class="text-[10px] font-normal text-secondary">Общий план и покупки</div>
                     <div class="text-lg card-title leading-tight">
                         {{ settingsStore.household?.name || 'Загрузка......' }}
                     </div>
@@ -316,7 +316,7 @@ const periods = [
                             <span v-if="isMe(member.id)" class="text-indigo-500 ml-1">(Вы)</span>
                         </div>
                         <div class="text-[10px] font-normal text-secondary">
-                            {{ member.id === settingsStore.household?.owner ? 'Администратор' : 'Участник' }}
+                            {{ member.id === settingsStore.household?.owner ? 'Владелец' : 'Участник' }}
                         </div>
                         <div v-if="isMe(member.id) && member.email" class="text-[10px] font-bold text-slate-300 truncate">
                             {{ member.email }}
@@ -334,7 +334,7 @@ const periods = [
                             @click="handleRemoveMember(member)"
                             class="px-3 py-2 rounded-full bg-red-50 text-red-500 hover:bg-red-100 font-black text-[10px] tap-effect"
                         >
-                            Исключить
+                            Убрать
                         </button>
                     </div>
                 </div>
@@ -342,47 +342,51 @@ const periods = [
 
             <div class="h-[1px] bg-slate-50 w-full"></div>
 
-            <div v-if="isOwner || settingsStore.household?.invite_code">
-                <div v-if="settingsStore.household?.invite_code">
-                    <div class="text-[10px] font-bold text-slate-400 mb-1 text-center">Код для приглашения</div>
-                    
-                    <button @click="copyCode" class="w-full bg-slate-900 rounded-[20px] p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-2">
-                        <div class="text-3xl font-black text-white tracking-[0.2em] text-center font-mono">
-                            {{ settingsStore.household.invite_code }}
-                        </div>
-                        <div class="text-[9px] text-slate-400 text-center mt-1 font-bold">
-                            Нажми, чтобы скопировать
-                        </div>
-                    </button>
+            <!-- Код приглашения: им делятся, чтобы вести общий план -->
+            <div v-if="settingsStore.household?.invite_code">
+                <div class="text-[10px] font-bold text-slate-400 mb-1 text-center">Код приглашения в вашу семью</div>
 
-                    <button v-if="isOwner" @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 py-2 hover:text-slate-600 transition-colors">
-                        {{ isGenerating ? 'Обновляем...' : 'Сгенерировать новый код' }}
-                    </button>
-                </div>
-                
-                <button 
-                    v-else-if="isOwner" 
-                    @click="handleGenerateCode"
-                    class="btn-primary w-full text-xs shadow-lg"
-                >
-                    {{ isGenerating ? 'Создаем' : 'Получить код доступа' }}
+                <button @click="copyCode" class="w-full bg-slate-900 rounded-[20px] p-4 relative overflow-hidden group tap-effect active:scale-95 transition-transform mb-1">
+                    <div class="text-3xl font-black text-white tracking-[0.2em] text-center font-mono">
+                        {{ settingsStore.household.invite_code }}
+                    </div>
+                    <div class="text-[9px] text-slate-400 text-center mt-1 font-bold">
+                        Нажмите, чтобы скопировать
+                    </div>
                 </button>
+                <p class="text-[11px] text-secondary text-center leading-snug px-2">
+                    Отправьте код близким — после ввода у вас будет общий план питания и список покупок
+                </p>
 
-                <button 
-                    @click="showJoinModal = true"
-                    class="btn-secondary w-full mt-2 text-xs"
-                >
-                    Вступить в другую семью
+                <button v-if="isOwner" @click="handleGenerateCode" class="w-full text-xs font-bold text-slate-400 pt-2 pb-1 hover:text-slate-600 transition-colors">
+                    {{ isGenerating ? 'Меняем...' : 'Сменить код (старый перестанет работать)' }}
                 </button>
             </div>
 
-            <div v-else-if="!isOwner && !settingsStore.household?.invite_code && settingsStore.familyMembers.length > 1">
-                 <button 
-                    @click="handleLeave"
-                    class="w-full py-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-full font-bold text-xs tap-effect flex items-center justify-center gap-2"
+            <button
+                v-else-if="isOwner"
+                @click="handleGenerateCode"
+                class="btn-primary w-full text-xs"
+            >
+                {{ isGenerating ? 'Создаём...' : 'Создать код приглашения' }}
+            </button>
+
+            <div class="space-y-2">
+                <button
+                    @click="showJoinModal = true"
+                    class="btn-secondary w-full text-xs flex items-center justify-center gap-2"
                 >
-                    <span class="material-icons-round text-sm">logout</span>
-                    Покинуть семью
+                    <span class="material-icons-round text-sm">group_add</span>
+                    У меня есть код приглашения
+                </button>
+
+                <button
+                    v-if="canLeave"
+                    @click="handleLeave"
+                    class="w-full py-3 text-slate-500 hover:text-slate-700 rounded-full font-bold text-xs tap-effect flex items-center justify-center gap-2"
+                >
+                    <span class="material-icons-round text-sm">person</span>
+                    Вернуться к своему плану
                 </button>
             </div>
 
@@ -577,20 +581,20 @@ const periods = [
                 <button @click="showJoinModal = false" class="sheet-close tap-effect" aria-label="Закрыть">
                     <span class="material-icons-round text-xl">close</span>
                 </button>
-                <h3 class="sheet-title">Вход в семью</h3>
+                <h3 class="sheet-title">Код приглашения</h3>
                 <div>
                     <button
                         @click="handleJoin"
-                        :disabled="isJoining || joinCodeInput.length < 6"
+                        :disabled="isJoining || joinCodeInput.replace(/\D/g, '').length !== 6"
                         class="sheet-action tap-effect"
                     >
                         <span v-if="isJoining" class="material-icons-round animate-spin text-sm">sync</span>
-                        {{ isJoining ? 'Проверка' : 'Войти' }}
+                        {{ isJoining ? 'Проверяем' : 'Готово' }}
                     </button>
                 </div>
             </div>
             <div class="min-h-0 overflow-y-auto px-6 pt-6 pb-[calc(32px+env(safe-area-inset-bottom,0px))]">
-                <p class="text-sm text-secondary text-center mb-4">Введите 6-значный код приглашения</p>
+                <p class="text-sm text-secondary text-center mb-4 leading-snug">Введите 6 цифр, которые вам прислали.<br>У вас будет общий план питания и список покупок.</p>
                 <input 
                     v-model="joinCodeInput" 
                     placeholder="000000" 
@@ -598,6 +602,8 @@ const periods = [
                     inputmode="numeric"
                     class="w-full text-center text-3xl tracking-[0.3em] font-semibold py-4 input-outline rounded-2xl outline-none text-slate-900 placeholder:text-slate-200"
                     maxlength="6"
+                    autocomplete="one-time-code"
+                    @keyup.enter="handleJoin"
                 >
             </div>
         </div>

@@ -87,18 +87,24 @@ export const useSettingsStore = defineStore('settings', () => {
       if (!userId) throw new Error('Участник не найден')
 
       if (userId === auth.user.id) {
-          ui.showToast('Нельзя исключить самого себя', 'error')
+          ui.showToast('Себя убрать из семьи нельзя', 'error')
           return
       }
 
       if (userId === hh.owner) {
-          ui.showToast('Нельзя исключить владельца семьи', 'error')
+          ui.showToast('Владельца семьи убрать нельзя', 'error')
           return
       }
 
-      await withTimeout(pb.collection('users').update(userId, { household: null }), 15000)
+      // Чужой профиль менять напрямую нельзя — это делает сервер после проверки,
+      // что вы владелец семьи
+      try {
+          await withTimeout(pb.send('/api/household/remove-member', { method: 'POST', body: { userId } }), 15000)
+      } catch (e) {
+          throw new Error(e?.response?.message || e?.message || 'Не удалось убрать участника')
+      }
       familyMembers.value = familyMembers.value.filter((m) => m.id !== userId)
-      ui.showToast('Участник исключён', 'success')
+      ui.showToast('Участник больше не в вашей семье', 'success')
   }
 
   const transferOwnership = async (newOwnerId) => {
@@ -164,30 +170,38 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const generateInviteCode = async () => {
       if (!household.value) throw new Error('Семья не найдена')
-      const code = Math.floor(100000 + Math.random() * 900000).toString()
-      const data = await pb.collection('households').update(household.value.id, { invite_code: code })
-      if (data) household.value = data 
+      // Код уникален среди всех семей — при редком совпадении пробуем ещё раз
+      for (let attempt = 0; attempt < 5; attempt++) {
+          const code = Math.floor(100000 + Math.random() * 900000).toString()
+          try {
+              const data = await pb.collection('households').update(household.value.id, { invite_code: code })
+              if (data) household.value = data
+              return
+          } catch (e) {
+              if (e?.data?.data?.invite_code?.code !== 'validation_not_unique') throw e
+          }
+      }
+      throw new Error('Не удалось создать код, попробуйте ещё раз')
   }
 
   const joinHousehold = async (code) => {
       const auth = useAuthStore()
       const ui = useUIStore()
-      if (!code || code.length < 6) {
-          ui.showToast('Код должен состоять из 6 цифр', 'error')
-          throw new Error('Неверный код')
-      }
-      
-      const targetHousehold = await pb.collection('households').getFirstListItem(`invite_code="${code}"`, { fields: 'id' })
-      
-      if (!targetHousehold) {
-          ui.showToast('Семья с таким кодом не найдена', 'error')
-          throw new Error('Неверный код')
+      const cleanCode = String(code || '').replace(/\D/g, '')
+      if (cleanCode.length !== 6) throw new Error('Код должен состоять из 6 цифр')
+      if (!auth.user?.id) throw new Error('Пользователь не найден')
+
+      // Чужую семью по коду ищет и подключает сервер: обычным запросом её
+      // не найти — правила доступа показывают только свою семью
+      let joined
+      try {
+          joined = await withTimeout(pb.send('/api/household/join', { method: 'POST', body: { code: cleanCode } }), 15000)
+      } catch (e) {
+          throw new Error(e?.response?.message || e?.message || 'Не удалось подключиться к семье')
       }
 
-      if (!auth.user?.id) throw new Error('Пользователь не найден')
-      await pb.collection('users').update(auth.user.id, { household: targetHousehold.id })
-      
-      ui.showToast('Вы присоединились к семье!', 'success')
+      // название не показываем: у большинства семей оно стандартное «Моя семья»
+      if (joined?.household) ui.showToast('Готово! Теперь у вас общий план и список покупок', 'success')
 
       await auth.refreshSession()
 
@@ -231,7 +245,7 @@ export const useSettingsStore = defineStore('settings', () => {
           })
            if (newHousehold) {
                 await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
-                ui.showToast('Создана новая семья', 'success')
+                ui.showToast('Вы снова ведёте свой план', 'success')
                 await auth.refreshSession()
 
                 const realtime = useRealtimeStore()
@@ -256,7 +270,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       await pb.collection('users').update(auth.user.id, { household: myOwnHousehold.id })
       
-      ui.showToast('Вы вернулись в свою семью', 'success')
+      ui.showToast('Вы снова ведёте свой план', 'success')
 
       await auth.refreshSession()
 

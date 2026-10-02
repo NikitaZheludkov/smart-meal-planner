@@ -634,3 +634,120 @@ onRecordAfterCreateSuccess((e) => {
 
   e.next()
 }, 'households')
+
+// Вступление в семью по коду приглашения. Через обычный API это невозможно:
+// правила households показывают пользователю только его собственную семью,
+// поэтому чужую по коду он не найдёт. Здесь код проверяется на сервере и
+// семья у пользователя меняется только при совпадении кода.
+routerAdd('POST', '/api/household/join', (e) => {
+  if (!e.auth) {
+    throw new UnauthorizedError('Нужно войти в аккаунт')
+  }
+
+  // Защита от перебора кодов: не больше 10 попыток за 10 минут на пользователя
+  const WINDOW_MS = 10 * 60 * 1000
+  const MAX_ATTEMPTS = 10
+  const storeKey = 'household_join_attempts_' + e.auth.id
+  const now = Date.now()
+  // в store кладём строку JSON: JS-массив внутри Go-хранилища ведёт себя непредсказуемо
+  let attempts = []
+  try { attempts = JSON.parse($app.store().get(storeKey) || '[]') } catch (_) {}
+  attempts = attempts.filter((t) => now - t < WINDOW_MS)
+  if (attempts.length >= MAX_ATTEMPTS) {
+    throw new ApiError(429, 'Слишком много попыток. Попробуйте через несколько минут')
+  }
+  attempts.push(now)
+  $app.store().set(storeKey, JSON.stringify(attempts))
+
+  const data = new DynamicModel({ code: '' })
+  e.bindBody(data)
+  const code = String(data.code || '').replace(/\D/g, '')
+  if (code.length !== 6) {
+    throw new BadRequestError('Код должен состоять из 6 цифр')
+  }
+
+  let household
+  try {
+    household = $app.findFirstRecordByFilter('households', 'invite_code = {:code}', { code })
+  } catch (_) {
+    throw new NotFoundError('Семья с таким кодом не найдена. Проверьте код или попросите новый')
+  }
+
+  const user = $app.findRecordById('users', e.auth.id)
+  if (user.get('household') === household.id) {
+    throw new BadRequestError('Вы уже в этой семье')
+  }
+
+  user.set('household', household.id)
+  $app.save(user)
+  $app.store().remove(storeKey)
+
+  return e.json(200, { household: household.id, name: household.get('name') })
+})
+
+// Сменить семью напрямую (записью в users.household) можно только на ту,
+// которой пользователь владеет сам — например, вернуться в свою. В чужую —
+// только через /api/household/join с кодом.
+onRecordUpdateRequest((e) => {
+  if (e.hasSuperuserAuth()) return e.next()
+
+  const next = e.record.get('household')
+  const prev = e.record.original().get('household')
+  if (next && next !== prev) {
+    let household
+    try {
+      household = $app.findRecordById('households', next)
+    } catch (_) {
+      throw new BadRequestError('Семья не найдена')
+    }
+    if (!e.auth || household.get('owner') !== e.auth.id) {
+      throw new ForbiddenError('Присоединиться к семье можно только по коду приглашения')
+    }
+  }
+
+  return e.next()
+}, 'users')
+
+// Владелец убирает участника из своей семьи. Напрямую нельзя: правила users
+// разрешают менять только собственный профиль. Участника возвращаем в его
+// личную семью (если она есть) — иначе клиент создаст её при следующем входе.
+routerAdd('POST', '/api/household/remove-member', (e) => {
+  if (!e.auth) {
+    throw new UnauthorizedError('Нужно войти в аккаунт')
+  }
+
+  const data = new DynamicModel({ userId: '' })
+  e.bindBody(data)
+  const userId = String(data.userId || '')
+  if (!userId || userId === e.auth.id) {
+    throw new BadRequestError('Нельзя убрать из семьи самого себя')
+  }
+
+  let member
+  try {
+    member = $app.findRecordById('users', userId)
+  } catch (_) {
+    throw new NotFoundError('Участник не найден')
+  }
+
+  const householdId = member.get('household')
+  let household
+  try {
+    household = $app.findRecordById('households', householdId)
+  } catch (_) {
+    throw new NotFoundError('Семья не найдена')
+  }
+  if (household.get('owner') !== e.auth.id) {
+    throw new ForbiddenError('Убирать участников может только владелец семьи')
+  }
+
+  let own = null
+  try {
+    own = $app.findFirstRecordByFilter('households', 'owner = {:uid} && id != {:hid}', { uid: userId, hid: householdId })
+  } catch (_) {}
+
+  member.set('household', own ? own.id : '')
+  $app.save(member)
+
+  return e.json(200, { ok: true })
+})
