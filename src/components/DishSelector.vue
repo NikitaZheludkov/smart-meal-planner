@@ -91,6 +91,16 @@ const selectFromDropdown = (dish) => {
 // --- Предложения (движок в lib/suggestions.js) ---
 const settingsStore = useSettingsStore()
 const SUGGESTIONS_PER_PAGE = 3
+const SUGGESTIONS_OPEN_KEY = 'dishSelector.suggestionsOpen'
+const readSuggestionsOpen = () => {
+    try { return localStorage.getItem(SUGGESTIONS_OPEN_KEY) === '1' } catch (_) { return false }
+}
+const suggestionsOpen = ref(readSuggestionsOpen())
+const toggleSuggestions = () => {
+    platform.haptic.selection()
+    suggestionsOpen.value = !suggestionsOpen.value
+    try { localStorage.setItem(SUGGESTIONS_OPEN_KEY, suggestionsOpen.value ? '1' : '0') } catch (_) {}
+}
 const suggestionFilters = ref([])
 const suggestionPage = ref(0)
 
@@ -144,7 +154,15 @@ const showMoreSuggestions = () => {
 watch([activeCategory, () => props.existingItems.length], () => { suggestionPage.value = 0 })
 
 // Видимые предложения не дублируем в общем списке ниже
-const recommendedDishes = computed(() => visibleSuggestions.value.map((r) => r.dish))
+const recommendedDishes = computed(() => suggestionsOpen.value ? visibleSuggestions.value.map((r) => r.dish) : [])
+
+// Подпись свёрнутого блока: первый вариант и сколько ещё
+const suggestionsPreview = computed(() => {
+    const list = rankedSuggestions.value
+    if (!list.length) return suggestionFilters.value.length ? 'нет блюд под фильтры' : 'нет подходящих блюд'
+    const first = list[0].dish.name
+    return list.length > 1 ? `${first} и ещё ${list.length - 1}` : first
+})
 
 const dropdownSearchResults = computed(() => {
     if (!searchQuery.value) return []
@@ -157,7 +175,8 @@ const dropdownSearchResults = computed(() => {
         list = list.filter(d => !selectedIds.has(d.id))
     }
 
-    return list.filter(d => d.name.toLowerCase().includes(q))
+    const found = list.filter(d => d.name.toLowerCase().includes(q))
+    return [...found.filter(isForSlot), ...found.filter((d) => !isForSlot(d))]
 })
 
 const filteredDishes = computed(() => {
@@ -180,6 +199,16 @@ const filteredDishes = computed(() => {
 
     return list
 })
+
+// Общий список делим: сначала блюда того приёма пищи, который заполняем
+// (нажали «Завтрак» — сверху завтраки), затем все остальные
+const isForSlot = (dish) => (dish.meal_type || []).includes(props.slotId)
+const slotDishes = computed(() => filteredDishes.value.filter(isForSlot))
+const otherDishes = computed(() => filteredDishes.value.filter((d) => !isForSlot(d)))
+const dishSections = computed(() => [
+    { id: 'slot', title: getSlotName.value, dishes: slotDishes.value },
+    { id: 'other', title: slotDishes.value.length || recommendedDishes.value.length ? 'Другие блюда' : 'Все блюда', dishes: otherDishes.value }
+].filter((section) => section.dishes.length))
 
 const groupedProducts = computed(() => {
     let list = productStore.products
@@ -453,18 +482,31 @@ const getDishSlotName = (id) => {
 
                 <!-- Предложения -->
                 <div v-if="!searchQuery" class="mb-4">
-                    <div class="flex items-center justify-between px-1 mb-2">
-                        <span class="app-eyebrow flex items-center gap-1"><span class="material-icons-round text-[13px] text-slate-900">auto_awesome</span>Предложения</span>
+                    <div class="bg-white rounded-2xl border border-slate-100 flex items-center">
                         <button
-                            v-if="suggestionPageCount > 1"
+                            @click="toggleSuggestions"
+                            class="flex-1 min-w-0 !rounded-2xl flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 text-left"
+                            :aria-expanded="suggestionsOpen"
+                        >
+                            <span class="material-icons-round text-lg text-slate-900 shrink-0">auto_awesome</span>
+                            <span class="flex-1 min-w-0">
+                                <span class="block card-title leading-tight">Предложения</span>
+                                <span v-if="!suggestionsOpen" class="block text-[11px] text-secondary truncate mt-0.5">{{ suggestionsPreview }}</span>
+                            </span>
+                            <span class="material-icons-round text-xl text-slate-400 shrink-0 transition-transform duration-300" :class="suggestionsOpen ? 'rotate-180' : ''">expand_more</span>
+                        </button>
+                        <button
+                            v-if="suggestionsOpen && suggestionPageCount > 1"
                             @click="showMoreSuggestions"
-                            class="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tap-effect"
+                            class="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tap-effect pr-3.5 pl-1 shrink-0"
                         >
                             <span class="material-icons-round text-sm">refresh</span>
                             Ещё варианты
                         </button>
                     </div>
 
+                    <CollapseTransition>
+                    <div v-if="suggestionsOpen" class="pt-2">
                     <div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mb-2">
                         <button
                             v-for="f in suggestionFilterOptions"
@@ -500,18 +542,20 @@ const getDishSlotName = (id) => {
                         {{ suggestionFilters.length ? 'Нет блюд под выбранные фильтры' : 'Нет блюд для этого приёма пищи' }}
                     </div>
                     </Transition>
+                    </div>
+                    </CollapseTransition>
                 </div>
 
                 <!-- Основной список -->
-                <div v-if="filteredDishes.length > 0" class="space-y-2">
-                    <div v-if="!searchQuery" class="flex items-center gap-2 px-1">
-                        <span class="app-eyebrow">Все блюда</span>
+                <div v-for="section in dishSections" :key="section.id" class="space-y-2 mb-4">
+                    <div class="flex items-center gap-2 px-1">
+                        <span class="app-eyebrow">{{ section.title }}</span>
                         <div class="h-px bg-slate-200 flex-1"></div>
                     </div>
 
                     <TransitionGroup name="list" tag="div" class="space-y-2 relative">
                     <div 
-                        v-for="dish in filteredDishes" 
+                        v-for="dish in section.dishes" 
                         :key="dish.id"
                         @click="selectItem(dish, 'dish')"
                         class="p-2.5 rounded-2xl flex items-center gap-3 border bg-white border-slate-100 shadow-sm transition-colors tap-effect active:scale-[0.98]"
