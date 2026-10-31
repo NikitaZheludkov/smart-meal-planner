@@ -147,12 +147,18 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
-  return { 
-      plan, dishes, products, shopping, 
+  // Мини-гайд «Как всё устроено»: показывается новым пользователям сам,
+  // а из настроек его можно открыть ещё раз
+  const isTourOpen = ref(false)
+  const openTour = () => { isTourOpen.value = true }
+
+  return {
+      plan, dishes, products, shopping,
       logs, toasts, isLogOpen, isOffline, isModalOpen,
       confirmState, isConfirmOpen,
       setOffline, addLog, showToast, initNetworkListeners,
       confirm, resolveConfirm,
-      syncModalState, clearModalState
+      syncModalState, clearModalState,
+      isTourOpen, openTour
   }
 })

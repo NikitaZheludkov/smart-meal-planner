@@ -306,6 +306,91 @@ watch(() => dishStore.dishes, (dishes) => {
 })
 
 const mealSlots = computed(() => dictionaries.mealTypes)
+
+// --- КАКИЕ ПРИЁМЫ ПИЩИ ВИДНЫ В НЕДЕЛЕ ---
+// Семья скрывает ненужные (например, перекус). В конкретный день скрытый
+// приём можно добавить кнопкой «+» — он остаётся в этом дне, пока там есть
+// записи. Отдельно «добавленные дни» не храним: их задают сами записи плана.
+const hiddenMealTypeSet = computed(() => new Set(settingsStore.hiddenMealTypes || []))
+const visibleMealSlots = computed(() => mealSlots.value.filter((m) => !hiddenMealTypeSet.value.has(m.id)))
+const daySlotsByDate = computed(() => {
+  const map = new Map()
+  for (const day of weekDays.value) {
+    const dStr = format(day, 'yyyy-MM-dd')
+    map.set(dStr, mealSlots.value.filter((m) => !hiddenMealTypeSet.value.has(m.id) || planByDateSlot.value.has(`${dStr}_${m.id}`)))
+  }
+  return map
+})
+const getDaySlots = (day) => daySlotsByDate.value.get(format(day, 'yyyy-MM-dd')) || visibleMealSlots.value
+const getAddableSlots = (day) => {
+  const shown = new Set(getDaySlots(day).map((s) => s.id))
+  return mealSlots.value.filter((m) => !shown.has(m.id))
+}
+
+// Меню «+» в карточке дня: какой приём добавить в этот день
+const slotMenuDate = ref(null)
+const toggleSlotMenu = (day) => {
+  platform.haptic.selection()
+  const dStr = format(day, 'yyyy-MM-dd')
+  slotMenuDate.value = slotMenuDate.value === dStr ? null : dStr
+}
+const addSlotToDay = (day, slot) => {
+  slotMenuDate.value = null
+  openSelector(day, slot)
+}
+watch(currentWeekStart, () => { slotMenuDate.value = null })
+
+// Шторка настройки приёмов пищи
+const showSlotSettings = ref(false)
+const slotSettingsModalId = `plan-slot-settings-${Math.random().toString(36).slice(2)}`
+watch(showSlotSettings, (open) => uiStore.syncModalState(slotSettingsModalId, open))
+onUnmounted(() => uiStore.clearModalState(slotSettingsModalId))
+const savingSlotId = ref(null)
+
+const itemName = (p) => (p.dish ? p.dishData?.name : p.productData?.name) || 'без названия'
+
+const toggleSlotVisibility = async (slot) => {
+  if (savingSlotId.value) return
+  const isHidden = hiddenMealTypeSet.value.has(slot.id)
+  // Последний видимый приём не скрываем — иначе сетка останется пустой
+  if (!isHidden && visibleMealSlots.value.length <= 1) return
+  platform.haptic.selection()
+
+  const current = settingsStore.hiddenMealTypes || []
+  if (isHidden) {
+    savingSlotId.value = slot.id
+    await settingsStore.setHiddenMealTypes(current.filter((id) => id !== slot.id))
+    savingSlotId.value = null
+    return
+  }
+
+  // Скрываем: то, что запланировано на этот приём с начала текущей недели,
+  // удаляем из плана (после предупреждения) — иначе ячейки с блюдами
+  // остались бы в уже прошедших днях недели. Прошлые недели не трогаем —
+  // это история, по ней работают подсказки.
+  const fromStr = format(startOfWeek(new Date(), { weekStartsOn: settingsStore.startDay ?? 1 }), 'yyyy-MM-dd')
+  const affected = planStore.plan
+    .filter((p) => p.meal_type === slot.id && p.date >= fromStr && !String(p.id).startsWith('temp-'))
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  if (affected.length) {
+    const lines = affected.slice(0, 4).map((p) => `• ${format(parseISO(p.date), 'EEEEEE, d MMM', { locale: ru })} — ${itemName(p)}`)
+    if (affected.length > 4) lines.push(`• и ещё ${affected.length - 4}`)
+    const ok = await uiStore.confirm(
+      `С начала этой недели на этот приём запланировано:\n${lines.join('\n')}\n\nЭти записи удалятся из плана. Прошлые недели не изменятся.`,
+      { title: `Скрыть «${slot.name}»?`, okText: 'Скрыть и удалить', cancelText: 'Оставить' }
+    )
+    if (!ok) return
+  }
+
+  savingSlotId.value = slot.id
+  const saved = await settingsStore.setHiddenMealTypes([...current, slot.id])
+  if (saved && affected.length) {
+    const removed = await planStore.removeManyFromPlan(affected.map((p) => p.id))
+    if (removed) uiStore.showToast(`«${slot.name}» скрыт, из плана удалено: ${removed}`, 'success')
+  }
+  savingSlotId.value = null
+}
 const dishTypeNameById = computed(() => new Map((dictionaries.dishTypes || []).map((t) => [t.id, t.name])))
 
 const loadData = async () => {
@@ -588,6 +673,9 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         <span class="material-icons-round text-base">auto_awesome</span>
                         Идеи на неделю
                     </button>
+                    <button @click="showSlotSettings = true; platform.haptic.impact('light')" class="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-400 tap-effect" aria-label="Приёмы пищи в плане">
+                        <span class="material-icons-round text-base">tune</span>
+                    </button>
                     <button @click="weekLayoutMode = 'grid'" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors tap-effect" :class="weekLayoutMode === 'grid' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'">
                         <span class="material-icons-round text-base">grid_view</span>
                     </button>
@@ -595,6 +683,9 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         <span class="material-icons-round text-base">view_agenda</span>
                     </button>
                 </div>
+
+                <!-- Тап мимо меню «+» закрывает его -->
+                <div v-if="slotMenuDate" class="fixed inset-0 z-20" @click="slotMenuDate = null"></div>
 
                 <div v-for="day in weekDays" :key="format(day, 'yyyy-MM-dd')"
                     class="bg-white rounded-[24px] p-3 flex flex-col gap-2 transition-colors duration-300"
@@ -607,7 +698,7 @@ onMounted(() => { if (auth.isAuth) loadData() })
                             <span class="text-[10px] font-bold" :class="isToday(day) ? 'text-slate-900' : 'text-slate-500'">{{ format(day, 'EEEE', { locale: ru }) }}</span>
                         </div>
 
-                        <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-2">
+                        <div v-if="getDailyTotals(day).kcal > 0" class="flex items-center gap-2 ml-auto">
                             <div class="flex flex-col items-center">
                                 <span class="text-[9px] font-black text-slate-800">{{ Math.round(getDailyTotals(day).kcal) }}</span>
                                 <span class="text-[7px] font-bold text-slate-400 leading-none">ккал</span>
@@ -629,10 +720,36 @@ onMounted(() => { if (auth.isAuth) loadData() })
                                 <span class="material-icons-round text-[10px] leading-none">info</span>
                             </button>
                         </div>
+
+                        <!-- «+» — добавить в этот день скрытый приём пищи -->
+                        <div v-if="getAddableSlots(day).length" class="relative shrink-0" :class="getDailyTotals(day).kcal > 0 ? 'ml-2' : 'ml-auto'">
+                            <button
+                                @click.stop="toggleSlotMenu(day)"
+                                class="w-6 h-6 rounded-full flex items-center justify-center tap-effect active:scale-90 transition-all"
+                                :class="slotMenuDate === format(day, 'yyyy-MM-dd') ? 'bg-slate-900 text-white rotate-45' : 'bg-slate-100 text-slate-400'"
+                                aria-label="Добавить приём пищи в этот день"
+                            >
+                                <span class="material-icons-round text-base leading-none">add</span>
+                            </button>
+                            <Transition name="fade">
+                                <div v-if="slotMenuDate === format(day, 'yyyy-MM-dd')" class="absolute right-0 top-8 z-30 min-w-[168px] bg-white rounded-2xl shadow-lg border border-slate-100 p-1.5">
+                                    <div class="px-2 pt-1 pb-1.5 text-[10px] font-bold text-slate-400">Добавить в этот день</div>
+                                    <button
+                                        v-for="slot in getAddableSlots(day)"
+                                        :key="slot.id"
+                                        @click.stop="addSlotToDay(day, slot)"
+                                        class="w-full flex items-center gap-2 px-2 py-2 rounded-xl text-left text-[13px] font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 tap-effect"
+                                    >
+                                        <span class="text-sm">{{ getSlotIcon(slot.name) }}</span>
+                                        {{ slot.name }}
+                                    </button>
+                                </div>
+                            </Transition>
+                        </div>
                     </div>
 
                     <div v-if="weekLayoutMode === 'list'" class="w-full flex flex-col gap-1">
-                        <button v-for="slot in mealSlots" :key="slot.id" @click="openSelector(day, slot)" class="w-full flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 tap-effect text-left rounded-lg">
+                        <button v-for="slot in getDaySlots(day)" :key="slot.id" @click="openSelector(day, slot)" class="w-full flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 tap-effect text-left rounded-lg">
                             <span class="text-xs shrink-0">{{ getSlotIcon(slot.name) }}</span>
                             <span class="text-[9px] font-black text-slate-400 uppercase tracking-wide shrink-0">{{ slot.name }}</span>
                             <span v-if="getSlotItems(day, slot.id).length > 0" class="flex-1 min-w-0 text-[11px] font-bold text-slate-700 truncate">
@@ -643,10 +760,10 @@ onMounted(() => { if (auth.isAuth) loadData() })
                         </button>
                     </div>
 
-                    <div v-else class="w-full grid grid-cols-4 gap-1.5">
+                    <div v-else class="w-full grid gap-1.5" :style="{ gridTemplateColumns: `repeat(${getDaySlots(day).length}, minmax(0, 1fr))` }">
 
                     <button
-                        v-for="slot in mealSlots"
+                        v-for="slot in getDaySlots(day)"
                         :key="slot.id" 
             @click="openSelector(day, slot)" 
             class="w-full h-20 rounded-xl border overflow-hidden relative tap-effect hover:bg-slate-50 flex flex-col transition-colors bg-white shadow-sm border-slate-100" 
@@ -736,6 +853,54 @@ onMounted(() => { if (auth.isAuth) loadData() })
     <WeekDraftSheet :is-open="showWeekDraft" :period-start="currentWeekStart" @close="showWeekDraft = false" />
 
     <DishDetailModal :is-open="showDishModal" :dish="viewingDish" @close="showDishModal = false" />
+
+    <!-- Какие приёмы пищи показывать в неделе -->
+    <Transition name="modal">
+      <div v-if="showSlotSettings" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showSlotSettings = false">
+        <div class="absolute inset-0 bg-black/40 transition-opacity" @click="showSlotSettings = false"></div>
+        <div class="sheet modal-content">
+          <div class="sheet-handle"></div>
+
+          <div class="sheet-header">
+            <button @click="showSlotSettings = false" class="sheet-close tap-effect" aria-label="Закрыть">
+              <span class="material-icons-round text-xl">close</span>
+            </button>
+            <div class="min-w-0">
+              <h2 class="sheet-title">Приёмы пищи</h2>
+              <p class="sheet-subtitle">Что показывать в неделе — для всей семьи</p>
+            </div>
+            <div></div>
+          </div>
+
+          <div class="min-h-0 overflow-y-auto px-5 pt-3 pb-[calc(24px+env(safe-area-inset-bottom,0px))]">
+            <div class="bg-slate-50 rounded-2xl divide-y divide-slate-100">
+              <div v-for="slot in mealSlots" :key="slot.id" class="flex items-center gap-3 px-4 py-3">
+                <span class="text-lg w-6 text-center" :class="hiddenMealTypeSet.has(slot.id) ? 'opacity-40 grayscale' : ''">{{ getSlotIcon(slot.name) }}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-semibold" :class="hiddenMealTypeSet.has(slot.id) ? 'text-slate-400' : 'text-slate-900'">{{ slot.name }}</div>
+                  <div v-if="hiddenMealTypeSet.has(slot.id)" class="text-[11px] text-secondary leading-snug">Скрыт. В нужный день — через «+» в карточке дня</div>
+                  <div v-else-if="visibleMealSlots.length <= 1" class="text-[11px] text-secondary leading-snug">Хотя бы один приём должен остаться</div>
+                </div>
+                <button
+                  @click="toggleSlotVisibility(slot)"
+                  :disabled="savingSlotId === slot.id || (!hiddenMealTypeSet.has(slot.id) && visibleMealSlots.length <= 1)"
+                  class="w-11 h-6 rounded-full relative shrink-0 transition-colors disabled:opacity-50"
+                  :class="hiddenMealTypeSet.has(slot.id) ? 'bg-slate-200' : 'bg-slate-900'"
+                  role="switch"
+                  :aria-checked="!hiddenMealTypeSet.has(slot.id)"
+                  :aria-label="slot.name"
+                >
+                  <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" :class="hiddenMealTypeSet.has(slot.id) ? 'translate-x-0' : 'translate-x-5'"></span>
+                </button>
+              </div>
+            </div>
+            <p class="text-[11px] text-secondary leading-snug px-1 mt-3">
+              Если скрыть приём, на который уже что-то запланировано, эти записи удалятся из плана — с начала текущей недели. Прошлые недели не меняются. Перед удалением спросим.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <Transition name="modal">
       <div v-if="showDayNutritionModal" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showDayNutritionModal = false">

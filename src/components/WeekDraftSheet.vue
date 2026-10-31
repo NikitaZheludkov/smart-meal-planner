@@ -8,7 +8,7 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { useSettingsStore } from '../stores/settings'
 import { useUIStore } from '../stores/ui'
 import { usePlatformStore } from '../stores/platform'
-import { buildWeekDraft, nextAlternative, SUGGESTION_FILTERS } from '../lib/suggestions'
+import { buildWeekDraft, nextAlternative, makeDays, SUGGESTION_FILTERS } from '../lib/suggestions'
 import CollapseTransition from './CollapseTransition.vue'
 
 // "Идеи на неделю": окно выглядит как сама неделя плана. Уже запланированное
@@ -37,13 +37,34 @@ const portions = computed(() => Number(settingsStore.defaultPortions) || 1)
 const garnishTypeId = computed(() => dictionaries.dishTypes.find((t) => t.name === 'Гарнир')?.id || null)
 const dishById = computed(() => new Map(dishStore.dishes.map((d) => [d.id, d])))
 const mealTypeNames = computed(() => Object.fromEntries(dictionaries.mealTypes.map((m) => [m.id, m.name])))
+// Только приёмы пищи, которые семья показывает в неделе (см. настройку в плане)
+const visibleMealTypes = computed(() => dictionaries.mealTypes.filter((m) => !(settingsStore.hiddenMealTypes || []).includes(m.id)))
 
-// Настройки подбора. Перекус по умолчанию не заполняем — его чаще решают на ходу.
-const selectedMealTypes = ref([])
+// Что заполнять — для каждого приёма пищи: 'off' (не заполнять), 'any' (любое
+// блюдо) или id вида блюда («на ужин — салаты»). С видом блюдо добавляется и
+// туда, где уже что-то стоит, но нет блюда этого вида. Выбор запоминается на
+// устройстве. Перекус по умолчанию не заполняем — его чаще решают на ходу.
+const MEALS_KEY = 'weekDraft.meals'
+const mealChoice = ref({})
+const selectedMealTypes = computed(() => visibleMealTypes.value.map((m) => m.id).filter((id) => (mealChoice.value[id] || 'off') !== 'off'))
+const dishTypeFor = (mealTypeId) => {
+  const choice = mealChoice.value[mealTypeId]
+  return choice && choice !== 'any' && choice !== 'off' ? choice : null
+}
+const dishTypeByMeal = computed(() => Object.fromEntries(selectedMealTypes.value.map((id) => [id, dishTypeFor(id)])))
+const dishTypeNameFor = (mealTypeId) => dictionaries.getDishTypeById(dishTypeFor(mealTypeId))?.name || ''
+const loadMealChoice = () => {
+  let saved = {}
+  try { saved = JSON.parse(localStorage.getItem(MEALS_KEY) || '{}') } catch {}
+  const typeIds = new Set(dictionaries.dishTypes.map((t) => t.id))
+  return Object.fromEntries(visibleMealTypes.value.map((m) => {
+    const value = saved[m.id]
+    const valid = value === 'off' || value === 'any' || typeIds.has(value)
+    return [m.id, valid ? value : (m.name === 'Перекус' ? 'off' : 'any')]
+  }))
+}
+const mealMenu = ref(null) // открытое меню приёма пищи: { id, name, top, left }
 const filters = ref([])
-// Вид блюда: null — любые (заполняем пустые приёмы пищи), иначе только этот
-// вид — например, салаты на всю неделю, в том числе к уже запланированному
-const dishTypeId = ref(null)
 const showFilters = ref(false)
 const seed = ref(0)
 const draft = ref([])
@@ -52,6 +73,17 @@ const added = ref(new Map()) // ключ слота -> [id записей пла
 const expanded = ref(new Set()) // карточки, у которых раскрыто объяснение
 const addingKey = ref('')
 const draftVersion = ref(0) // ключ для анимации смены всей подборки
+// Предложения, которые пользователь заменил сам (↻): остаются на месте при
+// «Перемешать» и смене фильтров. Ключ — слот; mode — для какого «Что» выбрано.
+const locked = ref(new Map())
+
+// Выходные: на этой неделе можно отметить свои, «Запомнить» — для всех недель.
+// Храним полный набор дней недели (0 = вс … 6 = сб).
+const weekend = ref([])
+const dayKinds = computed(() => makeDays({ weekendWeekdays: weekend.value, tags: dictionaries.availableTags || [] }))
+const sameDays = (a, b) => [...a].sort().join() === [...b].sort().join()
+const canRememberWeekend = computed(() => !sameDays(weekend.value, settingsStore.weekendDays || []))
+const isWeekendDate = (dateStr) => dayKinds.value.isWeekend(dateStr)
 
 const filterOptions = computed(() => [
   ...SUGGESTION_FILTERS.filter((f) => f.id !== 'long_ago'),
@@ -87,13 +119,15 @@ const rebuild = () => {
     mealTypeIds: orderedSlots,
     filters: filters.value,
     garnishTypeId: garnishTypeId.value,
-    dishTypeId: dishTypeId.value,
+    dishTypeByMeal: dishTypeByMeal.value,
     portions: portions.value,
     seed: seed.value,
     fromDate: fromDate.value,
-    mealTypeNames: mealTypeNames.value
+    mealTypeNames: mealTypeNames.value,
+    days: dayKinds.value,
+    fixed: [...locked.value.values()]
   })
-  tried.value = Object.fromEntries(draft.value.map((e) => [e.key, [e.dishId]]))
+  tried.value = Object.fromEntries(draft.value.map((e) => [e.key, locked.value.has(e.key) ? tried.value[e.key] || [e.dishId] : [e.dishId]]))
   added.value = new Map()
   expanded.value = new Set()
   draftVersion.value++
@@ -101,27 +135,78 @@ const rebuild = () => {
 
 watch(() => props.isOpen, (open) => {
   if (!open) return
-  selectedMealTypes.value = dictionaries.mealTypes.filter((m) => m.name !== 'Перекус').map((m) => m.id)
+  mealChoice.value = loadMealChoice()
+  mealMenu.value = null
   filters.value = []
-  dishTypeId.value = null
   showFilters.value = false
   seed.value = 0
+  locked.value = new Map()
+  tried.value = {}
+  weekend.value = [...(settingsStore.weekendDays || [])]
   rebuild()
 }, { immediate: true })
 
-const toggleMealType = (id) => {
+// Меню приёма пищи: открывается под чипом (позиция fixed — ряд чипов
+// прокручивается и обрезал бы выпадающий список)
+const MENU_WIDTH = 196
+const openMealMenu = (meal, event) => {
   platform.haptic.selection()
-  const list = selectedMealTypes.value
-  selectedMealTypes.value = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+  if (mealMenu.value?.id === meal.id) { mealMenu.value = null; return }
+  const rect = event.currentTarget.getBoundingClientRect()
+  mealMenu.value = {
+    id: meal.id,
+    name: meal.name,
+    top: rect.bottom + 6,
+    left: Math.max(12, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 12))
+  }
+}
+const setMealChoice = (value) => {
+  const id = mealMenu.value?.id
+  mealMenu.value = null
+  if (!id || mealChoice.value[id] === value) return
+  platform.haptic.selection()
+  mealChoice.value = { ...mealChoice.value, [id]: value }
+  try { localStorage.setItem(MEALS_KEY, JSON.stringify(mealChoice.value)) } catch {}
   rebuild()
 }
-const selectDishType = (id) => {
-  if (dishTypeId.value === id) return
+// Почему приём остался пустым: блюд такого вида нет вовсе — или есть, но
+// все уже стоят в этот или соседний день (подряд не повторяем)
+const emptyReason = (mealTypeId) => {
+  if (filters.value.length) return 'нет блюд под фильтры'
+  const typeId = dishTypeFor(mealTypeId)
+  const typeName = dishTypeNameFor(mealTypeId)
+  const exists = dishStore.dishes.some((d) => dictionaries.dishFitsSlot(d, mealTypeId) &&
+    (typeId ? d.dish_type === typeId : d.dish_type !== garnishTypeId.value))
+  if (!exists) {
+    return typeName
+      ? `нет блюд «${typeName}» с отметкой «${dictionaries.getDishMealType(mealTypeId)?.name || mealTypeNames.value[mealTypeId]}»`
+      : 'нет подходящих блюд'
+  }
+  return 'подходящие уже стоят рядом — подряд не повторяем'
+}
+const mealChipLabel = (meal) => {
+  const type = dishTypeNameFor(meal.id)
+  return type ? `${meal.name} · ${type.toLowerCase()}` : meal.name
+}
+
+// Дни, которые видны в подборке (с сегодняшнего до конца периода)
+const rangeDays = computed(() => {
+  const list = []
+  for (let d = fromDate.value; !isBefore(periodEnd.value, d); d = addDays(d, 1)) {
+    list.push({ weekday: d.getDay(), label: format(d, 'EEEEEE', { locale: ru }) })
+  }
+  return list
+})
+const toggleWeekend = (weekday) => {
   platform.haptic.selection()
-  dishTypeId.value = id
+  weekend.value = weekend.value.includes(weekday) ? weekend.value.filter((d) => d !== weekday) : [...weekend.value, weekday]
   rebuild()
 }
-const dishTypeName = computed(() => dictionaries.dishTypes.find((t) => t.id === dishTypeId.value)?.name || '')
+const rememberWeekend = async () => {
+  platform.haptic.impact('light')
+  const ok = await settingsStore.setWeekendDays([...weekend.value].sort())
+  if (ok) ui.showToast('Запомнили ваши выходные', 'success')
+}
 
 const toggleFilter = (id) => {
   platform.haptic.selection()
@@ -150,14 +235,16 @@ const replaceEntry = (entry) => {
   let next = nextAlternative({
     planItems: planStore.plan, draft: draft.value, entry, dishes: dishStore.dishes,
     periodStart: props.periodStart, periodLength: periodLength.value, filters: filters.value,
-    garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeId.value, portions: portions.value, tried: seen, mealTypeNames: mealTypeNames.value
+    garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeFor(entry.mealTypeId), portions: portions.value, tried: seen, mealTypeNames: mealTypeNames.value,
+    days: dayKinds.value
   })
   if (!next) {
     // Варианты закончились — начинаем круг заново
     next = nextAlternative({
       planItems: planStore.plan, draft: draft.value, entry, dishes: dishStore.dishes,
       periodStart: props.periodStart, periodLength: periodLength.value, filters: filters.value,
-      garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeId.value, portions: portions.value, tried: [entry.dishId], mealTypeNames: mealTypeNames.value
+      garnishTypeId: garnishTypeId.value, dishTypeId: dishTypeFor(entry.mealTypeId), portions: portions.value, tried: [entry.dishId], mealTypeNames: mealTypeNames.value,
+      days: dayKinds.value
     })
     tried.value[entry.key] = []
   }
@@ -167,11 +254,15 @@ const replaceEntry = (entry) => {
   }
   tried.value[entry.key] = [...(tried.value[entry.key] || []), next.dishId]
   draft.value = draft.value.map((e) => (e.key === entry.key ? next : e))
+  locked.value = new Map(locked.value).set(entry.key, { ...next, mode: dishTypeFor(entry.mealTypeId) })
 }
 
 const removeGarnish = (entry) => {
   platform.haptic.selection()
   draft.value = draft.value.map((e) => (e.key === entry.key ? { ...e, garnishId: null } : e))
+  // Убрали гарнир — это тоже выбор пользователя, сохраняем его
+  const updated = draft.value.find((e) => e.key === entry.key)
+  if (updated) locked.value = new Map(locked.value).set(entry.key, { ...updated, mode: dishTypeFor(entry.mealTypeId) })
 }
 
 const remaining = computed(() => draft.value.filter((e) => !added.value.has(e.key)))
@@ -326,30 +417,36 @@ const close = () => {
         <!-- Что заполнять — всегда на виду: список сразу подстраивается -->
         <div class="shrink-0 px-5 pt-3 pb-3 border-b border-slate-100">
           <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
-            <span class="w-10 text-[11px] text-secondary shrink-0">Когда</span>
+            <span class="w-[60px] text-[11px] text-secondary shrink-0">Заполнить</span>
             <button
-              v-for="m in dictionaries.mealTypes"
+              v-for="m in visibleMealTypes"
               :key="m.id"
-              @click="toggleMealType(m.id)"
-              class="chip tap-effect"
+              @click="openMealMenu(m, $event)"
+              class="chip tap-effect !pr-1.5"
               :class="selectedMealTypes.includes(m.id) ? 'chip-active' : ''"
-            >{{ m.name }}</button>
+            >
+              {{ mealChipLabel(m) }}
+              <span class="material-icons-round text-[16px] -ml-0.5 opacity-60 transition-transform" :class="mealMenu?.id === m.id ? 'rotate-180' : ''">expand_more</span>
+            </button>
           </div>
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5 mt-2">
-            <span class="w-10 text-[11px] text-secondary shrink-0">Что</span>
+
+          <div v-if="rangeDays.length" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5 mt-2">
+            <span class="w-[60px] text-[11px] text-secondary shrink-0">Выходные</span>
             <button
-              @click="selectDishType(null)"
-              class="chip tap-effect"
-              :class="dishTypeId === null ? 'chip-active' : ''"
-            >Любое</button>
-            <button
-              v-for="t in dictionaries.dishTypes"
-              :key="t.id"
-              @click="selectDishType(t.id)"
-              class="chip tap-effect"
-              :class="dishTypeId === t.id ? 'chip-active' : ''"
-            >{{ t.name }}</button>
+              v-for="d in rangeDays"
+              :key="d.weekday"
+              @click="toggleWeekend(d.weekday)"
+              class="chip tap-effect !px-0 w-[32px] justify-center"
+              :class="weekend.includes(d.weekday) ? 'chip-active' : ''"
+            >{{ d.label }}</button>
           </div>
+          <!-- Выходные отличаются от сохранённых — действуют только на эту неделю -->
+          <CollapseTransition>
+            <div v-if="rangeDays.length && canRememberWeekend" class="flex items-center gap-1.5 pt-1.5 pl-[66px] text-[11px]">
+              <span class="text-secondary">Только на эту неделю.</span>
+              <button @click="rememberWeekend" class="font-semibold text-slate-900 underline underline-offset-2 tap-effect">Запомнить</button>
+            </div>
+          </CollapseTransition>
 
           <!-- Фильтры — за кнопкой в шапке -->
           <CollapseTransition>
@@ -377,7 +474,7 @@ const close = () => {
           <div :key="draftVersion">
             <div v-for="day in days" :key="day.date" class="mb-4">
               <div class="flex items-baseline justify-between px-1 mb-1.5">
-                <span class="text-[12px] font-semibold text-slate-900 first-letter:uppercase">{{ day.label }}</span>
+                <span class="text-[12px] font-semibold text-slate-900 first-letter:uppercase">{{ day.label }}<span v-if="isWeekendDate(day.date)" class="font-normal text-secondary"> · выходной</span></span>
                 <span v-if="day.kcal" class="text-[11px] text-secondary">{{ formatKcal(day.kcal) }} ккал</span>
               </div>
 
@@ -394,7 +491,7 @@ const close = () => {
                       <Transition name="swap" mode="out-in">
                         <div :key="row.entry.dishId + '|' + (row.entry.garnishId || '')" class="flex-1 min-w-0">
                           <div class="text-[10px] leading-none mb-1 truncate">
-                            <span class="font-semibold uppercase tracking-wide text-slate-400">{{ row.slot.name }}</span>
+                            <span v-if="locked.has(row.entry.key) && !added.has(row.entry.key)" class="material-icons-round text-[11px] text-slate-400 align-[-2px] mr-0.5" title="Вы выбрали сами — останется при «Перемешать»">push_pin</span><span class="font-semibold uppercase tracking-wide text-slate-400">{{ row.slot.name }}</span>
                             <span v-if="row.planned.length && !added.has(row.entry.key)" class="text-slate-400"> · в плане: {{ row.planned.join(', ') }}</span>
                           </div>
                           <div class="card-title leading-snug">{{ dishById.get(row.entry.dishId)?.name }}</div>
@@ -449,7 +546,7 @@ const close = () => {
                   <div v-else class="flex items-baseline gap-2 px-3.5 py-1.5 min-w-0">
                     <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-300 shrink-0">{{ row.slot.name }}</span>
                     <span v-if="row.planned.length" class="text-[12px] text-slate-400 truncate">{{ row.planned.join(', ') }}</span>
-                    <span v-else class="text-[12px] text-slate-300 truncate">{{ filters.length ? 'нет блюд под фильтры' : dishTypeName ? `нет блюд «${dishTypeName}» с отметкой «${row.slot.name}»` : 'нет подходящих блюд' }}</span>
+                    <span v-else class="text-[12px] text-slate-300 truncate">{{ emptyReason(row.slot.id) }}</span>
                   </div>
                 </template>
               </div>
@@ -457,6 +554,34 @@ const close = () => {
           </div>
           </Transition>
         </div>
+
+        <!-- Меню приёма пищи: что подбирать -->
+        <template v-if="mealMenu">
+          <div class="fixed inset-0 z-[80]" @click="mealMenu = null"></div>
+          <div
+            class="fixed z-[81] bg-white rounded-2xl shadow-lg border border-slate-100 p-1.5 animate-fade-in"
+            :style="{ top: mealMenu.top + 'px', left: mealMenu.left + 'px', width: MENU_WIDTH + 'px' }"
+          >
+            <div class="px-2.5 pt-1 pb-1.5 text-[11px] text-secondary">{{ mealMenu.name }} — что подбирать</div>
+            <button
+              v-for="opt in [{ id: 'any', name: 'Любое блюдо' }, ...dictionaries.dishTypes.map((t) => ({ id: t.id, name: t.name }))]"
+              :key="opt.id"
+              @click="setMealChoice(opt.id)"
+              class="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-[13px] font-semibold text-slate-800 active:bg-slate-100 tap-effect"
+            >
+              {{ opt.name }}
+              <span v-if="mealChoice[mealMenu.id] === opt.id" class="material-icons-round text-base text-slate-900">check</span>
+            </button>
+            <div class="h-px bg-slate-100 my-1 mx-2"></div>
+            <button
+              @click="setMealChoice('off')"
+              class="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-[13px] font-semibold text-slate-500 active:bg-slate-100 tap-effect"
+            >
+              Не заполнять
+              <span v-if="mealChoice[mealMenu.id] === 'off'" class="material-icons-round text-base text-slate-900">check</span>
+            </button>
+          </div>
+        </template>
 
         <!-- Действия -->
         <div v-if="days.length" class="shrink-0 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] border-t border-slate-100 bg-white flex items-center gap-2">

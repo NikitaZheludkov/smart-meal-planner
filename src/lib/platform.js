@@ -30,7 +30,22 @@ export const platform = {
       await navigator.clipboard.writeText(text)
       return true
     } catch {
-      return false
+      // Во встроенных браузерах (Telegram и др.) Clipboard API бывает
+      // недоступен — копируем по-старому, через выделение текста
+      try {
+        const el = document.createElement('textarea')
+        el.value = text
+        el.setAttribute('readonly', '')
+        el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;'
+        document.body.appendChild(el)
+        el.select()
+        el.setSelectionRange(0, text.length)
+        const ok = document.execCommand('copy')
+        el.remove()
+        return ok
+      } catch {
+        return false
+      }
     }
   }
 }

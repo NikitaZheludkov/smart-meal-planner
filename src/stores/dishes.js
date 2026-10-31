@@ -139,6 +139,7 @@ export const useDishStore = defineStore('dishes', () => {
         is_batch: dishData.is_batch || false,
         batch_yield: dishData.batch_yield || 1,
         needs_side_dish: dishData.needs_side_dish || false,
+        cooking_method: dishData.cooking_method || '',
         household: auth.householdId
       }
 
@@ -212,7 +213,8 @@ export const useDishStore = defineStore('dishes', () => {
         carbs: Number(dishData.carbs) || 0,
         is_batch: dishData.is_batch || false,
         batch_yield: dishData.batch_yield || 1,
-        needs_side_dish: dishData.needs_side_dish || false
+        needs_side_dish: dishData.needs_side_dish || false,
+        cooking_method: dishData.cooking_method || ''
       }
 
       await withRetry(async () => {

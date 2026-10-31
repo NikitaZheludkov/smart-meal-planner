@@ -22,6 +22,8 @@ import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import TelegramLinkPromptModal from './components/TelegramLinkPromptModal.vue'
 import AnnouncementSheet from './components/AnnouncementSheet.vue'
+import OnboardingTour from './components/OnboardingTour.vue'
+import { TOUR_VERSION } from './lib/tour'
 
 const auth = useAuthStore()
 const dictionaries = useDictionariesStore()
@@ -137,6 +139,12 @@ const loadUserData = () => {
         loadUserDataPromise = null
     })
 }
+
+// Новичку один раз показываем мини-гайд — когда данные загрузились и
+// приложение уже на экране
+watch(() => auth.isAuth && !isAppInitializing.value, (ready) => {
+  if (ready && !auth.hasSeenTour(TOUR_VERSION)) ui.openTour()
+}, { immediate: true })
 
 // Если статус авторизации меняется (например, вошли), грузим данные
 watch(() => auth.isAuth, (newVal) => {
@@ -332,7 +340,8 @@ onUnmounted(() => {
     <ToastContainer />
     <ConfirmModal />
     <TelegramLinkPromptModal />
-    <AnnouncementSheet v-if="auth.isAuth && !isAppInitializing" />
+    <AnnouncementSheet v-if="auth.isAuth && !isAppInitializing && !ui.isTourOpen" />
+    <OnboardingTour v-if="auth.isAuth" />
   </div>
 </template>
 

@@ -7,7 +7,7 @@ import { useDictionariesStore } from '../stores/dictionaries'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 import { useSettingsStore } from '../stores/settings'
-import { buildContext, rankDishes, SUGGESTION_FILTERS } from '../lib/suggestions'
+import { buildContext, rankDishes, makeDays, SUGGESTION_FILTERS } from '../lib/suggestions'
 import { format, parseISO } from 'date-fns'
 import CollapseTransition from './CollapseTransition.vue'
 import { ru } from 'date-fns/locale'
@@ -134,7 +134,8 @@ const rankedSuggestions = computed(() => {
         filters: suggestionFilters.value,
         excludeDishIds: props.existingItems.map((i) => i.dish).filter(Boolean),
         garnishTypeId: garnishTypeId.value,
-        onlyGarnish
+        onlyGarnish,
+        days: makeDays({ weekendWeekdays: settingsStore.weekendDays, tags: dictionaries.availableTags || [] })
     })
     if (!onlyGarnish && activeCategory.value !== 'all') {
         ranked = ranked.filter((r) => r.dish.dish_type === activeCategory.value)
@@ -202,7 +203,7 @@ const filteredDishes = computed(() => {
 
 // Общий список делим: сначала блюда того приёма пищи, который заполняем
 // (нажали «Завтрак» — сверху завтраки), затем все остальные
-const isForSlot = (dish) => (dish.meal_type || []).includes(props.slotId)
+const isForSlot = (dish) => dictionaries.dishFitsSlot(dish, props.slotId)
 const slotDishes = computed(() => filteredDishes.value.filter(isForSlot))
 const otherDishes = computed(() => filteredDishes.value.filter((d) => !isForSlot(d)))
 const dishSections = computed(() => [
@@ -299,11 +300,6 @@ const getSlotName = computed(() => {
     return slot ? slot.name : 'Прием пищи'
 })
 
-const isSlotMatch = (dishMealTypeId) => dishMealTypeId === props.slotId
-const getDishSlotName = (id) => {
-    const slot = dictionaries.mealTypes.find(m => m.id === id)
-    return slot ? slot.name : ''
-}
 </script>
 
 <template>

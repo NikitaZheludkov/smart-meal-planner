@@ -751,3 +751,21 @@ routerAdd('POST', '/api/household/remove-member', (e) => {
 
   return e.json(200, { ok: true })
 })
+
+// Правила для блюда при любом сохранении (см. meal_utils.js), с какого бы
+// клиента ни сохраняли:
+// - обед и ужин — одна категория «Обед/Ужин»: отмечен один — дописываем второй;
+// - рецепт больше чем на 2 порции — ставим тег «Много порций».
+onRecordCreate((e) => {
+  const u = require(`${__hooks}/meal_utils.js`)
+  u.pairLunchDinner(e.app, e.record)
+  u.tagManyPortions(e.app, e.record)
+  e.next()
+}, 'dishes')
+
+onRecordUpdate((e) => {
+  const u = require(`${__hooks}/meal_utils.js`)
+  u.pairLunchDinner(e.app, e.record)
+  u.tagManyPortions(e.app, e.record)
+  e.next()
+}, 'dishes')

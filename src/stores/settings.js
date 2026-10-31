@@ -14,6 +14,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const startDay = ref(1)
   const periodLength = ref(7)
   const defaultPortions = ref(1)
+  // Приёмы пищи, скрытые в сетке недели (общая настройка семьи)
+  const hiddenMealTypes = ref([])
+  // Выходные дни семьи: 0 = вс … 6 = сб. По умолчанию суббота и воскресенье.
+  const DEFAULT_WEEKEND = [6, 0]
+  const weekendDays = ref(DEFAULT_WEEKEND)
 
   const household = ref(null)
   const familyMembers = ref([])
@@ -58,6 +63,8 @@ export const useSettingsStore = defineStore('settings', () => {
           startDay.value = Number(hhData.start_day ?? 1)
           periodLength.value = Number(hhData.period_length ?? 7)
           defaultPortions.value = Number(hhData.default_portions ?? 1)
+          hiddenMealTypes.value = Array.isArray(hhData.hidden_meal_types) ? hhData.hidden_meal_types : []
+          weekendDays.value = Array.isArray(hhData.weekend_days) ? hhData.weekend_days.map(Number) : DEFAULT_WEEKEND
           const ui = useUIStore()
           ui.addLog('Настройки семьи загружены')
       }
@@ -184,6 +191,23 @@ export const useSettingsStore = defineStore('settings', () => {
       throw new Error('Не удалось создать код, попробуйте ещё раз')
   }
 
+  // После смены семьи (вступили по коду, вернулись к своему плану) всё
+  // перечитываем заново: профиль с новой семьёй, подписку на обновления и
+  // данные. Продукты — до блюд: по ним подписываются ингредиенты.
+  const reloadHouseholdData = async () => {
+      const auth = useAuthStore()
+      await auth.refreshSession()
+      useRealtimeStore().reconnect()
+
+      const plan = usePlanStore()
+      const dishes = useDishStore()
+      const products = useProductStore()
+      const shopping = useShoppingStore()
+
+      await Promise.allSettled([fetchSettings(), products.fetchProducts(), shopping.fetchChecklist()])
+      await Promise.allSettled([dishes.fetchDishes(), plan.fetchPlan()])
+  }
+
   const joinHousehold = async (code) => {
       const auth = useAuthStore()
       const ui = useUIStore()
@@ -200,26 +224,9 @@ export const useSettingsStore = defineStore('settings', () => {
           throw new Error(e?.response?.message || e?.message || 'Не удалось подключиться к семье')
       }
 
+      await reloadHouseholdData()
       // название не показываем: у большинства семей оно стандартное «Моя семья»
       if (joined?.household) ui.showToast('Готово! Теперь у вас общий план и список покупок', 'success')
-
-      await auth.refreshSession()
-
-      const realtime = useRealtimeStore()
-      realtime.reconnect()
-
-      const plan = usePlanStore()
-      const dishes = useDishStore()
-      const products = useProductStore()
-      const shopping = useShoppingStore()
-
-      await Promise.allSettled([
-          fetchSettings(),
-          plan.fetchPlan(),
-          dishes.fetchDishes(),
-          products.fetchProducts(),
-          shopping.fetchChecklist()
-      ])
   }
 
   const leaveHousehold = async () => {
@@ -246,23 +253,7 @@ export const useSettingsStore = defineStore('settings', () => {
            if (newHousehold) {
                 await pb.collection('users').update(auth.user.id, { household: newHousehold.id })
                 ui.showToast('Вы снова ведёте свой план', 'success')
-                await auth.refreshSession()
-
-                const realtime = useRealtimeStore()
-                realtime.reconnect()
-
-                const plan = usePlanStore()
-                const dishes = useDishStore()
-                const products = useProductStore()
-                const shopping = useShoppingStore()
-
-                await Promise.allSettled([
-                    fetchSettings(),
-                    plan.fetchPlan(),
-                    dishes.fetchDishes(),
-                    products.fetchProducts(),
-                    shopping.fetchChecklist()
-                ])
+                await reloadHouseholdData()
                 return
            }
            throw new Error('Не удалось создать новую семью')
@@ -271,30 +262,48 @@ export const useSettingsStore = defineStore('settings', () => {
       await pb.collection('users').update(auth.user.id, { household: myOwnHousehold.id })
       
       ui.showToast('Вы снова ведёте свой план', 'success')
-
-      await auth.refreshSession()
-
-      const realtime = useRealtimeStore()
-      realtime.reconnect()
-
-      const plan = usePlanStore()
-      const dishes = useDishStore()
-      const products = useProductStore()
-      const shopping = useShoppingStore()
-
-      await Promise.allSettled([
-          fetchSettings(),
-          plan.fetchPlan(),
-          dishes.fetchDishes(),
-          products.fetchProducts(),
-          shopping.fetchChecklist()
-      ])
+      await reloadHouseholdData()
   }
 
-  return { 
-      startDay, periodLength, defaultPortions, 
+  // Сохраняем сразу (оптимистично), при ошибке возвращаем как было
+  const setHiddenMealTypes = async (ids) => {
+    const ui = useUIStore()
+    const prev = hiddenMealTypes.value
+    hiddenMealTypes.value = ids
+    try {
+      if (!household.value?.id) throw new Error('Семья не найдена')
+      const data = await withTimeout(pb.collection('households').update(household.value.id, { hidden_meal_types: ids }), 10000)
+      if (data) household.value = data
+      return true
+    } catch (e) {
+      console.error('Ошибка сохранения приёмов пищи:', e)
+      hiddenMealTypes.value = prev
+      ui.showToast('Не удалось сохранить настройку', 'error')
+      return false
+    }
+  }
+
+  const setWeekendDays = async (days) => {
+    const ui = useUIStore()
+    const prev = weekendDays.value
+    weekendDays.value = days
+    try {
+      if (!household.value?.id) throw new Error('Семья не найдена')
+      const data = await withTimeout(pb.collection('households').update(household.value.id, { weekend_days: days }), 10000)
+      if (data) household.value = data
+      return true
+    } catch (e) {
+      console.error('Ошибка сохранения выходных:', e)
+      weekendDays.value = prev
+      ui.showToast('Не удалось запомнить выходные', 'error')
+      return false
+    }
+  }
+
+  return {
+      startDay, periodLength, defaultPortions, hiddenMealTypes, weekendDays,
       household, familyMembers, loading,
-      fetchSettings, saveSettings,
+      fetchSettings, saveSettings, setHiddenMealTypes, setWeekendDays,
       generateInviteCode, joinHousehold, leaveHousehold,
       removeMember,
       transferOwnership

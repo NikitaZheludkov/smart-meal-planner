@@ -35,20 +35,59 @@ export const useAuthStore = defineStore('auth', () => {
     const userId = model?.id
     if (!userId) return
 
-    const username = (model?.username || '').toString().trim()
-    if (username) return
+    // Имя видят участники семьи. Email им не виден, поэтому если имени нет —
+    // подставляем часть email до «@» (её можно поменять в настройках)
+    const firstName = (model?.first_name || '').toString().trim()
+    if (firstName) return
 
     const email = (model?.email || '').toString().trim()
-    const nextUsername = getDefaultUsernameFromEmail(email)
-    if (!nextUsername) return
+    const nextName = getDefaultUsernameFromEmail(email)
+    if (!nextName) return
 
     try {
       const updatedUser = await withRetry(async () => {
-        return await withTimeout(pb.collection('users').update(userId, { username: nextUsername }), 15000)
+        return await withTimeout(pb.collection('users').update(userId, { first_name: nextName }), 15000)
       })
       user.value = updatedUser
     } catch (e) {
-      ui.addLog('Не удалось автоматически заполнить username', 'warn', e)
+      ui.addLog('Не удалось автоматически заполнить имя', 'warn', e)
+    }
+  }
+
+  // Мини-гайд просмотрен (версия гайда). Сохраняем в профиле — чтобы он не
+  // всплывал снова на другом устройстве — и на устройстве: на случай, если
+  // запись в профиль не прошла (нет сети)
+  const tourKey = () => `tour_seen_${pb.authStore.model?.id || ''}`
+  const markTourSeen = async (version) => {
+    try { localStorage.setItem(tourKey(), String(version)) } catch {}
+    const userId = pb.authStore.model?.id
+    if (!userId || Number(user.value?.tour_seen || 0) >= version) return
+    try {
+      user.value = await withTimeout(pb.collection('users').update(userId, { tour_seen: version }), 15000)
+    } catch (e) {
+      ui.addLog('Не удалось отметить гайд просмотренным', 'warn', e)
+    }
+  }
+  const hasSeenTour = (version) => {
+    // Профиль, сохранённый до появления гайда, поля не содержит — это
+    // давний пользователь, ему гайд сам не показываем
+    if (user.value && user.value.tour_seen === undefined) return true
+    let local = 0
+    try { local = Number(localStorage.getItem(tourKey()) || 0) } catch {}
+    return Number(user.value?.tour_seen || 0) >= version || local >= version
+  }
+
+  // Своё имя, которое видят участники семьи
+  const updateFirstName = async (name) => {
+    const userId = pb.authStore.model?.id
+    const clean = (name || '').toString().trim().slice(0, 40)
+    if (!userId || !clean) return false
+    try {
+      user.value = await withTimeout(pb.collection('users').update(userId, { first_name: clean }), 15000)
+      return true
+    } catch (e) {
+      ui.addLog('Не удалось сохранить имя', 'error', e)
+      return false
     }
   }
 
@@ -68,16 +107,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const ensureHouseholdId = async () => {
-    if (householdId.value) return householdId.value
-
-    const ownerUserId = pb.authStore.model?.id
-    if (!ownerUserId) throw new Error('Пользователь не найден')
-
+    // Семья из профиля — главный источник: после вступления в чужую семью
+    // (или возврата в свою) она меняется, и запомненный id устаревает
     const fromUser = pb.authStore.model?.household
     if (typeof fromUser === 'string' && fromUser) {
       householdId.value = fromUser
       return householdId.value
     }
+
+    if (householdId.value) return householdId.value
+
+    const ownerUserId = pb.authStore.model?.id
+    if (!ownerUserId) throw new Error('Пользователь не найден')
 
     let ownedHousehold = null
     try {
@@ -446,6 +487,9 @@ export const useAuthStore = defineStore('auth', () => {
     dismissTelegramLinkPrompt,
     init,
     refreshSession,
+    updateFirstName,
+    markTourSeen,
+    hasSeenTour,
     signIn,
     signUp,
     signInWithTelegram,

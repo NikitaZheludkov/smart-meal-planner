@@ -200,5 +200,21 @@ export const usePlanStore = defineStore('plan', () => {
     }
   }
 
-  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, updatePlanItem }
+  // Удаление нескольких записей разом — без тоста на каждую. Возвращает
+  // число удалённых; не удалившиеся возвращаются в план.
+  const removeManyFromPlan = async (ids) => {
+    const idSet = new Set(ids)
+    const removed = plan.value.filter((item) => idSet.has(item.id))
+    plan.value = plan.value.filter((item) => !idSet.has(item.id))
+
+    const results = await Promise.all(ids.map((id) => pb.collection('plan').delete(id).then(() => true).catch(() => false)))
+    const failed = new Set(ids.filter((_, i) => !results[i]))
+    if (failed.size) {
+      plan.value = [...plan.value, ...removed.filter((item) => failed.has(item.id))]
+      useUIStore().showToast('Не всё удалось удалить из плана', 'error')
+    }
+    return ids.length - failed.size
+  }
+
+  return { plan, loading, fetchPlan, addToPlan, removeFromPlan, removeManyFromPlan, updatePlanItem }
 })

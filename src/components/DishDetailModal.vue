@@ -84,6 +84,7 @@ const formData = ref({
     is_batch: false,
     batch_yield: 1,
     needs_side_dish: false,
+    cooking_method: '',
     tags: [],
     ingredients: []
 })
@@ -123,6 +124,7 @@ const serializeFormDataForCompare = (data = {}) => JSON.stringify({
     carbs: data.carbs ?? null,
     batch_yield: Number(data.batch_yield) || 1,
     needs_side_dish: !!data.needs_side_dish,
+    cooking_method: data.cooking_method || '',
     tags: Array.isArray(data.tags) ? [...data.tags] : [],
     ingredients: Array.isArray(data.ingredients)
         ? data.ingredients.map((ing) => ({
@@ -340,14 +342,28 @@ const saveIngredientAmount = (localKey) => {
     platform.haptic.notification('success')
 }
 
-const isMealTypeSelected = (id) => (formData.value.meal_type || []).includes(id)
+// Категория «Обед/Ужин» включает и выключает оба приёма сразу
+const isMealTypeSelected = (group) => group.ids.some((id) => (formData.value.meal_type || []).includes(id))
 
-const toggleMealType = (id) => {
+const toggleMealType = (group) => {
     platform.haptic.selection()
     const current = formData.value.meal_type || []
-    formData.value.meal_type = current.includes(id)
-        ? current.filter((mid) => mid !== id)
-        : [...current, id]
+    formData.value.meal_type = isMealTypeSelected(group)
+        ? current.filter((id) => !group.ids.includes(id))
+        : dictionaries.withMealPairs([...current, ...group.ids])
+}
+
+// Способ готовки — отметка, по которой потом точнее учитываем масло в КБЖУ.
+// Выбирается один; повторное нажатие снимает выбор.
+const COOKING_METHODS = [
+    { id: 'raw', emoji: '🥗', label: 'Без готовки' },
+    { id: 'boil', emoji: '🍲', label: 'Варить' },
+    { id: 'bake', emoji: '🔥', label: 'Запекать' },
+    { id: 'fry', emoji: '🍳', label: 'Жарить' }
+]
+const toggleCookingMethod = (id) => {
+    platform.haptic.selection()
+    formData.value.cooking_method = formData.value.cooking_method === id ? '' : id
 }
 
 const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
@@ -356,7 +372,20 @@ const isTagSelected = (tag) => {
     return formData.value.tags.includes(tag.id)
 }
 
+// «Много порций»: пока рецепт больше чем на 2 порции, тег стоит сам (то же
+// правило на сервере). При 1–2 порциях его можно поставить вручную.
+const manyPortionsTagId = computed(() => (dictionaries.availableTags || []).find((t) => t.name === 'Много порций')?.id || null)
+const isTagLocked = (tag) => tag.id === manyPortionsTagId.value && (formData.value.batch_yield || 1) > 2
+const syncManyPortionsTag = (oldValue, newValue) => {
+    const id = manyPortionsTagId.value
+    if (!id) return
+    const tags = formData.value.tags || []
+    if (newValue > 2 && !tags.includes(id)) formData.value.tags = [...tags, id]
+    else if (newValue <= 2 && oldValue > 2) formData.value.tags = tags.filter((t) => t !== id)
+}
+
 const toggleTag = (tag) => {
+    if (isTagLocked(tag)) return
     platform.haptic.selection()
     if (isTagSelected(tag)) {
         formData.value.tags = formData.value.tags.filter(tid => tid !== tag.id)
@@ -392,13 +421,14 @@ const initForm = (dishData) => {
     formData.value.batch_yield = Number(formData.value.batch_yield) || 1
     formData.value.is_batch = formData.value.batch_yield > 1
     formData.value.needs_side_dish = !!formData.value.needs_side_dish
+    formData.value.cooking_method = formData.value.cooking_method || ''
     
     if (!formData.value.id) {
         if (!formData.value.dish_type && dictionaries.dishTypes.length) {
             formData.value.dish_type = dictionaries.dishTypes[0].id
         }
         if (formData.value.meal_type.length === 0 && dictionaries.mealTypes.length) {
-            formData.value.meal_type = [dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id]
+            formData.value.meal_type = dictionaries.withMealPairs([dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id])
         }
         isEditing.value = true
     } else {
@@ -537,9 +567,7 @@ const getDishTypeName = computed(() => {
     return dictionaries.getDishTypeById(formData.value.dish_type)?.name || '...'
 })
 const getMealTypeName = computed(() => {
-    const names = toIdArray(formData.value.meal_type)
-        .map((id) => dictionaries.getMealTypeById(id)?.name)
-        .filter(Boolean)
+    const names = dictionaries.dishMealTypeNames(toIdArray(formData.value.meal_type))
     return names.length ? names.join(' · ') : '...'
 })
 
@@ -630,6 +658,7 @@ const requestBatchYieldChange = async (rawValue) => {
     }
 
     formData.value.batch_yield = newValue
+    syncManyPortionsTag(oldValue, newValue)
     platform.haptic.selection()
 }
 
@@ -806,12 +835,12 @@ onUnmounted(() => {
                                     <div class="text-[10px] font-bold text-slate-400 mb-1 pl-1">Вид приёма пищи <span class="font-normal">— можно выбрать несколько</span></div>
                                     <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
                                          <button
-                                            v-for="t in dictionaries.mealTypes"
+                                            v-for="t in dictionaries.dishMealTypes"
                                             :key="t.id"
-                                            @click="toggleMealType(t.id)"
+                                            @click="toggleMealType(t)"
                                             type="button"
                                             class="chip tap-effect"
-                                            :class="isMealTypeSelected(t.id) ? 'chip-active' : ''"
+                                            :class="isMealTypeSelected(t) ? 'chip-active' : ''"
                                         >
                                             {{ t.name }}
                                         </button>
@@ -827,11 +856,13 @@ onUnmounted(() => {
                                             @click="toggleTag(tag)"
                                             type="button"
                                             class="chip tap-effect"
-                                            :class="isTagSelected(tag) ? 'chip-active' : ''"
+                                            :class="[isTagSelected(tag) ? 'chip-active' : '', isTagLocked(tag) ? 'opacity-70' : '']"
+                                            :aria-disabled="isTagLocked(tag)"
                                         >
                                             {{ tag.name }}
                                         </button>
                                     </div>
+                                    <div v-if="manyPortionsTagId && (formData.batch_yield || 1) > 2" class="text-[10px] text-secondary mt-1.5 pl-1">«Много порций» стоит сам: рецепт больше чем на 2 порции</div>
                                     <div v-if="autoTagNames.length" class="text-[10px] text-secondary mt-1.5 pl-1">
                                         Автоматически по КБЖУ: {{ autoTagNames.join(' · ') }}
                                     </div>
@@ -858,6 +889,26 @@ onUnmounted(() => {
                                             class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
                                             :class="formData.needs_side_dish ? 'translate-x-5' : 'translate-x-0'"
                                         ></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Способ готовки: отметка для точного учёта масла в КБЖУ -->
+                            <div>
+                                <div class="text-[10px] font-bold text-slate-400 mb-1 pl-1">Как готовим <span class="font-normal">— для точного учёта масла в КБЖУ</span></div>
+                                <!-- Ширина по тексту, свободное место делится поровну: «Без готовки» длиннее остальных -->
+                                <div class="flex gap-[3px]">
+                                    <button
+                                        v-for="m in COOKING_METHODS"
+                                        :key="m.id"
+                                        type="button"
+                                        @click="toggleCookingMethod(m.id)"
+                                        class="chip tap-effect flex-auto !px-1 !gap-0.5 justify-center !text-[10.5px]"
+                                        :class="formData.cooking_method === m.id ? 'chip-active' : ''"
+                                        :aria-pressed="formData.cooking_method === m.id"
+                                    >
+                                        <!-- На узких экранах эмодзи прячем, чтобы все четыре подписи влезли в строку -->
+                                        <span class="text-[12px] leading-none max-[374px]:hidden">{{ m.emoji }}</span>{{ m.label }}
                                     </button>
                                 </div>
                             </div>

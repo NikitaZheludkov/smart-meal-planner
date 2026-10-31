@@ -160,9 +160,9 @@ const setMealType = (id) => {
           Все
         </button>
         <button 
-          v-for="type in dictionaries.mealTypes" 
-          :key="type.id" 
-          @click="setMealType(type.id)" 
+          v-for="type in dictionaries.dishMealTypes"
+          :key="type.id"
+          @click="setMealType(type.id)"
           class="chip tap-effect"
           :class="uiStore.dishes.activeTag === type.id ? 'chip-active' : ''"
         >

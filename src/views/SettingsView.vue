@@ -1,17 +1,22 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { usePlatformStore } from '../stores/platform'
 import { useUIStore } from '../stores/ui'
 import { useAppConfigStore } from '../stores/appConfig'
 import AdminPanel from '../components/AdminPanel.vue'
+import { useDishStore } from '../stores/dishes'
+import { useDictionariesStore } from '../stores/dictionaries'
+import { dishesToText, EXPORT_OPTIONS } from '../lib/dishExport'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const platform = usePlatformStore()
 const ui = useUIStore()
 const appConfig = useAppConfigStore()
+const dishStore = useDishStore()
+const dictionaries = useDictionariesStore()
 const showAdminPanel = ref(false)
 
 const selectedStartDay = ref(1)
@@ -25,6 +30,94 @@ onMounted(async () => {
     selectedPeriod.value = settingsStore.periodLength
     selectedPortions.value = settingsStore.defaultPortions
 })
+
+// --- ИМЯ (его видят участники семьи) ---
+const isEditingName = ref(false)
+const isSavingName = ref(false)
+const nameInput = ref('')
+const nameInputEl = ref(null)
+const startEditName = async () => {
+    nameInput.value = authStore.user?.first_name || ''
+    isEditingName.value = true
+    await nextTick()
+    nameInputEl.value?.focus()
+}
+const saveName = async () => {
+    const value = nameInput.value.trim()
+    if (!value || value === authStore.user?.first_name) {
+        isEditingName.value = false
+        return
+    }
+    isSavingName.value = true
+    const ok = await authStore.updateFirstName(value)
+    isSavingName.value = false
+    platform.haptic.notification(ok ? 'success' : 'error')
+    ui.showToast(ok ? 'Имя сохранено' : 'Не удалось сохранить имя', ok ? 'success' : 'error')
+    if (ok) {
+        isEditingName.value = false
+        settingsStore.fetchSettings().catch(() => {})
+    }
+}
+
+// --- КОПИРОВАНИЕ БЛЮД ---
+// Блюда и справочники грузим заранее: копировать в буфер нужно сразу по
+// нажатию — после долгого ожидания браузер может запретить запись в буфер
+const ensureDishData = () => Promise.all([
+    dishStore.dishes.length ? null : dishStore.fetchDishes(),
+    dictionaries.dishTypes.length ? null : dictionaries.fetchDictionaries()
+])
+onMounted(() => { ensureDishData().catch(() => {}) })
+
+// Шторка с галочками: что включить в текст. Выбор запоминаем на устройстве.
+const EXPORT_PREFS_KEY = 'dishExport.include'
+const loadExportPrefs = () => {
+    const defaults = Object.fromEntries(EXPORT_OPTIONS.map((o) => [o.id, true]))
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(EXPORT_PREFS_KEY) || '{}') } } catch { return defaults }
+}
+const exportInclude = ref(loadExportPrefs())
+watch(exportInclude, (val) => {
+    try { localStorage.setItem(EXPORT_PREFS_KEY, JSON.stringify(val)) } catch {}
+}, { deep: true })
+
+const showExportSheet = ref(false)
+const exportModalId = `settings-export-${Math.random().toString(36).slice(2)}`
+watch(showExportSheet, (open) => ui.syncModalState(exportModalId, open))
+onUnmounted(() => ui.clearModalState(exportModalId))
+
+const isLoadingDishes = ref(false)
+const openExportSheet = async () => {
+    platform.haptic.impact('light')
+    showExportSheet.value = true
+    isLoadingDishes.value = true
+    try { await ensureDishData() } catch { ui.showToast('Не удалось загрузить блюда', 'error') }
+    isLoadingDishes.value = false
+}
+
+const toggleExportOption = (id) => {
+    platform.haptic.selection()
+    exportInclude.value = { ...exportInclude.value, [id]: !exportInclude.value[id] }
+}
+
+// Текст собирается сразу при смене галочек — по нажатию «Скопировать» он
+// уже готов, и запись в буфер идёт без ожидания (иначе браузер может отказать)
+const exportText = computed(() => {
+    if (!dishStore.dishes.length) return ''
+    const tagById = new Map((dictionaries.availableTags || []).map((t) => [t.id, t.name]))
+    return dishesToText(dishStore.dishes, {
+        dishTypes: dictionaries.dishTypes,
+        mealTypeNames: dictionaries.dishMealTypeNames,
+        tagName: (id) => tagById.get(id),
+        include: exportInclude.value
+    })
+})
+
+const copyExportText = async () => {
+    if (!exportText.value) return
+    const ok = await platform.copyText(exportText.value)
+    platform.haptic.notification(ok ? 'success' : 'error')
+    ui.showToast(ok ? `Скопировано блюд: ${dishStore.dishes.length}` : 'Не удалось скопировать', ok ? 'success' : 'error')
+    if (ok) showExportSheet.value = false
+}
 
 // --- ЛОГИКА СЕМЬИ ---
 const showJoinModal = ref(false)
@@ -274,9 +367,25 @@ const periods = [
           <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
               {{ getInitials(authStore.user?.first_name || authStore.user?.username || authStore.user?.email) }}
           </div>
-          <p class="text-sm font-bold text-slate-500 truncate">
-              {{ authStore.user?.first_name || authStore.user?.username || authStore.user?.email?.split('@')[0] || 'Пользователь' }}
-          </p>
+          <form v-if="isEditingName" @submit.prevent="saveName" class="flex-1 flex items-center gap-1.5 min-w-0">
+              <input
+                  ref="nameInputEl"
+                  v-model="nameInput"
+                  maxlength="40"
+                  placeholder="Как вас зовут"
+                  class="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-slate-400"
+                  @keydown.esc="isEditingName = false"
+              />
+              <button type="submit" :disabled="isSavingName" class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 tap-effect disabled:opacity-50" aria-label="Сохранить имя">
+                  <span class="material-icons-round text-base">check</span>
+              </button>
+          </form>
+          <button v-else @click="startEditName" class="flex items-center gap-1 min-w-0 tap-effect" aria-label="Изменить имя">
+              <span class="text-sm font-bold text-slate-500 truncate">
+                  {{ authStore.user?.first_name || authStore.user?.email?.split('@')[0] || 'Пользователь' }}
+              </span>
+              <span class="material-icons-round text-sm text-slate-300 shrink-0">edit</span>
+          </button>
       </div>
     </div>
 
@@ -307,7 +416,7 @@ const periods = [
                 <div v-for="member in settingsStore.familyMembers" :key="member.id" class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
                          :class="isMe(member.id) ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">
-                        {{ getInitials(member.first_name || member.username) }}
+                        {{ getInitials(member.displayName) }}
                     </div>
                     
                     <div class="flex-1 min-w-0">
@@ -419,6 +528,23 @@ const periods = [
             </div>
           </div>
         </div>
+      </div>
+
+      <div>
+        <h3 class="card-title text-sm ml-2 mb-2">Блюда</h3>
+        <button
+          @click="openExportSheet"
+          class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center gap-3 text-left tap-effect"
+        >
+          <span class="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center shrink-0">
+            <span class="material-icons-round text-lg">content_copy</span>
+          </span>
+          <div class="flex-1 min-w-0">
+            <span class="card-title text-sm block">Скопировать блюда</span>
+            <span class="text-[10px] font-bold text-slate-400 leading-snug block mt-0.5">Списком или с составами и КБЖУ — выберите, что включить</span>
+          </div>
+          <span class="material-icons-round text-lg text-slate-300 shrink-0">chevron_right</span>
+        </button>
       </div>
 
       <div>
@@ -556,6 +682,21 @@ const periods = [
       </div>
 
       <div>
+        <h3 class="card-title text-sm ml-2 mb-2">Помощь</h3>
+        <button
+          @click="platform.haptic.impact('light'); ui.openTour()"
+          class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center gap-3 text-left tap-effect"
+        >
+          <span class="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 text-lg">🥗</span>
+          <div class="flex-1 min-w-0">
+            <span class="card-title text-sm block">Как всё устроено</span>
+            <span class="text-[10px] font-bold text-slate-400 leading-snug block mt-0.5">Короткий гайд на минуту — пройти ещё раз</span>
+          </div>
+          <span class="material-icons-round text-lg text-slate-300 shrink-0">chevron_right</span>
+        </button>
+      </div>
+
+      <div>
         <button
           @click="handleLogout"
           class="w-full bg-white p-4 rounded-[20px] shadow-sm border border-slate-100 flex items-center justify-center gap-2 tap-effect text-slate-900 font-bold text-sm"
@@ -570,6 +711,61 @@ const periods = [
     
 
     <AdminPanel :is-open="showAdminPanel" @close="showAdminPanel = false" />
+
+    <!-- Копирование блюд: галочки, предпросмотр, кнопка -->
+    <Transition name="modal">
+    <div v-if="showExportSheet" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showExportSheet = false">
+        <div class="absolute inset-0 bg-black/40 transition-opacity" @click="showExportSheet = false"></div>
+
+        <div class="sheet modal-content">
+            <div class="sheet-handle"></div>
+            <div class="sheet-header">
+                <button @click="showExportSheet = false" class="sheet-close tap-effect" aria-label="Закрыть">
+                    <span class="material-icons-round text-xl">close</span>
+                </button>
+                <div class="min-w-0">
+                    <h3 class="sheet-title">Список блюд</h3>
+                    <p class="sheet-subtitle">{{ isLoadingDishes && !dishStore.dishes.length ? 'Загружаем…' : `Все блюда: ${dishStore.dishes.length}` }}</p>
+                </div>
+                <div></div>
+            </div>
+
+            <div class="min-h-0 flex flex-col px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom,0px))] gap-3">
+                <div>
+                    <div class="text-[11px] text-secondary mb-1.5 px-1">Что добавить к названиям</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button
+                            v-for="opt in EXPORT_OPTIONS"
+                            :key="opt.id"
+                            @click="toggleExportOption(opt.id)"
+                            class="chip tap-effect"
+                            :class="exportInclude[opt.id] ? 'chip-active' : ''"
+                            role="checkbox"
+                            :aria-checked="!!exportInclude[opt.id]"
+                        >
+                            <span class="material-icons-round text-sm -ml-0.5 mr-0.5">{{ exportInclude[opt.id] ? 'check' : 'add' }}</span>
+                            {{ opt.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="min-h-0 flex-1 flex flex-col">
+                    <div class="text-[11px] text-secondary mb-1.5 px-1">Как будет выглядеть</div>
+                    <pre class="min-h-[120px] max-h-[40vh] overflow-y-auto bg-slate-50 rounded-2xl px-3.5 py-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap break-words font-sans">{{ exportText || (isLoadingDishes ? 'Загружаем блюда…' : 'Блюд пока нет') }}</pre>
+                </div>
+
+                <button
+                    @click="copyExportText"
+                    :disabled="!exportText"
+                    class="btn-primary w-full h-12 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                    <span class="material-icons-round text-lg">content_copy</span>
+                    Скопировать{{ dishStore.dishes.length ? ` · ${dishStore.dishes.length}` : '' }}
+                </button>
+            </div>
+        </div>
+    </div>
+    </Transition>
 
     <Transition name="modal">
     <div v-if="showJoinModal" class="fixed inset-0 z-[70] flex flex-col justify-end" @click.self="showJoinModal = false">

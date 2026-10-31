@@ -24,7 +24,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     { name: 'products', filter: (hhId) => `household="${hhId}"` },
     { name: 'dishes', filter: (hhId) => `household="${hhId}"` },
     { name: 'ingredients', filter: (hhId) => `household="${hhId}"` },
-    { name: 'households', filter: (hhId) => `id="${hhId}"` }
+    { name: 'households', filter: (hhId) => `id="${hhId}"` },
+    // Участники: кто-то вступил в семью или сменил имя — обновляем список
+    { name: 'users', filter: (hhId) => `household="${hhId}"` }
   ]
 
   const getRealtimeConnectedState = () => {
@@ -86,6 +88,12 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (collection === 'households') {
       if (record?.id && record.id !== hhId) return
+      requestRefresh('households')
+      return
+    }
+
+    // Список участников грузится вместе с настройками семьи
+    if (collection === 'users') {
       requestRefresh('households')
       return
     }

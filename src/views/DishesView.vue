@@ -28,7 +28,7 @@ const transitionName = ref('slide-left')
 // Получаем индекс приема пищи (все = 0)
 const getMealTypeIndex = (id) => {
   if (id === null) return 0
-  const index = dictionaries.mealTypes.findIndex(m => m.id === id)
+  const index = dictionaries.dishMealTypes.findIndex(m => m.id === id)
   return index !== -1 ? index + 1 : 0
 }
 
@@ -55,9 +55,9 @@ const showFilterModal = ref(false)
 const viewingDish = ref(null)
 const tagById = computed(() => new Map((dictionaries.availableTags || []).map((t) => [t.id, t])))
 
-// "Обед · Ужин · #Быстро · #Детское" — приёмы пищи и теги одной строкой
+// "Завтрак · Обед/Ужин · #Быстро · #С собой" — приёмы пищи и теги одной строкой
 const cardMeta = (dish) => [
-  ...(dish.meal_type || []).map((id) => dictionaries.getMealTypeById(id)?.name || '...'),
+  ...dictionaries.dishMealTypeNames(dish.meal_type),
   ...(dish.tags || []).map((id) => tagById.value.get(id)?.name).filter(Boolean).map((n) => '#' + n)
 ].join(' · ')
 
@@ -71,7 +71,7 @@ const openCreateDish = () => {
       id: null, 
       name: '',
       dish_type: uiStore.dishes.activeCategory !== 'all' ? uiStore.dishes.activeCategory : dictionaries.dishTypes[0]?.id, 
-      meal_type: [uiStore.dishes.activeTag ? uiStore.dishes.activeTag : (dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id)].filter(Boolean),
+      meal_type: dictionaries.withMealPairs([uiStore.dishes.activeTag || dictionaries.mealTypes[1]?.id || dictionaries.mealTypes[0]?.id].filter(Boolean)),
       kcal: null, protein: null, fat: null, carbs: null,
       tags: [],
       ingredients: []
@@ -122,7 +122,7 @@ const filteredDishes = computed(() => {
 
   // 2. Вид приёма пищи (Завтрак/Обед...)
   if (uiStore.dishes.activeTag) {
-    result = result.filter(d => (d.meal_type || []).includes(uiStore.dishes.activeTag))
+    result = result.filter(d => dictionaries.dishFitsSlot(d, uiStore.dishes.activeTag))
   }
 
   // 3. Вид блюда (Горячее/Салат...)
